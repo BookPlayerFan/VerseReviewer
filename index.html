@@ -6,12 +6,12 @@
   <title>Verse Review</title>
 
   <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=8">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=8">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=8">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=9">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=9">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=9">
   <link rel="manifest" href="manifest.json">
 
-  <!-- iOS PWA Settings -->
+  <!-- iOS Standalone Settings -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Verse Review">
@@ -23,8 +23,9 @@
   <style>
     :root {
       --bg-theme: #f8f9fa;
-      --top-barrier: 64px; /* Opaque barrier: drops content entirely below Dynamic Island */
-      --bottom-barrier: max(env(safe-area-inset-bottom), 16px);
+      /* 80px completely covers Dynamic Island and the entire iOS blur zone */
+      --top-barrier: 80px;
+      --bottom-barrier: max(env(safe-area-inset-bottom), 20px);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -45,14 +46,13 @@
       bottom: 0;
       width: 100%;
       height: 100%;
-      height: 100dvh;
       margin: 0;
       padding: 0;
       overflow: hidden;
       background-color: var(--bg-theme);
     }
 
-    /* 1. Opaque Shield: Completely blocks status bar and Dynamic Island frosted blur */
+    /* Solid Opaque Shield: Completely blocks status bar and Dynamic Island blur */
     .status-bar-shield {
       position: fixed;
       top: 0;
@@ -64,7 +64,7 @@
       pointer-events: none;
     }
 
-    /* 2. Fixed viewport container defeats WebKit iframe auto-shrink */
+    /* Fixed container sized to physical screen height */
     #frameContainer {
       position: fixed;
       top: var(--top-barrier);
@@ -72,7 +72,6 @@
       right: 0;
       bottom: var(--bottom-barrier);
       width: 100%;
-      height: calc(100% - var(--top-barrier) - var(--bottom-barrier));
       overflow: hidden;
       background-color: var(--bg-theme);
     }
@@ -98,22 +97,21 @@
   </div>
 
   <script>
-    // Enforce physical pixel height on iOS to defeat iframe content-collapsing
-    function enforceFrameHeight() {
-      const topH = 64;
-      const bottomH = Math.max(16, parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bottom-barrier')) || 16);
-      const trueHeight = window.innerHeight - topH - bottomH;
+    function lockFrameSize() {
+      const topH = 80;
+      const bottomH = Math.max(20, parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bottom-barrier')) || 20);
+      const trueH = window.innerHeight - topH - bottomH;
       const frame = document.getElementById('appFrame');
       const container = document.getElementById('frameContainer');
-      if (frame && trueHeight > 250) {
-        frame.style.height = trueHeight + 'px';
-        if (container) container.style.height = trueHeight + 'px';
+      if (trueH > 300) {
+        if (container) container.style.height = trueH + 'px';
+        if (frame) frame.style.height = trueH + 'px';
       }
     }
-    window.addEventListener('resize', enforceFrameHeight);
-    window.addEventListener('orientationchange', enforceFrameHeight);
-    window.addEventListener('DOMContentLoaded', enforceFrameHeight);
-    setTimeout(enforceFrameHeight, 350);
+    window.addEventListener('resize', lockFrameSize);
+    window.addEventListener('orientationchange', lockFrameSize);
+    window.addEventListener('DOMContentLoaded', lockFrameSize);
+    setTimeout(lockFrameSize, 300);
   </script>
 </body>
 </html>
