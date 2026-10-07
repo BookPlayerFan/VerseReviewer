@@ -1,0 +1,20 @@
+{
+  "name": "Verse Review",
+  "short_name": "Verse Review",
+  "start_url": "https://bookplayerfan.github.io/VerseReviewer/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=3",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=3",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
