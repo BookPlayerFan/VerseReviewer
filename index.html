@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Verse Review</title>
 
-  <!-- iOS Home Screen App Icon & Favicon -->
-  <link rel="apple-touch-icon" href="VerseReviewer.png">
-  <link rel="apple-touch-icon-precomposed" href="VerseReviewer.png">
-  <link rel="icon" type="image/png" href="VerseReviewer.png">
+  <!-- iOS Home Screen Icons (Full Absolute URLs + Cache Buster) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReviewer.png?v=2">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReviewer.png?v=2">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReviewer.png?v=2">
+
+  <!-- Web App Manifest for Modern iOS -->
+  <link rel="manifest" href="manifest.json">
 
   <!-- iOS Standalone PWA Settings -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,7 +19,7 @@
   <meta name="apple-mobile-web-app-title" content="Verse Review">
   <meta name="color-scheme" content="light dark">
 
-  <!-- Dynamic Theme Color for iOS Status Bar -->
+  <!-- Dynamic Theme Color for Status Bar -->
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fa">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
 
@@ -54,13 +57,8 @@
       background-color: var(--bg-theme);
       display: flex;
       flex-direction: column;
-
-      /* Buffer to keep status bar icons clear of text/blur */
       padding-top: max(calc(env(safe-area-inset-top) + 4px), 24px);
-
-      /* Chin gap: blends into dark or light mode */
       padding-bottom: env(safe-area-inset-bottom);
-
       transition: background-color 0.25s ease;
     }
 
@@ -75,7 +73,7 @@
   </style>
 </head>
 <body>
-  <!-- Replace with your actual Google Apps Script Web App exec URL -->
+  <!-- Ensure YOUR actual Apps Script Web App URL is here -->
   <iframe 
     src="https://script.google.com/macros/s/YOUR_ACTUAL_EXEC_ID/exec" 
     allow="clipboard-read; clipboard-write">
