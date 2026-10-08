@@ -12,9 +12,9 @@
   <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 
   <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=14">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=14">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=14">
   <link rel="manifest" href="manifest.json">
 
   <!-- Standalone PWA Settings -->
@@ -43,9 +43,13 @@
       box-sizing: border-box;
     }
 
+    /* Fixed Viewport Bounds (Defeats dvh/vh resizing fluctuations on reload) */
     html, body {
       position: fixed;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       width: 100%;
       height: 100%;
       margin: 0;
@@ -54,27 +58,29 @@
       background-color: var(--bg-theme);
     }
 
-    /* Solid Opaque Status Bar Shield */
+    /* Solid Opaque Status Bar Shield: Completely blocks Dynamic Island blur */
     .status-bar-shield {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      height: 56px;
+      height: 60px;
       background-color: var(--bg-theme);
       z-index: 1000;
       pointer-events: none;
     }
 
-    /* Direct Viewport Lock: 1:1 Pixel Mapping for iOS Hit-Testing */
+    /* 1:1 Pixel Mapping for iOS Hit-Testing */
     iframe {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      border: none;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      outline: none;
       display: block;
       background-color: var(--bg-theme);
     }
@@ -119,7 +125,7 @@
 
   <iframe 
     id="appFrame"
-    src="https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec" 
+    src="https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec?platform=mobile" 
     allow="clipboard-read; clipboard-write">
   </iframe>
 
@@ -132,14 +138,12 @@
       }
     }
 
-    // Dismiss only when the card is fully rendered inside Sidebar.html
     window.addEventListener('message', function(e) {
       if (e.data && e.data.type === 'VR_READY') {
         dismissSplash();
       }
     });
 
-    // Safety fallback
     setTimeout(dismissSplash, 4000);
   </script>
 </body>
