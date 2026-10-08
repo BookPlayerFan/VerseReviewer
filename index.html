@@ -1,146 +1,56 @@
 <!DOCTYPE html>
-<html lang="en" style="color-scheme: light dark;">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Verse Review</title>
-
-  <!-- Preconnect & Prefetch -->
-  <link rel="preconnect" href="https://script.google.com" crossorigin>
-  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-  <link rel="dns-prefetch" href="https://script.google.com">
-  <link rel="dns-prefetch" href="https://script.googleusercontent.com">
-
-  <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
-  <link rel="manifest" href="manifest.json">
-
-  <!-- Standalone PWA Settings -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Verse Review">
-  <meta name="color-scheme" content="light dark">
-
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fa">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
-
-  <style>
-    :root {
-      --bg-theme: #f8f9fa;
-      --spinner-color: #1a73e8;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-theme: #121212;
-        --spinner-color: #8ab4f8;
-      }
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html, body {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background-color: var(--bg-theme);
-    }
-
-    /* Solid Opaque Status Bar Shield */
-    .status-bar-shield {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 56px;
-      background-color: var(--bg-theme);
-      z-index: 1000;
-      pointer-events: none;
-    }
-
-    /* Direct Viewport Lock: 1:1 Pixel Mapping for iOS Hit-Testing */
-    iframe {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      border: none;
-      display: block;
-      background-color: var(--bg-theme);
-    }
-
-    /* Dark Mode Splash: Prevents White Loading Flash */
-    #splashScreen {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      background-color: var(--bg-theme);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-
-    .spinner {
-      width: 34px;
-      height: 34px;
-      border: 3px solid rgba(128, 128, 128, 0.2);
-      border-top-color: var(--spinner-color);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scripture Memory Sidebar</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="status-bar-shield"></div>
 
-  <!-- Splash Screen stays dark until app logic is visibly painted -->
-  <div id="splashScreen">
-    <div class="spinner"></div>
-  </div>
+  <aside class="sidebar-widget">
+    <div class="card-meta">
+      <span class="due-indicator">93 cards due</span>
+      <span class="badge-tag">New</span>
+    </div>
 
-  <iframe 
-    id="appFrame"
-    src="https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec" 
-    allow="clipboard-read; clipboard-write">
-  </iframe>
+    <header class="card-header">
+      <h2 class="reference-title">Philippians 3:19–21</h2>
+      <span class="level-sub">LEVEL 0 (NEW)</span>
+    </header>
 
-  <script>
-    function dismissSplash() {
-      const splash = document.getElementById('splashScreen');
-      if (splash && splash.style.display !== 'none') {
-        splash.style.opacity = '0';
-        setTimeout(() => { splash.style.display = 'none'; }, 250);
-      }
-    }
+    <div class="passage-toolbar">
+      <span id="revealCounter" class="counter-text">0 of 3 revealed</span>
+      <button id="revealAllBtn" class="btn-reveal-all" type="button">Reveal All</button>
+    </div>
 
-    // Dismiss only when the card is fully rendered inside Sidebar.html
-    window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'VR_READY') {
-        dismissSplash();
-      }
-    });
+    <div class="passage-container">
+      <p class="verse-block">
+        <sup class="verse-num">19</sup>
+        <span class="verse-mask" tabindex="0" role="button" aria-label="Verse 19">
+          Their end is destruction, their god is their belly, and they glory in their shame, with minds set on earthly things.
+        </span>
+      </p>
+      <p class="verse-block">
+        <sup class="verse-num">20</sup>
+        <span class="verse-mask" tabindex="0" role="button" aria-label="Verse 20">
+          But our citizenship is in heaven, and from it we await a Savior, the Lord Jesus Christ,
+        </span>
+      </p>
+      <p class="verse-block">
+        <sup class="verse-num">21</sup>
+        <span class="verse-mask" tabindex="0" role="button" aria-label="Verse 21">
+          who will transform our lowly body to be like his glorious body, by the power that enables him even to subject all things to himself.
+        </span>
+      </p>
+    </div>
 
-    // Safety fallback
-    setTimeout(dismissSplash, 4000);
-  </script>
+    <footer class="card-footer">
+      <button class="action-btn btn-skip" type="button">Skip</button>
+      <button class="action-btn btn-levelup" type="button">Level Up</button>
+    </footer>
+  </aside>
+
+  <script src="script.js"></script>
 </body>
 </html>
