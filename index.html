@@ -1,191 +1,146 @@
-/**
- * Bible Verse Spaced Repetition System
- * Tab: "Verses"
- * Columns: 
- *   B = Next Review Date
- *   C = Last Review Date
- *   D = Rep
- *   E = Level
- *   F = Reference
- *   H = Verse Text
- */
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: light dark;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Verse Review</title>
 
-// 1. Mobile Web App Endpoint with Inlined Data Preloading
-function doGet() {
-  const template = HtmlService.createTemplateFromFile('Sidebar');
-  template.initialCards = getDueCards();
-  return template.evaluate()
-    .setTitle('Verse Review')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
+  <!-- Preconnect & Prefetch -->
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="dns-prefetch" href="https://script.google.com">
+  <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 
-// 2. Desktop Toolbar Menu
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('Verse Review')
-    .addItem('Open Flashcard Review', 'showFlashcardSidebar')
-    .addToUi();
-}
+  <!-- iOS Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=13">
+  <link rel="manifest" href="manifest.json">
 
-// 3. Desktop Sidebar Launcher with Inlined Data Preloading
-function showFlashcardSidebar() {
-  const template = HtmlService.createTemplateFromFile('Sidebar');
-  template.initialCards = getDueCards();
-  const html = template.evaluate()
-    .setTitle('Verse Review')
-    .setWidth(360);
-  SpreadsheetApp.getUi().showSidebar(html);
-}
+  <!-- Standalone PWA Settings -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Verse Review">
+  <meta name="color-scheme" content="light dark">
 
-// Level Configurations
-const GROUP_CONFIG = {
-  0: { name: "New",               interval: 0,   repsNeeded: 1 },
-  1: { name: "Daily",             interval: 1,   repsNeeded: 4 },
-  2: { name: "2-Day",             interval: 2,   repsNeeded: 3 },
-  3: { name: "5-Day",             interval: 5,   repsNeeded: 2 },
-  4: { name: "2-Week",            interval: 12,  repsNeeded: 2 },
-  5: { name: "Monthly",           interval: 30,  repsNeeded: 2 },
-  6: { name: "Quarterly",         interval: 75,  repsNeeded: 1 },
-  7: { name: "Half-Year",         interval: 180, repsNeeded: 1 },
-  8: { name: "Mastery",           interval: 360, repsNeeded: 1 }
-};
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fa">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
 
-/**
- * Loads all due cards and Level 0 cards from "Verses".
- */
-function getDueCards() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Verses');
-  if (!sheet) return [];
+  <style>
+    :root {
+      --bg-theme: #f8f9fa;
+      --spinner-color: #1a73e8;
+    }
 
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
-
-  const data = sheet.getRange(1, 1, lastRow, 8).getValues();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const dueCards = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const nextDueRaw = data[i][1]; // Col B
-    const repRaw     = data[i][3]; // Col D
-    const groupRaw   = data[i][4]; // Col E
-    const ref        = data[i][5]; // Col F
-    const text       = data[i][7]; // Col H
-
-    if (!ref) continue;
-
-    const groupStr = String(groupRaw).trim();
-    const isGroupZero = (groupRaw === 0 || groupStr === "0") && groupRaw !== "" && groupRaw !== null;
-    const isOtherGroup = !isGroupZero && groupStr !== "" && !isNaN(Number(groupStr)) && Number(groupStr) >= 1;
-
-    let isDue = false;
-    let group = 0;
-    let rep = 1;
-
-    if (isGroupZero) {
-      isDue = true;
-      group = 0;
-      rep = Number(repRaw) || 1;
-    } else if (isOtherGroup) {
-      group = Number(groupStr);
-      rep = Number(repRaw) || 1;
-
-      if (nextDueRaw instanceof Date) {
-        const d = new Date(nextDueRaw);
-        d.setHours(0, 0, 0, 0);
-        if (d <= today) isDue = true;
-      } else if (typeof nextDueRaw === 'string' && nextDueRaw.trim() !== '') {
-        const parsed = new Date(nextDueRaw);
-        if (!isNaN(parsed.getTime())) {
-          parsed.setHours(0, 0, 0, 0);
-          if (parsed <= today) isDue = true;
-        }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-theme: #121212;
+        --spinner-color: #8ab4f8;
       }
-    } else {
-      continue;
     }
 
-    if (isDue) {
-      const groupInfo = GROUP_CONFIG[group] || GROUP_CONFIG[0];
-      dueCards.push({
-        rowIndex: i + 1,
-        reference: ref,
-        text: text || "(No verse text found in Column H)",
-        group: group,
-        groupName: groupInfo.name,
-        rep: rep,
-        repsNeeded: groupInfo.repsNeeded
-      });
+    * {
+      box-sizing: border-box;
     }
-  }
 
-  dueCards.sort((a, b) => a.group - b.group || a.rowIndex - b.rowIndex);
-  return dueCards;
-}
-
-/**
- * Fast batch write across Columns B:E.
- */
-function recordReview(rowIndex, newNextDateIso, newRep, newGroup) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Verses');
-  if (!sheet) return false;
-
-  let nextDateVal = "";
-  let lastDateVal = "";
-
-  if (newGroup > 0 && newNextDateIso) {
-    nextDateVal = new Date(newNextDateIso);
-    nextDateVal.setHours(0, 0, 0, 0);
-
-    lastDateVal = new Date();
-    lastDateVal.setHours(0, 0, 0, 0);
-  }
-
-  sheet.getRange(rowIndex, 2, 1, 4).setValues([[nextDateVal, lastDateVal, newRep, newGroup]]);
-  return true;
-}
-
-/**
- * Adds an unassigned verse to Level 0.
- */
-function addRandomNewVerse() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Verses');
-  if (!sheet) return { success: false, message: 'Sheet "Verses" not found.' };
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return { success: false, message: 'No verses found in sheet.' };
-
-  const data = sheet.getRange(1, 1, lastRow, 8).getValues();
-  const candidates = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const groupRaw = data[i][4];
-    const ref = data[i][5];
-
-    const isBlankGroup = groupRaw === "" || groupRaw === null || groupRaw === undefined;
-    if (ref && isBlankGroup) {
-      candidates.push({
-        rowIndex: i + 1,
-        reference: ref
-      });
+    html, body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: var(--bg-theme);
     }
-  }
 
-  if (candidates.length === 0) {
-    return { success: false, message: 'No unassigned verses remaining.' };
-  }
+    /* Solid Opaque Status Bar Shield */
+    .status-bar-shield {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background-color: var(--bg-theme);
+      z-index: 1000;
+      pointer-events: none;
+    }
 
-  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-  sheet.getRange(chosen.rowIndex, 2, 1, 4).setValues([["", "", 1, 0]]);
+    /* Direct Viewport Lock: 1:1 Pixel Mapping for iOS Hit-Testing */
+    iframe {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      border: none;
+      display: block;
+      background-color: var(--bg-theme);
+    }
 
-  return {
-    success: true,
-    reference: chosen.reference,
-    rowIndex: chosen.rowIndex
-  };
-}
+    /* Dark Mode Splash: Prevents White Loading Flash */
+    #splashScreen {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-theme);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 3px solid rgba(128, 128, 128, 0.2);
+      border-top-color: var(--spinner-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="status-bar-shield"></div>
+
+  <!-- Splash Screen stays dark until app logic is visibly painted -->
+  <div id="splashScreen">
+    <div class="spinner"></div>
+  </div>
+
+  <iframe 
+    id="appFrame"
+    src="https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec" 
+    allow="clipboard-read; clipboard-write">
+  </iframe>
+
+  <script>
+    function dismissSplash() {
+      const splash = document.getElementById('splashScreen');
+      if (splash && splash.style.display !== 'none') {
+        splash.style.opacity = '0';
+        setTimeout(() => { splash.style.display = 'none'; }, 250);
+      }
+    }
+
+    // Dismiss only when the card is fully rendered inside Sidebar.html
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'VR_READY') {
+        dismissSplash();
+      }
+    });
+
+    // Safety fallback
+    setTimeout(dismissSplash, 4000);
+  </script>
+</body>
+</html>
