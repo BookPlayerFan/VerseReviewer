@@ -12,9 +12,9 @@
   <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 
   <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=10">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=10">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=10">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=11">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=11">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=11">
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS Standalone Settings -->
@@ -30,7 +30,7 @@
     :root {
       --bg-theme: #f8f9fa;
       --top-barrier: 80px;
-      --bottom-barrier: max(env(safe-area-inset-bottom), 20px);
+      --bottom-barrier: max(env(safe-area-inset-bottom), 18px);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -69,20 +69,25 @@
       pointer-events: none;
     }
 
+    /* Strict CSS Anchoring: Eliminates JS height delays & hit-test displacement */
     #frameContainer {
       position: fixed;
       top: var(--top-barrier);
+      bottom: var(--bottom-barrier);
       left: 0;
       right: 0;
-      bottom: var(--bottom-barrier);
-      width: 100%;
       overflow: hidden;
       background-color: var(--bg-theme);
     }
 
     iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
+      min-height: 100%;
+      max-height: 100%;
       border: none;
       display: block;
       background-color: var(--bg-theme);
@@ -99,23 +104,5 @@
       allow="clipboard-read; clipboard-write">
     </iframe>
   </div>
-
-  <script>
-    function lockFrameSize() {
-      const topH = 80;
-      const bottomH = Math.max(20, parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bottom-barrier')) || 20);
-      const trueH = window.innerHeight - topH - bottomH;
-      const frame = document.getElementById('appFrame');
-      const container = document.getElementById('frameContainer');
-      if (trueH > 300) {
-        if (container) container.style.height = trueH + 'px';
-        if (frame) frame.style.height = trueH + 'px';
-      }
-    }
-    window.addEventListener('resize', lockFrameSize);
-    window.addEventListener('orientationchange', lockFrameSize);
-    window.addEventListener('DOMContentLoaded', lockFrameSize);
-    setTimeout(lockFrameSize, 300);
-  </script>
 </body>
 </html>
