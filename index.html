@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Verse Review</title>
 
+  <!-- High-Performance Preconnect & DNS-Prefetch Hints -->
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="dns-prefetch" href="https://script.google.com">
+  <link rel="dns-prefetch" href="https://script.googleusercontent.com">
+
   <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=9">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=9">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=9">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=10">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=10">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=10">
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS Standalone Settings -->
@@ -23,7 +29,6 @@
   <style>
     :root {
       --bg-theme: #f8f9fa;
-      /* 80px completely covers Dynamic Island and the entire iOS blur zone */
       --top-barrier: 80px;
       --bottom-barrier: max(env(safe-area-inset-bottom), 20px);
     }
@@ -52,7 +57,7 @@
       background-color: var(--bg-theme);
     }
 
-    /* Solid Opaque Shield: Completely blocks status bar and Dynamic Island blur */
+    /* Solid Opaque Shield for Status Bar / Dynamic Island */
     .status-bar-shield {
       position: fixed;
       top: 0;
@@ -64,7 +69,6 @@
       pointer-events: none;
     }
 
-    /* Fixed container sized to physical screen height */
     #frameContainer {
       position: fixed;
       top: var(--top-barrier);
