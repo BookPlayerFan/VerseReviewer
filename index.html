@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="color-scheme: light dark;">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -12,9 +12,9 @@
   <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 
   <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=11">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=11">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=11">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=12">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=12">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=12">
   <link rel="manifest" href="manifest.json">
 
   <!-- iOS Standalone Settings -->
@@ -29,13 +29,15 @@
   <style>
     :root {
       --bg-theme: #f8f9fa;
+      --spinner-color: #1a73e8;
       --top-barrier: 80px;
-      --bottom-barrier: max(env(safe-area-inset-bottom), 18px);
+      --bottom-barrier: max(env(safe-area-inset-bottom, 0px), 18px);
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
         --bg-theme: #121212;
+        --spinner-color: #8ab4f8;
       }
     }
 
@@ -57,7 +59,7 @@
       background-color: var(--bg-theme);
     }
 
-    /* Solid Opaque Shield for Status Bar / Dynamic Island */
+    /* Solid Opaque Shield for Dynamic Island / Status Bar */
     .status-bar-shield {
       position: fixed;
       top: 0;
@@ -69,7 +71,7 @@
       pointer-events: none;
     }
 
-    /* Strict CSS Anchoring: Eliminates JS height delays & hit-test displacement */
+    /* Stable CSS Viewport Anchoring (No JS Resizing) */
     #frameContainer {
       position: fixed;
       top: var(--top-barrier);
@@ -86,11 +88,43 @@
       left: 0;
       width: 100%;
       height: 100%;
-      min-height: 100%;
-      max-height: 100%;
       border: none;
       display: block;
       background-color: var(--bg-theme);
+    }
+
+    /* Dark Mode Splash Screen: Blocks white iframe loading flash */
+    #splashLoader {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--bg-theme);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+
+    #splashLoader.fade-out {
+      opacity: 0;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(128, 128, 128, 0.2);
+      border-top-color: var(--spinner-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -98,11 +132,32 @@
   <div class="status-bar-shield"></div>
 
   <div id="frameContainer">
+    <!-- Splash screen covers the iframe during Google's white redirect -->
+    <div id="splashLoader">
+      <div class="spinner"></div>
+    </div>
+
     <iframe 
       id="appFrame"
       src="https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec" 
+      scrolling="no"
+      onload="hideSplash()"
       allow="clipboard-read; clipboard-write">
     </iframe>
   </div>
+
+  <script>
+    function hideSplash() {
+      const loader = document.getElementById('splashLoader');
+      if (loader) {
+        loader.classList.add('fade-out');
+        setTimeout(() => {
+          if (loader.parentNode) loader.parentNode.removeChild(loader);
+        }, 300);
+      }
+    }
+    // Safety fallback to guarantee splash dismisses if iframe load event stalls
+    setTimeout(hideSplash, 3500);
+  </script>
 </body>
 </html>
