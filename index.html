@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Verse Review</title>
 
-  <!-- Preconnect & Prefetch -->
+  <!-- Preconnect & Prefetch Hints -->
   <link rel="preconnect" href="https://script.google.com" crossorigin>
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
   <link rel="dns-prefetch" href="https://script.google.com">
   <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 
   <!-- iOS Icons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=14">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=14">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=14">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=15">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=15">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=15">
   <link rel="manifest" href="manifest.json">
 
-  <!-- Standalone PWA Settings -->
+  <!-- Native Opaque Status Bar Setup -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Verse Review">
   <meta name="color-scheme" content="light dark">
 
@@ -43,13 +43,9 @@
       box-sizing: border-box;
     }
 
-    /* Fixed Viewport Bounds (Defeats dvh/vh resizing fluctuations on reload) */
     html, body {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      inset: 0;
       width: 100%;
       height: 100%;
       margin: 0;
@@ -58,19 +54,6 @@
       background-color: var(--bg-theme);
     }
 
-    /* Solid Opaque Status Bar Shield: Completely blocks Dynamic Island blur */
-    .status-bar-shield {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 60px;
-      background-color: var(--bg-theme);
-      z-index: 1000;
-      pointer-events: none;
-    }
-
-    /* 1:1 Pixel Mapping for iOS Hit-Testing */
     iframe {
       position: fixed;
       top: 0;
@@ -85,7 +68,6 @@
       background-color: var(--bg-theme);
     }
 
-    /* Dark Mode Splash: Prevents White Loading Flash */
     #splashScreen {
       position: fixed;
       inset: 0;
@@ -116,9 +98,6 @@
   </style>
 </head>
 <body>
-  <div class="status-bar-shield"></div>
-
-  <!-- Splash Screen stays dark until app logic is visibly painted -->
   <div id="splashScreen">
     <div class="spinner"></div>
   </div>
