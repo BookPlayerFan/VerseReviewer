@@ -224,6 +224,39 @@
       margin-bottom: 6px;
     }
 
+    /* Rank badge shown under the verse reference: Bronze > Silver > Gold > ... > Diamond */
+    .rank-badge {
+      --rc: var(--rl);
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.9px;
+      color: var(--rc);
+      border: 1px solid var(--rc);
+      background: transparent;
+    }
+    @supports (background: color-mix(in srgb, red 10%, transparent)) {
+      .rank-badge {
+        background: color-mix(in srgb, var(--rc) 14%, transparent);
+        border-color: color-mix(in srgb, var(--rc) 40%, transparent);
+      }
+    }
+    .rank-badge.is-new { --rc: var(--text-meta); font-weight: 700; }
+    .rank-1 { --rl: #a8643a; --rd: #d9945f; }
+    .rank-2 { --rl: #7b8794; --rd: #b8c2cc; }
+    .rank-3 { --rl: #b88a00; --rd: #f2c94c; }
+    .rank-4 { --rl: #5b6b8c; --rd: #aebbd9; }
+    .rank-5 { --rl: #138a55; --rd: #4fd18e; }
+    .rank-6 { --rl: #c62847; --rd: #ff7088; }
+    .rank-7 { --rl: #2754c5; --rd: #7da2ff; }
+    .rank-8 { --rl: #0e92b8; --rd: #6fe0ff; }
+    @media (prefers-color-scheme: dark) {
+      .rank-badge { --rc: var(--rd); }
+      .rank-badge.is-new { --rc: var(--text-meta); }
+    }
+
     .meta-tag.is-lapse-badge {
       color: var(--text-lapse);
       font-weight: 700;
@@ -759,21 +792,32 @@
     // Review intervals live on the server, which computes every due date.
     const GROUP_CONFIG = {
       0: { name: "New",       repsNeeded: 1 },
-      1: { name: "Daily",     repsNeeded: 4 },
-      2: { name: "2-Day",     repsNeeded: 3 },
-      3: { name: "5-Day",     repsNeeded: 2 },
-      4: { name: "2-Week",    repsNeeded: 2 },
-      5: { name: "Monthly",   repsNeeded: 2 },
-      6: { name: "Quarterly", repsNeeded: 1 },
-      7: { name: "Half-Year", repsNeeded: 1 },
-      8: { name: "Mastery",   repsNeeded: 1 }
+      1: { name: "Bronze",     repsNeeded: 4 },
+      2: { name: "Silver",     repsNeeded: 3 },
+      3: { name: "Gold",     repsNeeded: 2 },
+      4: { name: "Platinum",    repsNeeded: 2 },
+      5: { name: "Emerald",   repsNeeded: 2 },
+      6: { name: "Ruby", repsNeeded: 1 },
+      7: { name: "Sapphire", repsNeeded: 1 },
+      8: { name: "Diamond",   repsNeeded: 1 }
     };
+
+    // Level names, shown as a badge under each verse. Level 0 is simply "New".
+    const RANK_NAMES = ["New", "Bronze", "Silver", "Gold", "Platinum", "Emerald", "Ruby", "Sapphire", "Diamond"];
+    function rankName(g) { return RANK_NAMES[Math.max(0, Math.min(8, g | 0))]; }
+    function setRankBadge(metaTag, g) {
+      metaTag.textContent = "";
+      const b = document.createElement("span");
+      b.className = "rank-badge " + (g > 0 ? "rank-" + Math.min(8, g) : "is-new");
+      b.textContent = rankName(g);
+      metaTag.appendChild(b);
+    }
 
     const RESTART_LABEL = "Try again";
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-5';
+    const CLIENT_BUILD = 'sync-6';
 
     let queue = [];
     let currentIndex = 0;
@@ -1339,7 +1383,7 @@
       const fastTrackTarget = getFastTrackTarget(card);
 
       if (card.isLapse) {
-        metaTag.textContent = `Lapse Retry (Level ${card.group})`;
+        metaTag.textContent = `Lapse Retry · ${rankName(card.group)}`;
         metaTag.classList.add("is-lapse-badge");
         btnFailText.textContent = "Repeat";
         btnPassText.textContent = "Clear";
@@ -1348,7 +1392,7 @@
         if (failBadge) failBadge.textContent = "REPEAT";
       } else if (fastTrackTarget) {
         // ⚡ Fast-Track Recovery Mode
-        metaTag.textContent = `⚡ Fast-Track (L${fastTrackTarget} Recovery)`;
+        metaTag.textContent = `⚡ Fast-Track · back to ${rankName(fastTrackTarget)}`;
         metaTag.classList.add("is-fasttrack-badge");
         btnFailText.textContent = "Fail";
         btnPassText.textContent = "Pass";
@@ -1356,16 +1400,16 @@
         if (passBadge) passBadge.textContent = "RESTORE";
         if (failBadge) failBadge.textContent = "FAIL";
 
-        pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass Restores Level ${fastTrackTarget}">✦</span>`;
+        pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
       } else if (card.group === 0) {
-        metaTag.textContent = "Level 0 (New)";
+        setRankBadge(metaTag, 0);
         btnFailText.textContent = "Skip";
         btnPassText.textContent = "Level Up";
         btnFail.style.display = "flex";
         if (passBadge) passBadge.textContent = "LEVEL UP";
         if (failBadge) failBadge.textContent = "SKIP";
       } else {
-        metaTag.textContent = `Level ${card.group} (${card.groupName})`;
+        setRankBadge(metaTag, card.group);
         btnFailText.textContent = "Fail";
         btnPassText.textContent = "Pass";
         btnFail.style.display = "none";
@@ -1504,7 +1548,7 @@
       let ms = 160;
 
       if (action === "Pass") {
-        notice.textContent = "🎉 Promoted to Level 1 (Daily)!";
+        notice.textContent = "🎉 Promoted to Bronze!";
         learningCards.splice(learningIndex, 1);
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
         enqueueSubmit(
@@ -1652,12 +1696,12 @@
       animateOut(action);
 
       if (isFastTrackRestored) {
-        notice.textContent = `⚡ Memory Verified! Restored to Level ${newGroup} (${nextConfig.name})`;
+        notice.textContent = `⚡ Memory Verified! Restored to ${nextConfig.name}`;
         advanceAfter(750);
       } else if (graduated) {
         notice.textContent = card.group === 0
-          ? `🎉 Promoted to Level 1 (${nextConfig.name})!`
-          : `🎉 Graduated to Level ${newGroup} (${nextConfig.name})!`;
+          ? `🎉 Promoted to ${nextConfig.name}!`
+          : `🎉 Moved up to ${nextConfig.name}!`;
         advanceAfter(650);
       } else if (action === "Fail" && card.group > 0) {
         notice.textContent = "Added to end of queue";

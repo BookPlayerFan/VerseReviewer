@@ -35,14 +35,14 @@ const BUILD = 'sync-5'; // shown in the app's status readout (tap the "Card x of
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
   0: { name: "New",               interval: 0,   repsNeeded: 1 },
-  1: { name: "Daily",             interval: 1,   repsNeeded: 4 },
-  2: { name: "2-Day",             interval: 2,   repsNeeded: 3 },
-  3: { name: "5-Day",             interval: 5,   repsNeeded: 2 },
-  4: { name: "2-Week",            interval: 12,  repsNeeded: 2 },
-  5: { name: "Monthly",           interval: 30,  repsNeeded: 2 },
-  6: { name: "Quarterly",         interval: 75,  repsNeeded: 1 },
-  7: { name: "Half-Year",         interval: 180, repsNeeded: 1 },
-  8: { name: "Mastery",           interval: 360, repsNeeded: 1 }
+  1: { name: "Bronze",             interval: 1,   repsNeeded: 4 },
+  2: { name: "Silver",             interval: 2,   repsNeeded: 3 },
+  3: { name: "Gold",             interval: 5,   repsNeeded: 2 },
+  4: { name: "Platinum",            interval: 12,  repsNeeded: 2 },
+  5: { name: "Emerald",           interval: 30,  repsNeeded: 2 },
+  6: { name: "Ruby",         interval: 75,  repsNeeded: 1 },
+  7: { name: "Sapphire",         interval: 180, repsNeeded: 1 },
+  8: { name: "Diamond",           interval: 360, repsNeeded: 1 }
 };
 
 const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
