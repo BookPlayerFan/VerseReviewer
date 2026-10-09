@@ -102,11 +102,21 @@
     <div class="spinner"></div>
   </div>
 
-  <iframe 
-    id="appFrame"
-    src="https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec?platform=mobile" 
-    allow="clipboard-read; clipboard-write">
-  </iframe>
+  <iframe id="appFrame"></iframe>
+
+  <script>
+    var APP_URL = "https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec";
+
+    // Optional access key: only used if you add a VR_KEY script property in Apps Script.
+    // It is stored on this device only, never in this public file.
+    function loadApp() {
+      var key = "";
+      try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
+      var url = APP_URL + "?platform=mobile" + (key ? "&key=" + encodeURIComponent(key) : "");
+      document.getElementById("appFrame").src = url;
+    }
+    loadApp();
+  </script>
 
   <script>
     function dismissSplash() {
@@ -118,8 +128,17 @@
     }
 
     window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'VR_READY') {
+      if (!e.data) return;
+
+      if (e.data.type === 'VR_READY') {
         dismissSplash();
+      } else if (e.data.type === 'VR_AUTH_REQUIRED') {
+        dismissSplash();
+        var entered = window.prompt("Enter your access key");
+        if (entered) {
+          try { localStorage.setItem("vr_key", entered.trim()); } catch (err) {}
+          loadApp();
+        }
       }
     });
 
