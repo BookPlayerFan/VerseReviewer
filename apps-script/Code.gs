@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-8'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-9'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -548,6 +548,63 @@ function sanitizeStats_(st) {
  * A scored card also records what is needed to undo it (see undoLast). Switching between
  * the Review and Learning screens does not.
  */
+// ───────────── Review log ─────────────
+// Every scored card is added as a row on a "Log" tab (created automatically on first use).
+// Nothing in the app reads it yet; it is for looking back on later. A logging problem never blocks a review.
+const LOG_HEADERS = ['Time', 'Date', 'Reference', 'Result', 'Level Before', 'Level After', 'Rep Before', 'Rep After', 'Try Today', 'Same-Day Repeat'];
+const LOG_SHEET = 'Log';
+
+function getLogSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LOG_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(LOG_SHEET);
+    sheet.appendRow(LOG_HEADERS);
+    try { sheet.setFrozenRows(1); } catch (e) {}
+    try { sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd hh:mm:ss'); } catch (e) {}
+    try { sheet.getRange('B:B').setNumberFormat('yyyy-mm-dd'); } catch (e) {}
+  }
+  return sheet;
+}
+
+// info: { ref, result, lb, la, rb, ra, tries, repeat }. Returns { t, f } so Undo can remove the row.
+function logEvent_(info) {
+  try {
+    const sheet = getLogSheet_();
+    const now = new Date();
+    sheet.appendRow([
+      now, today_(), info.ref, info.result,
+      info.lb, info.la, info.rb, info.ra,
+      info.tries, info.repeat ? 'Yes' : ''
+    ]);
+    return { t: now.getTime(), f: info.ref };
+  } catch (e) {
+    console.error('Log write failed: ' + e);
+    return null;
+  }
+}
+
+function unlogEvent_(logRef) {
+  try {
+    if (!logRef) return;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
+    if (!sheet) return;
+    const last = sheet.getLastRow();
+    const first = Math.max(2, last - 40);
+    if (last < first) return;
+    const vals = sheet.getRange(first, 1, last - first + 1, 3).getValues();
+    for (let i = vals.length - 1; i >= 0; i--) {
+      const t = vals[i][0] instanceof Date ? vals[i][0].getTime() : Number(vals[i][0]);
+      if (t === logRef.t && cleanRef_(vals[i][2]) === logRef.f) {
+        sheet.deleteRow(first + i);
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('Log undo failed: ' + e);
+  }
+}
+
 function submitReview(expectedVersion, review, next) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000); // throws on timeout; the client keeps the review and offers a retry
@@ -575,6 +632,7 @@ function submitReview(expectedVersion, review, next) {
 
     const prev = { idx: s.currentIndex, qlen: s.queue.length, stats: s.stats, processed: s.processed };
     const isScore = !!review || idx !== prev.idx || queue.length !== prev.qlen;
+    const prevCard = s.queue[s.currentIndex] || null;
 
     s.queue = queue;
     s.currentIndex = idx;
@@ -583,6 +641,34 @@ function submitReview(expectedVersion, review, next) {
     s.stats = sanitizeStats_(next.stats);
     s.mode = (next.mode === 'learning') ? 'learning' : 'review';
     s.version++;
+
+    let logRef = null;
+    if (isScore) {
+      const pushed = Math.max(0, queue.length - prev.qlen);
+      const ref = review ? cleanRef_(review.reference) : (prevCard ? prevCard.f : '');
+      if (ref) {
+        if (!s.tries) s.tries = {};
+        s.tries[ref] = (s.tries[ref] || 0) + 1;
+        let info;
+        if (review && written) {
+          const lb = Number(written.before[3]) || 0;
+          info = {
+            ref: ref,
+            result: lb === 0 ? 'Level Up' : (pushed > 0 ? 'Fail' : 'Pass'),
+            lb: lb, la: Number(review.group), rb: Number(written.before[2]) || 0, ra: Number(review.rep),
+            tries: s.tries[ref], repeat: false
+          };
+        } else if (prevCard) {
+          info = {
+            ref: ref,
+            result: pushed > 0 ? 'Fail' : 'Pass',
+            lb: prevCard.g, la: prevCard.g, rb: prevCard.p, ra: prevCard.p,
+            tries: s.tries[ref], repeat: true
+          };
+        }
+        if (info) logRef = logEvent_(info);
+      }
+    }
 
     let undoId = null;
     if (isScore) {
@@ -594,7 +680,9 @@ function submitReview(expectedVersion, review, next) {
         pushed: Math.max(0, queue.length - prev.qlen),
         stats: prev.stats,
         processed: prev.processed,
-        row: written
+        row: written,
+        log: logRef,
+        tryRef: logRef ? logRef.f : null
       };
     }
 
@@ -637,6 +725,9 @@ function undoLast(undoId) {
         }
       }
     }
+
+    unlogEvent_(u.log);
+    if (u.tryRef && s.tries && s.tries[u.tryRef]) s.tries[u.tryRef]--;
 
     for (let i = 0; i < u.pushed; i++) s.queue.pop();
     s.currentIndex = u.idx;
