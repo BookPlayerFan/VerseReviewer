@@ -244,6 +244,29 @@
       }
     }
     .rank-badge.is-new { --rc: var(--text-meta); font-weight: 700; }
+    .rank-badge.pop { animation: rankPop 0.5s ease-out both; }
+    .rank-badge.pop-big { animation: rankPop 0.8s ease-out both; font-size: 13px; padding: 3px 14px; }
+    @keyframes rankPop {
+      0%   { transform: scale(0.7); opacity: 0; }
+      55%  { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .rank-arrow { color: var(--text-meta); margin: 0 6px; font-weight: 600; }
+    .notice .rank-badge { vertical-align: middle; }
+
+    /* "Your ranks" screen (reuses the full-screen sheet used by the verse picker) */
+    .ranks-total { font-size: 13px; color: var(--text-muted); margin: 0 0 8px; }
+    .rank-row { display: flex; align-items: center; justify-content: space-between; width: 100%;
+      background: none; border: 0; box-shadow: none; min-height: 0; padding: 12px 4px;
+      border-bottom: 1px solid var(--border-card); flex-direction: row; border-radius: 0; }
+    .rank-row .rank-count { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .rank-row.zero .rank-count { color: var(--text-meta); font-weight: 500; }
+    .rank-refs { padding: 6px 4px 10px 8px; font-size: 14px; line-height: 1.6; color: var(--text-muted);
+      border-bottom: 1px solid var(--border-card); }
+
+    .link-quiet { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
+      padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text-muted); align-self: center; }
+
     .rank-1 { --rl: #a8643a; --rd: #d9945f; }
     .rank-2 { --rl: #7b8794; --rd: #b8c2cc; }
     .rank-3 { --rl: #b88a00; --rd: #f2c94c; }
@@ -774,8 +797,18 @@
         <button type="button" class="btn-restart" id="btnRestart" onclick="restartSession()" style="display: none;">
           Try again
         </button>
+        <button type="button" class="link-quiet" id="btnRanks" onclick="openRanks()" style="display: none;">Your ranks</button>
       </div>
     </div>
+  </div>
+
+  <div class="picker" id="ranksView">
+    <div class="picker-head">
+      <span class="picker-title">Your ranks</span>
+      <button type="button" class="picker-close" onclick="closeRanks()">Close</button>
+    </div>
+    <div class="ranks-total" id="ranksTotal"></div>
+    <div class="picker-list" id="ranksList"></div>
   </div>
 
   <div class="picker" id="picker">
@@ -813,11 +846,83 @@
       metaTag.appendChild(b);
     }
 
+    function makePill(g, popClass) {
+      const b = document.createElement("span");
+      b.className = "rank-badge " + (g > 0 ? "rank-" + Math.min(8, g) : "is-new") + (popClass ? " " + popClass : "");
+      b.textContent = rankName(g);
+      return b;
+    }
+
+    // Brief rank-up moment in the toast: old badge, arrow, new badge popping in. Diamond gets a bigger one.
+    function showRankUp(fromG, toG, restored) {
+      const el = document.getElementById("toastNotice");
+      el.textContent = "";
+      if (restored) {
+        el.appendChild(document.createTextNode("Restored to "));
+      } else if (fromG >= 0) {
+        el.appendChild(makePill(fromG));
+        const a = document.createElement("span");
+        a.className = "rank-arrow";
+        a.textContent = "→";
+        el.appendChild(a);
+      }
+      el.appendChild(makePill(toG, toG >= 8 ? "pop-big" : "pop"));
+      if (toG >= 8) el.appendChild(document.createTextNode("  Top rank"));
+    }
+
+    function openRanks() {
+      const box = document.getElementById("ranksList");
+      document.getElementById("ranksView").classList.add("open");
+      document.getElementById("ranksTotal").textContent = "Loading…";
+      box.textContent = "";
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !Array.isArray(res.ranks)) { document.getElementById("ranksTotal").textContent = "Couldn't load."; return; }
+          renderRanks(res.ranks);
+        })
+        .withFailureHandler(function() {
+          document.getElementById("ranksTotal").textContent = "Couldn't load.";
+        })
+        .getRankCollection();
+    }
+
+    function closeRanks() {
+      document.getElementById("ranksView").classList.remove("open");
+    }
+
+    function renderRanks(ranks) {
+      const box = document.getElementById("ranksList");
+      box.textContent = "";
+      let total = 0;
+      for (let g = 1; g <= 8; g++) total += (ranks[g] || []).length;
+      document.getElementById("ranksTotal").textContent = total + (total === 1 ? " verse" : " verses") + " ranked";
+      for (let g = 8; g >= 1; g--) {
+        const refs = ranks[g] || [];
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "rank-row" + (refs.length ? "" : " zero");
+        row.appendChild(makePill(g));
+        const n = document.createElement("span");
+        n.className = "rank-count";
+        n.textContent = refs.length;
+        row.appendChild(n);
+        box.appendChild(row);
+        if (refs.length) {
+          const list = document.createElement("div");
+          list.className = "rank-refs";
+          list.style.display = "none";
+          list.textContent = refs.join(" · ");
+          box.appendChild(list);
+          row.onclick = function() { list.style.display = list.style.display === "none" ? "block" : "none"; };
+        }
+      }
+    }
+
     const RESTART_LABEL = "Try again";
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-6';
+    const CLIENT_BUILD = 'sync-7';
 
     let queue = [];
     let currentIndex = 0;
@@ -1136,6 +1241,8 @@
         document.getElementById("btnAddVerse").style.display === "none" &&
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
+      const rb = document.getElementById("btnRanks");
+      if (rb) rb.style.display = onComplete ? "flex" : "none";
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       el.textContent = tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow";
       el.style.display = "block";
@@ -1548,14 +1655,14 @@
       let ms = 160;
 
       if (action === "Pass") {
-        notice.textContent = "🎉 Promoted to Bronze!";
+        showRankUp(0, 1, false);
         learningCards.splice(learningIndex, 1);
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
         enqueueSubmit(
           { rowIndex: card.rowIndex, reference: card.reference, rep: 1, group: 1 },
           snapshot(currentIndex)
         );
-        ms = 650;
+        ms = 800;
       } else if (learningIndex < learningCards.length - 1) {
         learningIndex++;
       } else {
@@ -1696,13 +1803,11 @@
       animateOut(action);
 
       if (isFastTrackRestored) {
-        notice.textContent = `⚡ Memory Verified! Restored to ${nextConfig.name}`;
-        advanceAfter(750);
+        showRankUp(card.group, newGroup, true);
+        advanceAfter(850);
       } else if (graduated) {
-        notice.textContent = card.group === 0
-          ? `🎉 Promoted to ${nextConfig.name}!`
-          : `🎉 Moved up to ${nextConfig.name}!`;
-        advanceAfter(650);
+        showRankUp(card.group, newGroup, false);
+        advanceAfter(newGroup >= 8 ? 1100 : 750);
       } else if (action === "Fail" && card.group > 0) {
         notice.textContent = "Added to end of queue";
         advanceAfter(320);

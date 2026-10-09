@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-5'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-7'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -692,4 +692,21 @@ function addChosenVerse(rowIndex, reference) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// For the "Your ranks" screen: the references at each of the 8 ranked levels (Level 0 is not included).
+function getRankCollection() {
+  const data = readSheetData_();
+  const ranks = [];
+  for (let g = 0; g <= MAX_GROUP; g++) ranks.push([]);
+  for (let i = 1; i < data.length; i++) {
+    const ref = cleanRef_(data[i][5]);
+    if (!ref) continue;
+    const raw = data[i][4];
+    const str = String(raw === null || raw === undefined ? '' : raw).trim();
+    if (str === '' || isNaN(Number(str))) continue;
+    const g = Math.min(MAX_GROUP, Math.floor(Number(str)));
+    if (g >= 1) ranks[g].push(ref);
+  }
+  return { ranks: ranks };
 }
