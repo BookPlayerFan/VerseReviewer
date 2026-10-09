@@ -1179,7 +1179,7 @@
       if (!chip) return;
       // Always shown: it names the screen you're on, and tapping it switches to the other one.
       const learning = (mode === 'learning');
-      chip.textContent = learning ? "New Verse" : "Review";
+      chip.textContent = "New Verse";
       chip.classList.toggle("active", learning);
       chip.style.display = "inline-flex";
     }
@@ -1680,7 +1680,7 @@
       setSummaryButtons(false, false);
       renderTomorrowNote();
 
-      progressLabel.textContent = "Session Complete";
+      progressLabel.textContent = "";
       statusLabel.textContent = "All Done 🎉";
       progressFill.style.width = "100%";
 
