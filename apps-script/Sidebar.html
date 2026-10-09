@@ -248,9 +248,9 @@
     .rank-2 { --rl: #7b8794; --rd: #b8c2cc; }
     .rank-3 { --rl: #b88a00; --rd: #f2c94c; }
     .rank-4 { --rl: #5b6b8c; --rd: #aebbd9; }
-    .rank-5 { --rl: #138a55; --rd: #4fd18e; }
-    .rank-6 { --rl: #c62847; --rd: #ff7088; }
-    .rank-7 { --rl: #2754c5; --rd: #7da2ff; }
+    .rank-5 { --rl: #2754c5; --rd: #7da2ff; }
+    .rank-6 { --rl: #138a55; --rd: #4fd18e; }
+    .rank-7 { --rl: #c62847; --rd: #ff7088; }
     .rank-8 { --rl: #0e92b8; --rd: #6fe0ff; }
     @media (prefers-color-scheme: dark) {
       .rank-badge { --rc: var(--rd); }
@@ -796,14 +796,14 @@
       2: { name: "Silver",     repsNeeded: 3 },
       3: { name: "Gold",     repsNeeded: 2 },
       4: { name: "Platinum",    repsNeeded: 2 },
-      5: { name: "Emerald",   repsNeeded: 2 },
-      6: { name: "Ruby", repsNeeded: 1 },
-      7: { name: "Sapphire", repsNeeded: 1 },
+      5: { name: "Sapphire",   repsNeeded: 2 },
+      6: { name: "Emerald", repsNeeded: 1 },
+      7: { name: "Ruby", repsNeeded: 1 },
       8: { name: "Diamond",   repsNeeded: 1 }
     };
 
     // Level names, shown as a badge under each verse. Level 0 is simply "New".
-    const RANK_NAMES = ["New", "Bronze", "Silver", "Gold", "Platinum", "Emerald", "Ruby", "Sapphire", "Diamond"];
+    const RANK_NAMES = ["New", "Bronze", "Silver", "Gold", "Platinum", "Sapphire", "Emerald", "Ruby", "Diamond"];
     function rankName(g) { return RANK_NAMES[Math.max(0, Math.min(8, g | 0))]; }
     function setRankBadge(metaTag, g) {
       metaTag.textContent = "";

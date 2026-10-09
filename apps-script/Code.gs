@@ -39,9 +39,9 @@ const GROUP_CONFIG = {
   2: { name: "Silver",             interval: 2,   repsNeeded: 3 },
   3: { name: "Gold",             interval: 5,   repsNeeded: 2 },
   4: { name: "Platinum",            interval: 12,  repsNeeded: 2 },
-  5: { name: "Emerald",           interval: 30,  repsNeeded: 2 },
-  6: { name: "Ruby",         interval: 75,  repsNeeded: 1 },
-  7: { name: "Sapphire",         interval: 180, repsNeeded: 1 },
+  5: { name: "Sapphire",           interval: 30,  repsNeeded: 2 },
+  6: { name: "Emerald",         interval: 75,  repsNeeded: 1 },
+  7: { name: "Ruby",         interval: 180, repsNeeded: 1 },
   8: { name: "Diamond",           interval: 360, repsNeeded: 1 }
 };
 
