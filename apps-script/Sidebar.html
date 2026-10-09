@@ -1,0 +1,2006 @@
+<!DOCTYPE html>
+<html style="color-scheme: light dark;">
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fa">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
+
+  <style>
+    :root {
+      --bg-page: #f8f9fa;
+      --bg-card: #ffffff;
+      --bg-body: #f8f9fa;
+      --border-card: #dadce0;
+      --border-body: #e8eaed;
+      
+      --text-primary: #202124;
+      --text-muted: #5f6368;
+      --text-meta: #70757a;
+      --text-accent: #1a73e8;
+      --text-lapse: #d97706;
+      --text-fasttrack: #b45309;
+      --badge-lapse-bg: #fef3c7;
+      --badge-fasttrack-bg: #fef3c7;
+      --badge-version-bg: rgba(95, 99, 104, 0.12);
+      --btn-fail-bg: #fce8e6;
+      --btn-fail-text: #c5221f;
+      --btn-pass-bg: #e6f4ea;
+      --btn-pass-text: #137333;
+      --btn-restart-bg: #e8f0fe;
+      --btn-restart-text: #1a73e8;
+      --badge-pass: #137333;
+      --badge-fail: #c5221f;
+      --card-shadow: rgba(0, 0, 0, 0.06);
+
+      --spoiler-bg: rgba(120, 120, 120, 0.28);
+      --spoiler-blur: 8px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-page: #121212;
+        --bg-card: #1e1e1e;
+        --bg-body: #28292a;
+        --border-card: #38383a;
+        --border-body: #3c4043;
+        
+        --text-primary: #f1f3f4;
+        --text-muted: #9aa0a6;
+        --text-meta: #9aa0a6;
+        --text-accent: #8ab4f8;
+        --text-lapse: #fbbf24;
+        --text-fasttrack: #fcd34d;
+        --badge-lapse-bg: #451a03;
+        --badge-fasttrack-bg: #451a03;
+        --badge-version-bg: rgba(255, 255, 255, 0.12);
+        --btn-fail-bg: #4a1d1b;
+        --btn-fail-text: #f28b82;
+        --btn-pass-bg: #133a22;
+        --btn-pass-text: #81c995;
+        --btn-restart-bg: #1e3a5f;
+        --btn-restart-text: #8ab4f8;
+        --badge-pass: #81c995;
+        --badge-fail: #f28b82;
+        --card-shadow: rgba(0, 0, 0, 0.4);
+
+        --spoiler-bg: rgba(255, 255, 255, 0.22);
+        --spoiler-blur: 8px;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      box-sizing: border-box;
+      background-color: var(--bg-page);
+    }
+
+    body {
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      padding-top: max(env(safe-area-inset-top, 0px), 8px);
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+      padding-left: max(env(safe-area-inset-left, 0px), 12px);
+      padding-right: max(env(safe-area-inset-right, 0px), 12px);
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      padding: 0 4px;
+      font-weight: 500;
+      flex-shrink: 0;
+      height: 20px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 3px;
+      background: var(--border-card);
+      border-radius: 2px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--text-accent);
+      border-radius: 2px;
+      transition: width 0.25s ease;
+    }
+
+    #deckContainer {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+
+    .card {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      padding: 16px 14px 12px 14px;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 4px 14px var(--card-shadow);
+      touch-action: pan-y;
+      will-change: transform, opacity;
+      box-sizing: border-box;
+      min-height: 0;
+    }
+
+    .swipe-badge {
+      position: absolute;
+      top: 18px;
+      padding: 6px 14px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 8px;
+      text-transform: uppercase;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+      transition: opacity 0.1s ease;
+    }
+
+    .badge-pass { left: 18px; color: var(--badge-pass); border: 3px solid var(--badge-pass); transform: rotate(-12deg); }
+    .badge-fail { right: 18px; color: var(--badge-fail); border: 3px solid var(--badge-fail); transform: rotate(12deg); }
+
+    .card-header-group {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .ref-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 3px;
+      line-height: 1.2;
+    }
+
+    .ref-header {
+      font-size: 23px;
+      font-weight: 700;
+      color: var(--text-accent);
+      text-align: center;
+    }
+
+    .version-badge {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-muted);
+      background: var(--badge-version-bg);
+      border: 1px solid var(--border-body);
+      padding: 2px 5px;
+      border-radius: 5px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .meta-tag {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-meta);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+    }
+
+    .meta-tag.is-lapse-badge {
+      color: var(--text-lapse);
+      font-weight: 700;
+      background: var(--badge-lapse-bg);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .meta-tag.is-fasttrack-badge {
+      color: var(--text-fasttrack);
+      font-weight: 800;
+      background: var(--badge-fasttrack-bg);
+      padding: 2px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.6px;
+    }
+
+    .pips-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      min-height: 14px;
+    }
+
+    .pip {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--border-body);
+      border: 1px solid var(--border-card);
+      transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .pip.filled {
+      background: var(--text-accent);
+      border-color: var(--text-accent);
+      transform: scale(1.15);
+      box-shadow: 0 0 5px rgba(26, 115, 232, 0.4);
+    }
+
+    /* Fast-Track Glowing Pip */
+    .fast-track-pip {
+      font-size: 15px;
+      line-height: 1;
+      color: var(--text-fasttrack);
+      filter: drop-shadow(0 0 6px rgba(217, 119, 6, 0.7));
+      animation: pulse-glow 1.8s infinite ease-in-out;
+      user-select: none;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.3); opacity: 1; filter: drop-shadow(0 0 9px rgba(217, 119, 6, 1)); }
+    }
+
+    .verse-body {
+      user-select: text;
+      flex: 1;
+      background: var(--bg-body);
+      border: 1px solid var(--border-body);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
+      scroll-behavior: smooth;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+
+    .passage-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 0 8px 0;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border-body);
+      flex-shrink: 0;
+    }
+
+    .passage-status {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-reveal-all {
+      background: var(--btn-restart-bg);
+      color: var(--btn-restart-text);
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    /* 1. Mobile Default Typography (Touchscreens) */
+    .passage-stream {
+      font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+      font-size: 17.5px;
+      line-height: 1.7;
+      letter-spacing: 0.1px;
+      color: var(--text-primary);
+      text-align: justify;
+      text-justify: inter-word;
+      word-break: normal;
+    }
+
+    /* 2. Desktop Override Typography (Mouse / Precision Trackpads) */
+    @media (hover: hover) and (pointer: fine) {
+      .passage-stream {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 16.5px;
+        line-height: 1.7;
+        letter-spacing: 0px;
+      }
+    }
+
+    .verse-unit {
+      cursor: pointer;
+      display: inline;
+    }
+
+    .v-num {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-accent);
+      vertical-align: super;
+      margin-right: 3px;
+      margin-left: 3px;
+      user-select: none;
+      display: inline-block;
+    }
+
+    .v-text {
+      border-radius: 4px;
+      padding: 2px 4px;
+      transition: filter 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
+    }
+
+    .v-text.blurred {
+      filter: blur(var(--spoiler-blur));
+      opacity: 0.2;
+      background-color: var(--spoiler-bg);
+      user-select: none;
+    }
+
+    .v-text.revealed {
+      filter: none;
+      opacity: 1;
+      background-color: transparent;
+    }
+
+    .notice {
+      font-size: 13px;
+      text-align: center;
+      color: var(--badge-pass);
+      font-weight: 700;
+      min-height: 18px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+
+    .action-container { 
+      display: flex; 
+      flex-direction: column; 
+      flex-shrink: 0;
+    }
+
+    .btn-row { 
+      display: flex; 
+      gap: 10px; 
+      width: 100%;
+    }
+
+    button {
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+    button:active { transform: scale(0.97); filter: brightness(0.92); }
+
+    .btn-fail { 
+      flex: 1; 
+      min-height: 54px; 
+      background: var(--btn-fail-bg); 
+      color: var(--btn-fail-text); 
+      font-size: 16px; 
+    }
+
+    .btn-pass { 
+      flex: 1; 
+      min-height: 54px; 
+      background: var(--btn-pass-bg); 
+      color: var(--btn-pass-text); 
+      font-size: 16px; 
+    }
+
+    .shortcut-hint { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 2px; }
+    @media (max-width: 480px) {
+      .shortcut-hint { display: none; }
+      .btn-fail, .btn-pass { min-height: 56px; }
+    }
+
+    .summary-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      padding: 24px 20px;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: 0 4px 14px var(--card-shadow);
+      text-align: center;
+      box-sizing: border-box;
+      min-height: 0;
+    }
+
+    .summary-header .crown-icon { font-size: 44px; margin-bottom: 6px; }
+    .summary-header h2 { font-size: 24px; margin: 0 0 6px 0; color: var(--text-primary); font-weight: 700; }
+    .summary-header p { margin: 0; color: var(--text-muted); font-size: 14px; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .stat-box {
+      background: var(--bg-body);
+      border: 1px solid var(--border-body);
+      border-radius: 12px;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .stat-val { font-size: 24px; font-weight: 800; margin-bottom: 2px; color: var(--text-primary); }
+    .stat-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
+    .val-pass { color: var(--btn-pass-text); }
+    .val-grad { color: var(--text-accent); }
+    .val-fail { color: var(--btn-fail-text); }
+
+    .summary-btn-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .btn-add-verse {
+      width: 100%;
+      min-height: 52px;
+      background: var(--btn-pass-bg);
+      color: var(--btn-pass-text);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .btn-restart { 
+      width: 100%; 
+      min-height: 48px; 
+      background: var(--btn-restart-bg); 
+      color: var(--btn-restart-text); 
+      font-size: 14px; 
+    }
+    /* Three columns so the mode label sits in the true center of the bar. */
+    .status-bar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sb-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .sb-left > span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sb-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    #sessionStatus {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    /* Quiet "Undo": invisible until a card was just scored, then fades out on its own. */
+    .undo-link {
+      background: none;
+      border: 0;
+      box-shadow: none;
+      padding: 5px 4px;
+      margin: -5px 0;
+      min-height: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .undo-link.show { opacity: 0.75; pointer-events: auto; }
+
+    /* Tiny muted line pinned to the bottom of the Review Complete card. */
+    .summary-card { position: relative; }
+    .tomorrow-note {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 10px;
+      font-size: 11px;
+      color: var(--text-meta);
+      opacity: 0.8;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    /* Names the screen you're on; tap it to switch. Plain in Review, blue in Learning. */
+    .learning-chip {
+      flex-direction: row;
+      justify-content: center;
+      min-width: 76px;
+      min-height: 0;
+      /* extra padding enlarges the tap area; negative margin keeps the bar the same height */
+      padding: 5px 12px;
+      margin: -5px 0;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+      background: transparent;
+      color: var(--text-muted);
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .learning-chip.active {
+      background: var(--btn-restart-bg);
+      color: var(--btn-restart-text);
+    }
+
+    .diag-line {
+      font-size: 10px;
+      line-height: 1.35;
+      color: var(--text-muted);
+      margin: -4px 4px 6px 4px;
+      word-break: break-all;
+      user-select: text;
+      flex-shrink: 0;
+    }
+
+    button:disabled { opacity: 0.55; cursor: default; }
+    button:disabled:active { transform: none; filter: none; }
+
+    /* Simple "pick a verse" sheet */
+    .picker {
+      position: fixed; inset: 0; z-index: 50;
+      background: var(--bg-card);
+      display: none; flex-direction: column;
+      padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
+    }
+    .picker.open { display: flex; }
+    .picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .picker-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .picker-close { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
+      padding: 6px 4px; font-size: 14px; color: var(--text-muted); }
+    .picker-search { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px;
+      border: 1px solid var(--border-card); border-radius: 10px; background: transparent;
+      color: var(--text-primary); margin-bottom: 8px; }
+    .picker-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .picker-item { display: block; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0;
+      box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
+      color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
+    .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
+
+    .notice.is-error { color: var(--badge-fail); }
+
+    .sync-warning {
+      flex-direction: row;
+      min-height: 0;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--badge-lapse-bg);
+      color: var(--text-lapse);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="status-bar">
+    <div class="sb-left">
+      <span id="queueProgress" onclick="toggleDiag()"></span>
+      <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
+    </div>
+    <button type="button" class="learning-chip" id="learningChip" onclick="toggleLearning()" style="display: none;"></button>
+    <div class="sb-right">
+      <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">Undo</button>
+      <span id="sessionStatus"></span>
+    </div>
+  </div>
+
+  <div class="progress-track">
+    <div class="progress-fill" id="sessionProgressFill"></div>
+  </div>
+
+  <div class="diag-line" id="diagLine" style="display: none;"></div>
+
+  <div id="deckContainer">
+    <div class="card" id="activeCard">
+      <div class="swipe-badge badge-pass" id="badgePass">PASS</div>
+      <div class="swipe-badge badge-fail" id="badgeFail">FAIL</div>
+
+      <div class="card-header-group">
+        <div class="ref-header-row">
+          <span class="ref-header" id="cardRef">---</span>
+          <span class="version-badge" id="cardVersion" style="display: none;"></span>
+        </div>
+        <div class="meta-tag" id="cardMeta">---</div>
+        <div class="pips-container" id="cardPips"></div>
+      </div>
+
+      <div class="verse-body" id="cardBody" onclick="handleContainerClick(event)">
+      </div>
+
+      <div class="notice" id="toastNotice"></div>
+
+      <div class="action-container">
+        <div class="btn-row">
+          <button type="button" class="btn-fail" id="btnFail" onclick="scoreCard('Fail')" style="display: none;">
+            <span id="btnFailText">Fail</span>
+            <span class="shortcut-hint">[F]</span>
+          </button>
+          <button type="button" class="btn-pass" id="btnPass" onclick="scoreCard('Pass')">
+            <span id="btnPassText">Pass</span>
+            <span class="shortcut-hint">[S]</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-card" id="summaryView" style="display: none;">
+      <div class="summary-header">
+        <div class="crown-icon" id="summaryIcon">🏆</div>
+        <h2 id="summaryTitle">Review Complete!</h2>
+        <p id="summarySubtitle">You have finished all verses scheduled for today.</p>
+      </div>
+
+      <div class="stats-grid" id="summaryStats">
+        <div class="stat-box">
+          <div class="stat-val" id="statReviewed">0</div>
+          <div class="stat-lbl">Reviewed</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val val-pass" id="statPassed">0</div>
+          <div class="stat-lbl">Flawless</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val val-grad" id="statGraduated">0</div>
+          <div class="stat-lbl">Leveled Up</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val val-fail" id="statFailed">0</div>
+          <div class="stat-lbl">Repeats</div>
+        </div>
+      </div>
+
+      <div class="tomorrow-note" id="tomorrowNote" style="display: none;"></div>
+
+      <div class="summary-btn-stack">
+        <div class="notice" id="summaryNotice"></div>
+        <button type="button" class="btn-add-verse" id="btnAddVerse" onclick="addNewVerse()" style="display: none;">
+          Add New Verse
+        </button>
+        <button type="button" class="btn-restart" id="btnRestart" onclick="restartSession()" style="display: none;">
+          Try again
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="picker" id="picker">
+    <div class="picker-head">
+      <span class="picker-title">Choose a verse</span>
+      <button type="button" class="picker-close" onclick="closePicker()">Cancel</button>
+    </div>
+    <input type="search" class="picker-search" id="pickerSearch" placeholder="Search" autocomplete="off" oninput="renderPicker()">
+    <div class="picker-list" id="pickerList"></div>
+  </div>
+
+  <script>
+    // Mirrors GROUP_CONFIG in Code.gs for names and repsNeeded only.
+    // Review intervals live on the server, which computes every due date.
+    const GROUP_CONFIG = {
+      0: { name: "New",       repsNeeded: 1 },
+      1: { name: "Daily",     repsNeeded: 4 },
+      2: { name: "2-Day",     repsNeeded: 3 },
+      3: { name: "5-Day",     repsNeeded: 2 },
+      4: { name: "2-Week",    repsNeeded: 2 },
+      5: { name: "Monthly",   repsNeeded: 2 },
+      6: { name: "Quarterly", repsNeeded: 1 },
+      7: { name: "Half-Year", repsNeeded: 1 },
+      8: { name: "Mastery",   repsNeeded: 1 }
+    };
+
+    const RESTART_LABEL = "Try again";
+    const SETTLE_TIMEOUT_MS = 15000;
+    const POLL_MS = 15000;
+    const TOUCH_SYNC_GAP_MS = 8000;
+    const CLIENT_BUILD = 'sync-5';
+
+    let queue = [];
+    let currentIndex = 0;
+    let baseCount = 0;
+    let isFlipped = false;
+    let isScoring = false;
+    let isFetching = false;
+    let isRefreshing = false;
+    let totalCardsProcessed = 0;
+    let didSwipeMove = false;
+    let progressHigh = 0;
+    let loadedAt = 0;
+    let tomorrowCount = null;
+    let undoId = null;
+    let undoTimer = null;
+    const UNDO_SHOW_MS = 10000;
+    let epoch = 0; // bumps whenever the server's session replaces ours, cancelling in-flight card animations
+
+    let parsedSegments = [];
+    let segmentStates = [];
+
+    // Today's session. The server is the source of truth so every device shows the same session.
+    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
+    let sessionVersion = 0;
+    let sessionDate = "";
+    // Which screen you are on: 'review' (the daily deck) or 'learning' (Level 0 verses).
+    // Both are saved with the session, so any device reopens where you left off.
+    let mode = 'review';
+    let learningCards = [];
+    let learningIndex = 0;
+    let enterLearningAfterLoad = null; // reference of a just-added verse to jump straight to
+    let serverBuild = "";
+    let lastCheckAt = 0;
+    let diag = { checkedAt: "", result: "none yet", error: "", adopted: "" };
+    let diagOn = false;
+
+    // Reviews waiting to be saved. They go to the server one at a time, in order.
+    let outbox = [];
+    let inFlight = false;
+    let submitFailed = false;
+    let problemCount = 0;
+    let settleWaiters = [];
+
+    const initialSession = <?!= initialSessionJson ?>;
+
+    window.onload = function() {
+      attachSwipeGestures();
+      if (initialSession && Array.isArray(initialSession.cards)) {
+        adoptSession(initialSession);
+      } else {
+        fetchSession();
+      }
+    };
+
+    function notifyReady() {
+      // Apps Script nests this page in its own wrapper iframe, so the PWA shell is window.top.
+      try { window.top.postMessage({ type: 'VR_READY' }, '*'); } catch (e) {}
+    }
+
+    // ───────────── Loading ─────────────
+
+    function fetchSession() {
+      if (isFetching) return;
+      isFetching = true;
+      document.getElementById("queueProgress").textContent = "Loading cards...";
+      google.script.run
+        .withSuccessHandler(function(session) {
+          isFetching = false;
+          if (!session || !Array.isArray(session.cards)) {
+            renderLoadError("The server returned no session data.");
+            return;
+          }
+          adoptSession(session);
+        })
+        .withFailureHandler(function(err) {
+          isFetching = false;
+          renderLoadError((err && err.message) ? err.message : String(err || "Unknown error"));
+        })
+        .loadSession();
+    }
+
+    // Replaces everything on screen with the server's version of today's session.
+    function adoptSession(session) {
+      queue = session.cards || [];
+      learningCards = session.learning || [];
+      learningIndex = 0;
+      mode = (session.mode === 'learning') ? 'learning' : 'review';
+      baseCount = session.baseCount || 0;
+      currentIndex = session.currentIndex || 0;
+      sessionStats = session.stats || { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
+      totalCardsProcessed = session.processed || 0;
+      sessionVersion = session.version;
+      sessionDate = session.date;
+      if (typeof session.tomorrow === 'number') tomorrowCount = session.tomorrow;
+      hideUndo();
+      serverBuild = session.build || "(old server code)";
+      diag.adopted = new Date().toLocaleTimeString();
+      renderDiag();
+      progressHigh = 0;
+      isScoring = false;
+      epoch++;
+      loadedAt = Date.now();
+      outbox = [];
+      inFlight = false;
+      submitFailed = false;
+      problemCount = 0;
+      updateSyncWarning();
+      setSummaryBusy(false);
+      render();
+      notifyReady();
+
+      // After "Add New Verse", show the new verse on the Learning screen.
+      if (enterLearningAfterLoad !== null) {
+        const ref = enterLearningAfterLoad;
+        enterLearningAfterLoad = null;
+        const at = learningCards.findIndex(function(c) { return c.reference === ref; });
+        if (at >= 0) {
+          learningIndex = at;
+          if (mode !== 'learning') setMode('learning');
+          else render();
+        }
+      }
+    }
+
+    function renderLoadError(msg) {
+      loadedAt = 0; // lets the next time the app is opened retry automatically
+      document.getElementById("activeCard").style.display = "none";
+      document.getElementById("summaryView").style.display = "flex";
+      document.getElementById("queueProgress").textContent = "Couldn't load";
+      document.getElementById("sessionStatus").textContent = "";
+      document.getElementById("sessionProgressFill").style.width = "0%";
+      document.getElementById("summaryIcon").textContent = "⚠️";
+      document.getElementById("summaryTitle").textContent = "Couldn't Load Cards";
+      document.getElementById("summarySubtitle").textContent = msg;
+      document.getElementById("summaryStats").style.display = "none";
+      document.getElementById("summaryIcon").style.display = "";
+      setSummaryButtons(false, true);
+      renderTomorrowNote();
+      setSummaryBusy(false);
+      updateLearningChip();
+      notifyReady();
+    }
+
+    function setSummaryButtons(showAdd, showRetry) {
+      const addBtn = document.getElementById("btnAddVerse");
+      const retryBtn = document.getElementById("btnRestart");
+      if (addBtn) addBtn.style.display = showAdd ? "flex" : "none";
+      if (retryBtn) retryBtn.style.display = showRetry ? "flex" : "none";
+    }
+
+    function setSummaryBusy(busy, label) {
+      const restartBtn = document.getElementById("btnRestart");
+      const addBtn = document.getElementById("btnAddVerse");
+      if (restartBtn) {
+        restartBtn.disabled = busy;
+        restartBtn.textContent = busy ? (label || "Loading…") : RESTART_LABEL;
+      }
+      if (addBtn) addBtn.disabled = busy;
+    }
+
+    function showSummaryNotice(msg, isError) {
+      const el = document.getElementById("summaryNotice");
+      if (!el) return;
+      el.textContent = msg || "";
+      el.classList.toggle("is-error", !!isError);
+    }
+
+    // ───────────── Saving ─────────────
+
+    // The card list as the server stores it: no verse text, just what's needed to rebuild it.
+    function snapshot(nextIndex) {
+      return {
+        queue: queue.map(function(c) {
+          return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isLapse ? 1 : 0 };
+        }),
+        currentIndex: nextIndex,
+        baseCount: baseCount,
+        processed: totalCardsProcessed,
+        mode: mode,
+        stats: sessionStats
+      };
+    }
+
+    function pendingCount() {
+      return outbox.length + (inFlight ? 1 : 0);
+    }
+
+    function enqueueSubmit(review, state) {
+      hideUndo();
+      outbox.push({ review: review, state: state });
+      pumpOutbox();
+    }
+
+    function pumpOutbox() {
+      if (inFlight || submitFailed || outbox.length === 0) {
+        updateSyncWarning();
+        checkSettled();
+        return;
+      }
+      const item = outbox[0];
+      inFlight = true;
+      updateSyncWarning();
+      google.script.run
+        .withSuccessHandler(function(res) {
+          inFlight = false;
+          if (res && res.ok) {
+            sessionVersion = res.version;
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; renderTomorrowNote(); }
+            outbox.shift();
+            if (res.undoId && outbox.length === 0) showUndo(res.undoId);
+            pumpOutbox();
+          } else if (res && res.session) {
+            // Another device moved the session on. Catch up and drop our out-of-date saves.
+            adoptSession(res.session);
+            flashNotice("Updated from your other device");
+            checkSettled();
+          } else {
+            // The server refused this one (for example the verse was deleted from the sheet).
+            outbox.shift();
+            problemCount++;
+            pumpOutbox();
+          }
+        })
+        .withFailureHandler(function() {
+          inFlight = false;
+          submitFailed = true;
+          updateSyncWarning();
+          checkSettled();
+        })
+        .submitReview(sessionVersion, item.review, item.state);
+    }
+
+    function retrySubmit() {
+      submitFailed = false;
+      pumpOutbox();
+    }
+
+    function checkSettled() {
+      if (pendingCount() > 0) return;
+      const waiters = settleWaiters;
+      settleWaiters = [];
+      waiters.forEach(function(fn) { fn(); });
+    }
+
+    // Runs fn once all saves finish (or after a safety timeout).
+    function whenWritesSettled(fn) {
+      let done = false;
+      const once = function() { if (done) return; done = true; fn(); };
+      if (pendingCount() === 0) { once(); return; }
+      settleWaiters.push(once);
+      setTimeout(once, SETTLE_TIMEOUT_MS);
+    }
+
+    function updateSyncWarning() {
+      const el = document.getElementById("syncWarning");
+      if (!el) return;
+      if (submitFailed) {
+        el.textContent = "⚠ " + pendingCount() + " unsaved · Retry";
+        el.style.display = "inline-flex";
+      } else if (problemCount > 0) {
+        el.textContent = "⚠ Save problem · Reload";
+        el.style.display = "inline-flex";
+      } else {
+        el.style.display = "none";
+      }
+    }
+
+    function onSyncWarningTap() {
+      if (submitFailed) retrySubmit();
+      else restartSession();
+    }
+
+    // ───────────── Undo ─────────────
+
+    function showUndo(id) {
+      undoId = id;
+      const b = document.getElementById("undoBtn");
+      if (b) b.classList.add("show");
+      clearTimeout(undoTimer);
+      undoTimer = setTimeout(hideUndo, UNDO_SHOW_MS);
+    }
+
+    function hideUndo() {
+      clearTimeout(undoTimer);
+      undoId = null;
+      const b = document.getElementById("undoBtn");
+      if (b) b.classList.remove("show");
+    }
+
+    function undoLast() {
+      if (!undoId || isScoring || pendingCount() > 0) return;
+      const id = undoId;
+      hideUndo();
+      isScoring = true;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          isScoring = false;
+          if (res && res.session) {
+            adoptSession(res.session);
+            flashNotice(res.ok ? "Undone" : "Nothing to undo");
+          } else {
+            flashNotice("Couldn't undo");
+          }
+        })
+        .withFailureHandler(function() {
+          isScoring = false;
+          flashNotice("Couldn't undo");
+        })
+        .undoLast(id);
+    }
+
+    function renderTomorrowNote() {
+      const el = document.getElementById("tomorrowNote");
+      if (!el) return;
+      const onComplete = document.getElementById("summaryView").style.display !== "none" &&
+        document.getElementById("btnAddVerse").style.display === "none" &&
+        document.getElementById("btnRestart").style.display === "none" &&
+        mode !== 'learning';
+      if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
+      el.textContent = tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow";
+      el.style.display = "block";
+    }
+
+    // Short message that works on both the card and summary screens.
+    function flashNotice(msg) {
+      const summaryVisible = document.getElementById("summaryView").style.display !== "none";
+      const el = document.getElementById(summaryVisible ? "summaryNotice" : "toastNotice");
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove("is-error");
+      setTimeout(function() { if (el.textContent === msg) el.textContent = ""; }, 2500);
+    }
+
+    // ───────────── Verse rendering ─────────────
+
+    function parseVerseSegments(rawText, reference) {
+      if (!rawText) return [];
+
+      const hasBrackets = /\[\d+\]/.test(rawText);
+      if (!hasBrackets) {
+        return [{ num: "", text: rawText.trim() }];
+      }
+
+      let startNum = "";
+      if (reference) {
+        const m = reference.match(/:(\d+)/);
+        if (m) startNum = m[1];
+      }
+
+      const regex = /\[(\d+)\]/g;
+      const segments = [];
+      let lastIndex = 0;
+      let currentNum = startNum || "1";
+      let match;
+
+      while ((match = regex.exec(rawText)) !== null) {
+        const chunk = rawText.substring(lastIndex, match.index).trim();
+        if (chunk || segments.length > 0) {
+          segments.push({ num: currentNum, text: chunk });
+        }
+        currentNum = match[1];
+        lastIndex = regex.lastIndex;
+      }
+
+      const tail = rawText.substring(lastIndex).trim();
+      if (tail) {
+        segments.push({ num: currentNum, text: tail });
+      }
+
+      return segments;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function getFastTrackTarget(card) {
+      if (card.group === 4 && card.rep === 6) return 6;
+      if (card.group === 5 && (card.rep === 7 || card.rep === 8)) return card.rep;
+      return null;
+    }
+
+    // Failing needs the verse revealed first, except for brand-new (Level 0) cards, where Fail means Skip.
+    function hasActiveCard() {
+      return mode === 'learning' ? !!learningCards[learningIndex] : currentIndex < queue.length;
+    }
+
+    function canFail() {
+      if (mode === 'learning') return true; // "Next" / "Done" never need the verse revealed
+      const c = queue[currentIndex];
+      return !!c && (c.group === 0 || isFlipped);
+    }
+
+    function render() {
+      if (mode === 'learning') renderLearning();
+      else renderCard();
+      updateLearningChip();
+    }
+
+    function updateLearningChip() {
+      const chip = document.getElementById("learningChip");
+      if (!chip) return;
+      // Always shown: it names the screen you're on, and tapping it switches to the other one.
+      const learning = (mode === 'learning');
+      chip.textContent = learning ? "Learning" : "Review";
+      chip.classList.toggle("active", learning);
+      chip.style.display = "inline-flex";
+    }
+
+    function setMode(m) {
+      mode = m;
+      enqueueSubmit(null, snapshot(currentIndex)); // saves the screen you're on so any device reopens here
+      render();
+    }
+
+    function toggleLearning() {
+      if (isScoring || isFetching || isRefreshing) return;
+      if (mode === 'learning') {
+        setMode('review');
+      } else {
+        learningIndex = 0;
+        setMode('learning');
+      }
+    }
+
+    // Learning screen with no Level 0 verses: offer to add one.
+    function renderEmptyLearning() {
+      isScoring = false;
+      document.getElementById("activeCard").style.display = "none";
+      document.getElementById("summaryView").style.display = "flex";
+      document.getElementById("queueProgress").textContent = "";
+      document.getElementById("sessionStatus").textContent = "";
+      document.getElementById("sessionProgressFill").style.width = "0%";
+
+      const icon = document.getElementById("summaryIcon");
+      icon.textContent = "";
+      icon.style.display = "none";
+      document.getElementById("summaryTitle").textContent = "No Learning Verses";
+      document.getElementById("summarySubtitle").textContent = "Would you like to add a new verse?";
+      document.getElementById("summaryStats").style.display = "none";
+      setSummaryButtons(true, false);
+      renderTomorrowNote();
+    }
+
+    function renderLearning() {
+      isScoring = false;
+
+      const cardEl = document.getElementById("activeCard");
+      const summaryEl = document.getElementById("summaryView");
+      const card = learningCards[learningIndex];
+      if (!card) { renderEmptyLearning(); return; }
+
+      cardEl.style.display = "flex";
+      summaryEl.style.display = "none";
+
+      isFlipped = false;
+      parsedSegments = parseVerseSegments(card.text, card.reference);
+      segmentStates = parsedSegments.map(() => 'hidden');
+
+      cardEl.style.transition = "none";
+      cardEl.style.transform = "translate(0, 0) rotate(0deg)";
+      cardEl.style.opacity = "1";
+
+      const passBadge = document.getElementById("badgePass");
+      const failBadge = document.getElementById("badgeFail");
+      if (passBadge) { passBadge.style.opacity = "0"; passBadge.textContent = "LEVEL UP"; }
+
+      const hasNext = learningIndex < learningCards.length - 1;
+      const doneLabel = hasNext ? "Next" : "Done";
+      if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }
+
+      // Learning verses don't count toward today's card numbers or reviewed total.
+      // The center label already says "Learning", so the left side shows only the position (if more than one).
+      document.getElementById("queueProgress").textContent = learningCards.length > 1
+        ? `${learningIndex + 1} of ${learningCards.length}`
+        : "";
+      document.getElementById("sessionStatus").textContent = "";
+      document.getElementById("sessionProgressFill").style.width = "0%";
+
+      const metaTag = document.getElementById("cardMeta");
+      metaTag.className = "meta-tag";
+      metaTag.textContent = card.day > 0 ? "Learning verse · Day " + card.day : "Learning verse";
+      document.getElementById("cardPips").innerHTML = "";
+
+      const versionBadge = document.getElementById("cardVersion");
+      const ver = (card.version || "").trim();
+      if (ver && ver.toUpperCase() !== "ESV") {
+        versionBadge.textContent = ver;
+        versionBadge.style.display = "inline-block";
+      } else {
+        versionBadge.style.display = "none";
+      }
+
+      document.getElementById("btnPassText").textContent = "Level Up";
+      document.getElementById("btnFailText").textContent = doneLabel;
+      document.getElementById("btnFail").style.display = "flex";
+
+      document.getElementById("cardRef").textContent = card.reference;
+      renderCardBody();
+    }
+
+    function renderCard() {
+      isScoring = false;
+
+      const cardEl = document.getElementById("activeCard");
+      const summaryEl = document.getElementById("summaryView");
+      const progressLabel = document.getElementById("queueProgress");
+      const statusLabel = document.getElementById("sessionStatus");
+      const progressFill = document.getElementById("sessionProgressFill");
+      const pipsContainer = document.getElementById("cardPips");
+      const metaTag = document.getElementById("cardMeta");
+      const versionBadge = document.getElementById("cardVersion");
+      const btnFail = document.getElementById("btnFail");
+      const btnFailText = document.getElementById("btnFailText");
+      const btnPassText = document.getElementById("btnPassText");
+      const passBadge = document.getElementById("badgePass");
+      const failBadge = document.getElementById("badgeFail");
+
+      if (currentIndex >= queue.length) {
+        renderEndOfDayScreen();
+        return;
+      }
+
+      cardEl.style.display = "flex";
+      summaryEl.style.display = "none";
+
+      const card = queue[currentIndex];
+      isFlipped = false;
+
+      parsedSegments = parseVerseSegments(card.text, card.reference);
+      segmentStates = parsedSegments.map(() => 'hidden');
+
+      cardEl.style.transition = "none";
+      cardEl.style.transform = "translate(0, 0) rotate(0deg)";
+      cardEl.style.opacity = "1";
+
+      if (passBadge) passBadge.style.opacity = "0";
+      if (failBadge) failBadge.style.opacity = "0";
+
+      const inRetry = currentIndex >= baseCount;
+      progressLabel.textContent = inRetry
+        ? `Retry ${currentIndex - baseCount + 1} of ${queue.length - baseCount}`
+        : `Card ${currentIndex + 1} of ${baseCount}`;
+      statusLabel.textContent = totalCardsProcessed > 0 ? `${totalCardsProcessed} reviewed` : '';
+
+      // The bar only moves forward, even when failed cards are re-queued.
+      const percent = queue.length > 0 ? (currentIndex / queue.length) * 100 : 0;
+      progressHigh = Math.max(progressHigh, percent);
+      progressFill.style.width = `${progressHigh}%`;
+
+      pipsContainer.innerHTML = '';
+      metaTag.className = "meta-tag";
+
+      const ver = (card.version || "").trim();
+      if (ver && ver.toUpperCase() !== "ESV") {
+        versionBadge.textContent = ver;
+        versionBadge.style.display = "inline-block";
+      } else {
+        versionBadge.style.display = "none";
+      }
+
+      const fastTrackTarget = getFastTrackTarget(card);
+
+      if (card.isLapse) {
+        metaTag.textContent = `Lapse Retry (Level ${card.group})`;
+        metaTag.classList.add("is-lapse-badge");
+        btnFailText.textContent = "Repeat";
+        btnPassText.textContent = "Clear";
+        btnFail.style.display = "none";
+        if (passBadge) passBadge.textContent = "CLEAR";
+        if (failBadge) failBadge.textContent = "REPEAT";
+      } else if (fastTrackTarget) {
+        // ⚡ Fast-Track Recovery Mode
+        metaTag.textContent = `⚡ Fast-Track (L${fastTrackTarget} Recovery)`;
+        metaTag.classList.add("is-fasttrack-badge");
+        btnFailText.textContent = "Fail";
+        btnPassText.textContent = "Pass";
+        btnFail.style.display = "none";
+        if (passBadge) passBadge.textContent = "RESTORE";
+        if (failBadge) failBadge.textContent = "FAIL";
+
+        pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass Restores Level ${fastTrackTarget}">✦</span>`;
+      } else if (card.group === 0) {
+        metaTag.textContent = "Level 0 (New)";
+        btnFailText.textContent = "Skip";
+        btnPassText.textContent = "Level Up";
+        btnFail.style.display = "flex";
+        if (passBadge) passBadge.textContent = "LEVEL UP";
+        if (failBadge) failBadge.textContent = "SKIP";
+      } else {
+        metaTag.textContent = `Level ${card.group} (${card.groupName})`;
+        btnFailText.textContent = "Fail";
+        btnPassText.textContent = "Pass";
+        btnFail.style.display = "none";
+        if (passBadge) passBadge.textContent = "PASS";
+        if (failBadge) failBadge.textContent = "FAIL";
+
+        for (let i = 1; i <= card.repsNeeded; i++) {
+          const pip = document.createElement("div");
+          pip.className = "pip" + (i <= card.rep ? " filled" : "");
+          pipsContainer.appendChild(pip);
+        }
+      }
+
+      document.getElementById("cardRef").textContent = card.reference;
+      renderCardBody();
+    }
+
+    function renderCardBody() {
+      const body = document.getElementById("cardBody");
+      const revealedCount = segmentStates.filter(s => s === 'revealed').length;
+      const allRevealed = revealedCount === parsedSegments.length;
+
+      let html = '';
+
+      if (parsedSegments.length > 1) {
+        html += `
+          <div class="passage-toolbar">
+            <span class="passage-status">${revealedCount} of ${parsedSegments.length} revealed</span>
+            <button type="button" class="btn-reveal-all" onclick="toggleRevealAll(event)">
+              ${allRevealed ? 'Hide All' : 'Reveal All'}
+            </button>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="passage-toolbar">
+            <span class="passage-status">${allRevealed ? 'Revealed' : 'Tap to reveal'}</span>
+            <button type="button" class="btn-reveal-all" onclick="toggleRevealAll(event)">
+              ${allRevealed ? 'Hide' : 'Reveal'}
+            </button>
+          </div>
+        `;
+      }
+
+      html += '<div class="passage-stream">';
+      parsedSegments.forEach((seg, idx) => {
+        const isRev = segmentStates[idx] === 'revealed';
+        html += `
+          <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
+            ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}
+            <span class="v-text ${isRev ? 'revealed' : 'blurred'}">${escapeHtml(seg.text)}</span>
+          </span>
+        `;
+      });
+      html += '</div>';
+
+      body.innerHTML = html;
+    }
+
+    function handleVerseClick(index, event) {
+      if (event) event.stopPropagation();
+      if (isScoring) return;
+
+      segmentStates[index] = segmentStates[index] === 'revealed' ? 'hidden' : 'revealed';
+      syncFlipState();
+      renderCardBody();
+    }
+
+    function handleContainerClick(event) {
+      if (didSwipeMove) {
+        didSwipeMove = false;
+        return;
+      }
+      if (isScoring || !hasActiveCard()) return;
+
+      const nextHiddenIdx = segmentStates.findIndex(s => s === 'hidden');
+      if (nextHiddenIdx !== -1) {
+        segmentStates[nextHiddenIdx] = 'revealed';
+        syncFlipState();
+        renderCardBody();
+      }
+    }
+
+    function toggleRevealAll(event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      if (isScoring) return;
+
+      const allRevealed = segmentStates.every(s => s === 'revealed');
+      const targetState = allRevealed ? 'hidden' : 'revealed';
+      segmentStates = segmentStates.map(() => targetState);
+
+      syncFlipState();
+      renderCardBody();
+    }
+
+    function syncFlipState() {
+      const anyRevealed = segmentStates.some(s => s === 'revealed');
+      isFlipped = anyRevealed;
+      if (mode === 'learning') return;
+
+      const card = queue[currentIndex];
+      if (card && (card.group > 0 || card.isLapse)) {
+        document.getElementById("btnFail").style.display = isFlipped ? "flex" : "none";
+      }
+    }
+
+    // ───────────── Scoring ─────────────
+
+    function animateOut(action) {
+      const cardEl = document.getElementById("activeCard");
+      cardEl.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+      cardEl.style.transform = action === "Pass"
+        ? "translate(350px, 30px) rotate(20deg)"
+        : "translate(-350px, 30px) rotate(-20deg)";
+      cardEl.style.opacity = "0";
+    }
+
+    function advanceAfter(ms) {
+      const startedIn = epoch;
+      setTimeout(function() {
+        if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
+        document.getElementById("toastNotice").textContent = "";
+        currentIndex++;
+        render();
+      }, ms);
+    }
+
+    // Learning screen: "Level Up" promotes the verse to Level 1; "Next" / "Done" just move on.
+    function scoreLearning(action) {
+      if (isScoring) return;
+      const card = learningCards[learningIndex];
+      if (!card) return;
+      isScoring = true;
+
+      const notice = document.getElementById("toastNotice");
+      let ms = 160;
+
+      if (action === "Pass") {
+        notice.textContent = "🎉 Promoted to Level 1 (Daily)!";
+        learningCards.splice(learningIndex, 1);
+        learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
+        enqueueSubmit(
+          { rowIndex: card.rowIndex, reference: card.reference, rep: 1, group: 1 },
+          snapshot(currentIndex)
+        );
+        ms = 650;
+      } else if (learningIndex < learningCards.length - 1) {
+        learningIndex++;
+      } else {
+        mode = 'review';
+        learningIndex = 0;
+        enqueueSubmit(null, snapshot(currentIndex));
+      }
+
+      animateOut(action);
+      const startedIn = epoch;
+      setTimeout(function() {
+        if (startedIn !== epoch) return;
+        document.getElementById("toastNotice").textContent = "";
+        render();
+      }, ms);
+    }
+
+    function scoreCard(action) {
+      if (mode === 'learning') { scoreLearning(action); return; }
+      if (isScoring || currentIndex >= queue.length) return;
+      if (action === "Fail" && !canFail()) return;
+
+      isScoring = true;
+
+      const card = queue[currentIndex];
+      const notice = document.getElementById("toastNotice");
+
+      totalCardsProcessed++;
+
+      // Intraday retries are never written to the sheet.
+      if (card.isLapse) {
+        if (action === "Pass") {
+          notice.textContent = "🎉 Cleared for today!";
+        } else {
+          queue.push(card);
+          notice.textContent = "🔄 Re-queued for repeat";
+        }
+        enqueueSubmit(null, snapshot(currentIndex + 1));
+        animateOut(action);
+        advanceAfter(320);
+        return;
+      }
+
+      const currentConfig = GROUP_CONFIG[card.group] || GROUP_CONFIG[0];
+      const fastTrackTarget = getFastTrackTarget(card);
+
+      let newRep = card.rep;
+      let newGroup = card.group;
+      let graduated = false;
+      let isFastTrackRestored = false;
+
+      if (card.group > 0) {
+        sessionStats.reviewed++;
+        if (action === "Pass") {
+          sessionStats.passed++;
+        } else {
+          sessionStats.failed++;
+        }
+      }
+
+      if (action === "Pass") {
+        if (fastTrackTarget) {
+          // ⚡ Fast-Track Success: restores immediately to the mature level
+          newGroup = fastTrackTarget;
+          newRep = 1;
+          graduated = true;
+          isFastTrackRestored = true;
+        } else if (card.rep >= currentConfig.repsNeeded) {
+          if (card.group < 8) {
+            newGroup = card.group + 1;
+            newRep = 1;
+            graduated = true;
+          } else {
+            newGroup = 8;
+            newRep = card.rep + 1;
+          }
+        } else {
+          newRep = card.rep + 1;
+        }
+      } else {
+        // ─── TIERED FAIL MATRIX ───
+        if (fastTrackTarget) {
+          // Failed during Fast-Track probation (true memory break)
+          newGroup = card.group === 4 ? 2 : 3;
+          newRep = 1;
+        } else {
+          switch (card.group) {
+            case 0:
+              newGroup = 0; newRep = 1; break;
+            case 1:
+              newGroup = 1; newRep = 1; break;
+            case 2:
+              // Soft landing: drops to L1 at rep 3 of 4 (only 2 days to re-graduate)
+              newGroup = 1; newRep = 3; break;
+            case 3:
+              newGroup = 2; newRep = 1; break;
+            case 4:
+              newGroup = 3; newRep = 1; break;
+            case 5:
+              // 30d -> 5d quick check
+              newGroup = 3; newRep = 1; break;
+            case 6:
+              // Fast-Track to L6: 12d check at Level 4
+              newGroup = 4; newRep = 6; break;
+            case 7:
+              // Fast-Track to L7: 30d check at Level 5
+              newGroup = 5; newRep = 7; break;
+            case 8:
+              // Fast-Track to L8: 30d check at Level 5
+              newGroup = 5; newRep = 8; break;
+            default:
+              newGroup = 1; newRep = 1; break;
+          }
+        }
+
+        // Re-queue a clone for intraday repeat verification
+        if (card.group > 0) {
+          queue.push(Object.assign({}, card, {
+            group: newGroup,
+            rep: newRep,
+            isLapse: true
+          }));
+        }
+      }
+
+      if (graduated && card.group > 0) {
+        sessionStats.graduated++;
+      }
+
+      const nextConfig = GROUP_CONFIG[newGroup] || GROUP_CONFIG[1];
+
+      // The server computes the due date and stores the session; we send the new level and rep.
+      enqueueSubmit(
+        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup },
+        snapshot(currentIndex + 1)
+      );
+
+      animateOut(action);
+
+      if (isFastTrackRestored) {
+        notice.textContent = `⚡ Memory Verified! Restored to Level ${newGroup} (${nextConfig.name})`;
+        advanceAfter(750);
+      } else if (graduated) {
+        notice.textContent = card.group === 0
+          ? `🎉 Promoted to Level 1 (${nextConfig.name})!`
+          : `🎉 Graduated to Level ${newGroup} (${nextConfig.name})!`;
+        advanceAfter(650);
+      } else if (action === "Fail" && card.group > 0) {
+        notice.textContent = "Added to end of queue";
+        advanceAfter(320);
+      } else {
+        advanceAfter(160);
+      }
+    }
+
+    function renderEndOfDayScreen() {
+      const cardEl = document.getElementById("activeCard");
+      const summaryEl = document.getElementById("summaryView");
+      const progressLabel = document.getElementById("queueProgress");
+      const statusLabel = document.getElementById("sessionStatus");
+      const progressFill = document.getElementById("sessionProgressFill");
+
+      cardEl.style.display = "none";
+      summaryEl.style.display = "flex";
+      document.getElementById("summaryIcon").style.display = "";
+      setSummaryButtons(false, false);
+      renderTomorrowNote();
+
+      progressLabel.textContent = "Session Complete";
+      statusLabel.textContent = "All Done 🎉";
+      progressFill.style.width = "100%";
+
+      if (totalCardsProcessed === 0) {
+        document.getElementById("summaryIcon").textContent = "✨";
+        document.getElementById("summaryTitle").textContent = "All Caught Up!";
+        document.getElementById("summarySubtitle").textContent = "No verses are due for review right now.";
+        document.getElementById("summaryStats").style.display = "none";
+      } else if (sessionStats.reviewed === 0) {
+        document.getElementById("summaryIcon").textContent = "🎉";
+        document.getElementById("summaryTitle").textContent = "Session Complete!";
+        document.getElementById("summarySubtitle").textContent = "You introduced your new verses for today.";
+        document.getElementById("summaryStats").style.display = "none";
+      } else {
+        document.getElementById("summaryIcon").textContent = "🏆";
+        document.getElementById("summaryTitle").textContent = "Review Complete!";
+        document.getElementById("summarySubtitle").textContent = "You have finished all verses scheduled for today.";
+        document.getElementById("summaryStats").style.display = "grid";
+
+        document.getElementById("statReviewed").textContent = sessionStats.reviewed;
+        document.getElementById("statPassed").textContent = sessionStats.passed;
+        document.getElementById("statGraduated").textContent = sessionStats.graduated;
+        document.getElementById("statFailed").textContent = sessionStats.failed;
+      }
+    }
+
+    // Refresh: saves anything pending, then asks the server for the current session.
+    // If today's deck is finished the server starts a new batch of due cards (today's stats carry over).
+    function restartSession() {
+      if (isFetching || isRefreshing) return;
+      isRefreshing = true;
+      showSummaryNotice("");
+      setSummaryBusy(true, pendingCount() > 0 ? "Saving…" : "Loading…");
+      if (submitFailed) retrySubmit();
+      whenWritesSettled(function() {
+        isRefreshing = false;
+        isFetching = true;
+        google.script.run
+          .withSuccessHandler(function(session) {
+            isFetching = false;
+            if (!session || !Array.isArray(session.cards)) {
+              renderLoadError("The server returned no session data.");
+              return;
+            }
+            adoptSession(session);
+          })
+          .withFailureHandler(function(err) {
+            isFetching = false;
+            renderLoadError((err && err.message) ? err.message : String(err || "Unknown error"));
+          })
+          .refreshSession();
+      });
+    }
+
+    // "Add New Verse": opens a short list of unassigned verses; tapping one starts learning it.
+    let pickerItems = [];
+
+    function addNewVerse() {
+      const btn = document.getElementById("btnAddVerse");
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      showSummaryNotice("");
+      google.script.run
+        .withSuccessHandler(function(list) {
+          btn.disabled = false;
+          if (!Array.isArray(list) || list.length === 0) {
+            showSummaryNotice("No unassigned verses left in your sheet.", true);
+            return;
+          }
+          pickerItems = list;
+          document.getElementById("pickerSearch").value = "";
+          document.getElementById("picker").classList.add("open");
+          renderPicker();
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          showSummaryNotice("Couldn't load verses: " + ((err && err.message) || err), true);
+        })
+        .listUnassigned();
+    }
+
+    function closePicker() {
+      document.getElementById("picker").classList.remove("open");
+    }
+
+    function renderPicker() {
+      const q = document.getElementById("pickerSearch").value.trim().toLowerCase();
+      const box = document.getElementById("pickerList");
+      box.textContent = "";
+      const shown = pickerItems.filter(function(it) { return !q || it.f.toLowerCase().indexOf(q) >= 0; });
+      if (shown.length === 0) {
+        const e = document.createElement("div");
+        e.className = "picker-empty";
+        e.textContent = "No matches";
+        box.appendChild(e);
+        return;
+      }
+      shown.forEach(function(it) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "picker-item";
+        b.textContent = it.f;
+        b.onclick = function() { chooseVerse(it); };
+        box.appendChild(b);
+      });
+    }
+
+    function chooseVerse(it) {
+      closePicker();
+      const btn = document.getElementById("btnAddVerse");
+      if (btn) { btn.disabled = true; btn.textContent = "Adding..."; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) { btn.disabled = false; btn.textContent = "Add New Verse"; }
+          if (res && res.success) {
+            enterLearningAfterLoad = res.reference;
+            restartSession();
+          } else {
+            showSummaryNotice((res && res.message) ? res.message : "Couldn't add that verse.", true);
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) { btn.disabled = false; btn.textContent = "Add New Verse"; }
+          showSummaryNotice("Error adding verse: " + ((err && err.message) || err), true);
+        })
+        .addChosenVerse(it.r, it.f);
+    }
+
+    // ───────────── Gestures ─────────────
+
+    function attachSwipeGestures() {
+      const deckContainer = document.getElementById("deckContainer");
+      let startX = 0, startY = 0, deltaX = 0, deltaY = 0;
+      let isDragging = false;
+      let axis = null; // 'x' | 'y' | null (undecided)
+      const SWIPE_THRESHOLD = 80;
+      const AXIS_LOCK_PX = 8;
+
+      function springBack() {
+        const cardEl = document.getElementById("activeCard");
+        const badgePass = document.getElementById("badgePass");
+        const badgeFail = document.getElementById("badgeFail");
+        if (cardEl) {
+          cardEl.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+          cardEl.style.transform = "translate(0, 0) rotate(0deg)";
+        }
+        if (badgePass) badgePass.style.opacity = 0;
+        if (badgeFail) badgeFail.style.opacity = 0;
+      }
+
+      deckContainer.addEventListener("touchstart", function(e) {
+        const cardEl = document.getElementById("activeCard");
+        if (isScoring || !cardEl || !hasActiveCard() || e.target.closest("button")) {
+          isDragging = false;
+          return;
+        }
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        deltaX = 0; deltaY = 0;
+        axis = null;
+        isDragging = true;
+        didSwipeMove = false;
+        cardEl.style.transition = "none";
+      }, { passive: true });
+
+      deckContainer.addEventListener("touchmove", function(e) {
+        const cardEl = document.getElementById("activeCard");
+        const badgePass = document.getElementById("badgePass");
+        const badgeFail = document.getElementById("badgeFail");
+
+        if (!isDragging || !cardEl) return;
+        deltaX = e.touches[0].clientX - startX;
+        deltaY = e.touches[0].clientY - startY;
+
+        // Lock to one axis on the first real movement: vertical = scroll the verse, horizontal = swipe.
+        if (!axis && (Math.abs(deltaX) > AXIS_LOCK_PX || Math.abs(deltaY) > AXIS_LOCK_PX)) {
+          axis = Math.abs(deltaX) > Math.abs(deltaY) ? 'x' : 'y';
+          didSwipeMove = true;
+        }
+        if (axis !== 'x') return;
+
+        if (e.cancelable) e.preventDefault();
+
+        const failAllowed = canFail();
+        const effectiveDeltaX = (deltaX < 0 && !failAllowed) ? deltaX * 0.2 : deltaX;
+
+        cardEl.style.transform = `translate(${effectiveDeltaX}px, ${deltaY * 0.25}px) rotate(${effectiveDeltaX * 0.08}deg)`;
+
+        if (deltaX > 20 && badgePass) {
+          badgePass.style.opacity = Math.min((deltaX - 20) / 50, 1);
+          if (badgeFail) badgeFail.style.opacity = 0;
+        } else if (deltaX < -20 && badgeFail && failAllowed) {
+          badgeFail.style.opacity = Math.min((-deltaX - 20) / 50, 1);
+          if (badgePass) badgePass.style.opacity = 0;
+        } else {
+          if (badgePass) badgePass.style.opacity = 0;
+          if (badgeFail) badgeFail.style.opacity = 0;
+        }
+      }, { passive: false });
+
+      deckContainer.addEventListener("touchend", function() {
+        if (!isDragging) return;
+        isDragging = false;
+        if (axis !== 'x') return; // taps and vertical scrolls never score
+
+        if (deltaX > SWIPE_THRESHOLD) {
+          scoreCard("Pass");
+        } else if (deltaX < -SWIPE_THRESHOLD && canFail()) {
+          scoreCard("Fail");
+        }
+        if (!isScoring) springBack();
+      });
+
+      // iOS can cancel a touch (system gesture, notification, etc.); never leave the card stuck off-center.
+      deckContainer.addEventListener("touchcancel", function() {
+        if (!isDragging) return;
+        isDragging = false;
+        if (axis === 'x') springBack();
+      });
+    }
+
+    window.addEventListener("keydown", function(e) {
+      const key = e.key.toLowerCase();
+      if (e.code === "Space") {
+        e.preventDefault();
+        handleContainerClick(e);
+      } else if (key === "r") {
+        e.preventDefault();
+        toggleRevealAll(e);
+      } else if (key === "f") {
+        scoreCard("Fail");
+      } else if (key === "s") {
+        scoreCard("Pass");
+      } else if (key === "u") {
+        undoLast();
+      }
+    });
+
+    // ───────────── Staying in sync with your other device ─────────────
+    // We ask the server whether the session has moved on: when you come back to the app,
+    // when the window gains focus, on a tap after a pause, and every few seconds.
+
+    function renderDiag() {
+      const el = document.getElementById("diagLine");
+      if (!el || !diagOn) return;
+      el.textContent =
+        "page " + CLIENT_BUILD + " · server " + (serverBuild || "?") +
+        " · v" + sessionVersion + " · " + (sessionDate || "no date") +
+        " · last check " + (diag.checkedAt || "never") + ": " + diag.result +
+        (diag.error ? " · error: " + diag.error : "") +
+        " · loaded " + (diag.adopted || "never") +
+        " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "");
+    }
+
+    function toggleDiag() {
+      diagOn = !diagOn;
+      const el = document.getElementById("diagLine");
+      el.style.display = diagOn ? "block" : "none";
+      renderDiag();
+    }
+
+    function noteCheck(result, error) {
+      diag.checkedAt = new Date().toLocaleTimeString();
+      diag.result = result;
+      diag.error = error || "";
+      renderDiag();
+    }
+
+    function syncCheck() {
+      if (document.visibilityState === "hidden") return;
+      if (submitFailed && !inFlight) retrySubmit();
+      if (isFetching || isRefreshing || isScoring || pendingCount() > 0) return;
+
+      if (!loadedAt) {
+        restartSession(); // the last load failed; try again
+        return;
+      }
+
+      lastCheckAt = Date.now();
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res) { noteCheck("empty reply"); return; }
+          if (res.build) serverBuild = res.build;
+          if (!res.changed) { noteCheck("up to date"); return; }
+          noteCheck("changed on server, loading");
+          // Re-check: the user may have started scoring while the request was in flight.
+          if (isFetching || isRefreshing || isScoring || pendingCount() > 0) return;
+          isFetching = true;
+          google.script.run
+            .withSuccessHandler(function(session) {
+              isFetching = false;
+              if (!session || !Array.isArray(session.cards)) { noteCheck("bad session reply"); return; }
+              if (isScoring || pendingCount() > 0) return;
+              adoptSession(session);
+              flashNotice("Synced");
+              noteCheck("synced");
+            })
+            .withFailureHandler(function(err) {
+              isFetching = false;
+              noteCheck("load failed", (err && err.message) || String(err));
+            })
+            .loadSession();
+        })
+        .withFailureHandler(function(err) {
+          noteCheck("check failed", (err && err.message) || String(err));
+        })
+        .checkSession(sessionVersion, sessionDate);
+    }
+
+    // A tap after a pause checks first, so you catch up before acting.
+    function syncIfIdle() {
+      if (Date.now() - lastCheckAt > TOUCH_SYNC_GAP_MS) syncCheck();
+    }
+
+    document.addEventListener("visibilitychange", syncCheck);
+    window.addEventListener("focus", syncCheck);
+    window.addEventListener("pageshow", syncCheck);
+    document.addEventListener("touchstart", syncIfIdle, { passive: true, capture: true });
+    document.addEventListener("mousedown", syncIfIdle, { capture: true });
+    setInterval(syncCheck, POLL_MS);
+  </script>
+</body>
+</html>
