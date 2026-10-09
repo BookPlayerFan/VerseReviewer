@@ -922,7 +922,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-7';
+    const CLIENT_BUILD = 'sync-8';
 
     let queue = [];
     let currentIndex = 0;
@@ -1303,6 +1303,7 @@
     }
 
     function getFastTrackTarget(card) {
+      if (card.group === 3 && card.rep === 5) return 5;
       if (card.group === 4 && card.rep === 6) return 6;
       if (card.group === 5 && (card.rep === 7 || card.rep === 8)) return card.rep;
       return null;
@@ -1746,7 +1747,8 @@
         // ─── TIERED FAIL MATRIX ───
         if (fastTrackTarget) {
           // Failed during Fast-Track probation (true memory break)
-          newGroup = card.group === 4 ? 2 : 3;
+          // Gold/Platinum recovery -> Silver; Sapphire-level recovery (Emerald, Ruby, Diamond) -> Gold
+          newGroup = (card.group === 3 || card.group === 4) ? 2 : 3;
           newRep = 1;
         } else {
           switch (card.group) {
@@ -1758,12 +1760,13 @@
               // Soft landing: drops to L1 at rep 3 of 4 (only 2 days to re-graduate)
               newGroup = 1; newRep = 3; break;
             case 3:
-              newGroup = 2; newRep = 1; break;
+              // Soft landing: drops to Silver at rep 2 of 3
+              newGroup = 2; newRep = 2; break;
             case 4:
               newGroup = 3; newRep = 1; break;
             case 5:
-              // 30d -> 5d quick check
-              newGroup = 3; newRep = 1; break;
+              // Fast-Track to L5: 5d check at Gold; one pass restores Sapphire
+              newGroup = 3; newRep = 5; break;
             case 6:
               // Fast-Track to L6: 12d check at Level 4
               newGroup = 4; newRep = 6; break;
