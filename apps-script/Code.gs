@@ -651,43 +651,6 @@ function undoLast(undoId) {
   }
 }
 
-function addRandomNewVerse() {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Verses');
-    if (!sheet) return { success: false, message: 'Sheet "Verses" not found.' };
-
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return { success: false, message: 'No verses found in sheet.' };
-
-    const data = sheet.getRange(1, 1, lastRow, 8).getValues();
-    const candidates = [];
-
-    for (let i = 1; i < data.length; i++) {
-      const groupRaw = data[i][4];
-      const ref = cleanRef_(data[i][5]);
-      const isBlankGroup = groupRaw === "" || groupRaw === null || groupRaw === undefined;
-      if (ref && isBlankGroup) {
-        candidates.push({ rowIndex: i + 1, reference: ref });
-      }
-    }
-
-    if (candidates.length === 0) {
-      return { success: false, message: 'No unassigned verses remaining.' };
-    }
-
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-    // Column C holds the date added while a verse is Level 0, so the app can show "Day N".
-    sheet.getRange(chosen.rowIndex, 2, 1, 4).setValues([["", today_(), 1, 0]]);
-
-    return { success: true, reference: chosen.reference, rowIndex: chosen.rowIndex };
-  } finally {
-    lock.releaseLock();
-  }
-}
-
 // Verses with no level yet, in sheet order, for the "Add New Verse" picker.
 function listUnassigned() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
