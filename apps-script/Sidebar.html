@@ -1179,7 +1179,7 @@
       if (!chip) return;
       // Always shown: it names the screen you're on, and tapping it switches to the other one.
       const learning = (mode === 'learning');
-      chip.textContent = learning ? "Learning" : "Review";
+      chip.textContent = learning ? "New Verse" : "Review";
       chip.classList.toggle("active", learning);
       chip.style.display = "inline-flex";
     }
@@ -1212,7 +1212,7 @@
       const icon = document.getElementById("summaryIcon");
       icon.textContent = "";
       icon.style.display = "none";
-      document.getElementById("summaryTitle").textContent = "No Learning Verses";
+      document.getElementById("summaryTitle").textContent = "No New Verse";
       document.getElementById("summarySubtitle").textContent = "Would you like to add a new verse?";
       document.getElementById("summaryStats").style.display = "none";
       setSummaryButtons(true, false);
@@ -1247,7 +1247,7 @@
       if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }
 
       // Learning verses don't count toward today's card numbers or reviewed total.
-      // The center label already says "Learning", so the left side shows only the position (if more than one).
+      // The center label already says "New Verse", so the left side shows only the position (if more than one).
       document.getElementById("queueProgress").textContent = learningCards.length > 1
         ? `${learningIndex + 1} of ${learningCards.length}`
         : "";
@@ -1256,7 +1256,7 @@
 
       const metaTag = document.getElementById("cardMeta");
       metaTag.className = "meta-tag";
-      metaTag.textContent = card.day > 0 ? "Learning verse · Day " + card.day : "Learning verse";
+      metaTag.textContent = card.day > 0 ? "New Verse · Day " + card.day : "New Verse";
       document.getElementById("cardPips").innerHTML = "";
 
       const versionBadge = document.getElementById("cardVersion");
