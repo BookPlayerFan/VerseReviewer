@@ -17,8 +17,9 @@
   <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=15">
   <link rel="manifest" href="manifest.json">
 
-  <!-- Status bar style left unset so iOS chooses it (experiment; previous value: default) -->
+  <!-- Status bar: translucent (page colour shows behind the clock; iframe is offset below it) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Verse Review">
   <meta name="color-scheme" content="light dark">
 
@@ -55,12 +56,13 @@
 
     iframe {
       position: fixed;
-      top: 0;
+      /* Start below the status bar; the page background behind the clock follows light/dark live. */
+      top: env(safe-area-inset-top, 0px);
       left: 0;
       right: 0;
       bottom: 0;
       width: 100%;
-      height: 100%;
+      height: calc(100% - env(safe-area-inset-top, 0px));
       border: 0;
       outline: none;
       display: block;
@@ -142,27 +144,6 @@
     });
 
     setTimeout(dismissSplash, 4000);
-
-    // Keep the theme-color tag in step with the system light/dark setting while the app is open.
-    // (Experiment: iOS may or may not re-read it for a home-screen app. Harmless if it doesn't.)
-    (function() {
-      var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-      if (!mq) return;
-      function syncThemeColor() {
-        var color = mq.matches ? '#121212' : '#f8f9fa';
-        var old = document.querySelectorAll('meta[name="theme-color"]');
-        for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
-        var m = document.createElement('meta');
-        m.name = 'theme-color';
-        m.content = color;
-        document.head.appendChild(m);
-      }
-      if (mq.addEventListener) mq.addEventListener('change', syncThemeColor);
-      else if (mq.addListener) mq.addListener(syncThemeColor);
-      document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible') syncThemeColor();
-      });
-    })();
   </script>
 </body>
 </html>
