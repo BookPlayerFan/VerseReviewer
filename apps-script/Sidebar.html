@@ -277,11 +277,11 @@
     .vl-verse { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 14px;
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-    .vl-tip { position: absolute; left: 14px; top: calc(100% - 4px); z-index: 5; max-width: 80%;
-      background: var(--text-primary); color: var(--bg-card); font-size: 13px; font-weight: 500;
-      padding: 6px 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); pointer-events: none; white-space: nowrap; }
-    .vl-tip::before { content: ""; position: absolute; left: 14px; top: -5px; border: 5px solid transparent;
-      border-top: 0; border-bottom-color: var(--text-primary); }
+    .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
+      background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
+      padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); } }
+    :root[data-theme="dark"] .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
     .vl-verse + .vl-verse { border-top: 1px solid var(--border-card); }
 
     .link-quiet { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
@@ -708,7 +708,8 @@
     .picker-search { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px;
       border: 1px solid var(--border-card); border-radius: 10px; background: transparent;
       color: var(--text-primary); margin-bottom: 8px; }
-    .picker-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .picker-list { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+    #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
     .picker-item { display: block; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0;
       box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
       color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
