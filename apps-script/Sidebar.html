@@ -839,6 +839,7 @@
       <div class="vl-seg">
         <button type="button" id="vlSortBook" class="active" onclick="setVlSort('book')">Book</button>
         <button type="button" id="vlSortRank" onclick="setVlSort('rank')">Rank</button>
+        <button type="button" id="vlSortDate" onclick="setVlSort('date')">Date</button>
       </div>
     </div>
     <div class="picker-list" id="vlList"></div>
@@ -1002,7 +1003,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "" }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
           vlVerses.sort(compareVerses);
           renderVerseList();
         })
@@ -1029,6 +1030,7 @@
     function updateVlSeg() {
       document.getElementById("vlSortBook").classList.toggle("active", vlSort === "book");
       document.getElementById("vlSortRank").classList.toggle("active", vlSort === "rank");
+      document.getElementById("vlSortDate").classList.toggle("active", vlSort === "date");
     }
 
     function vlGroup(key, label, count, verses, showPills) {
@@ -1119,7 +1121,20 @@
         box.appendChild(e);
         return;
       }
-      if (vlSort === "rank") {
+      if (vlSort === "date") {
+        // The next 14 days (today first); overdue verses count as due today.
+        const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        for (let d = 0; d < 14; d++) {
+          const dt = new Date();
+          dt.setHours(12, 0, 0, 0);
+          dt.setDate(dt.getDate() + d);
+          let label = DOW[dt.getDay()] + ", " + MON[dt.getMonth()] + " " + dt.getDate();
+          if (d === 0) label = "Today · " + label; else if (d === 1) label = "Tomorrow · " + label;
+          const vs = vlVerses.filter(function(v) { return v.d === d; });
+          vlGroup("d" + d, label, vs.length, vs, true);
+        }
+      } else if (vlSort === "rank") {
         for (let g = 8; g >= 0; g--) {
           const vs = vlVerses.filter(function(v) { return v.g === g; });
           if (g === 0 && vs.length === 0) continue;
