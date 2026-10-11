@@ -939,6 +939,31 @@
       return { book: idx, name: idx === 999 ? (String(name).trim() || "Other") : BIBLE_BOOKS[idx][0], chapter: chapter, verse: verse };
     }
 
+    // How many verses a reference covers: "John 10:27-30" is 4, "Rom 8:28,30" is 2, "Ps 23:1" is 1.
+    // A range that crosses chapters, or a whole chapter with no verse numbers, can't be counted
+    // without a table of chapter lengths, so each of those counts as 1.
+    function verseCount(ref) {
+      const m = String(ref || "").match(/\d+\s*[:.]\s*([^]*)$/);
+      if (!m) return 1;
+      const tail = m[1];
+      let total = 0;
+      tail.split(/[,;]/).forEach(function(tok) {
+        const t = tok.trim();
+        if (!t) return;
+        if (t.indexOf(":") >= 0) { total += 1; return; }
+        const r = t.match(/^(\d+)[a-z]?\s*[-\u2013\u2014]\s*(\d+)[a-z]?$/i);
+        if (r) {
+          const lo = parseInt(r[1], 10), hi = parseInt(r[2], 10);
+          total += hi >= lo ? (hi - lo + 1) : 1;
+        } else if (/^\d+[a-z]?$/i.test(t)) {
+          total += 1;
+        } else {
+          total += 1;
+        }
+      });
+      return Math.max(1, total);
+    }
+
     function compareVerses(a, b) {
       return (a.p.book - b.p.book) || (a.p.chapter - b.p.chapter) || (a.p.verse - b.p.verse) ||
         (a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
@@ -958,7 +983,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f) }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f) }; });
           vlVerses.sort(compareVerses);
           renderVerseList();
         })
@@ -1030,8 +1055,12 @@
     function renderVerseList() {
       const box = document.getElementById("vlList");
       box.textContent = "";
-      const total = vlVerses.length;
-      document.getElementById("vlTotal").textContent = total + (total === 1 ? " verse" : " verses");
+      const refCount = vlVerses.length;
+      const verseTotal = vlVerses.reduce(function(sum, v) { return sum + v.n; }, 0);
+      document.getElementById("vlTotal").textContent =
+        verseTotal + (verseTotal === 1 ? " Verse" : " Verses") + " · " +
+        refCount + (refCount === 1 ? " Reference" : " References");
+      const total = refCount;
       if (total === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
@@ -1063,7 +1092,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-10';
+    const CLIENT_BUILD = 'sync-11';
 
     let queue = [];
     let currentIndex = 0;
