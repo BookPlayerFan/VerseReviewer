@@ -254,15 +254,26 @@
     .rank-arrow { color: var(--text-meta); margin: 0 6px; font-weight: 600; }
     .notice .rank-badge { vertical-align: middle; }
 
-    /* "Your ranks" screen (reuses the full-screen sheet used by the verse picker) */
-    .ranks-total { font-size: 13px; color: var(--text-muted); margin: 0 0 8px; }
-    .rank-row { display: flex; align-items: center; justify-content: space-between; width: 100%;
+    /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
+    .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
+    .vl-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; gap: 10px; }
+    .vl-seg { display: inline-flex; border: 1px solid var(--border-card); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+    .vl-seg button { background: transparent; border: 0; box-shadow: none; min-height: 0; width: auto;
+      padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--text-muted); border-radius: 0; flex-direction: row; }
+    .vl-seg button.active { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); color: var(--text-accent, #1a73e8); }
+    .vl-row { display: flex; align-items: center; justify-content: space-between; width: 100%;
       background: none; border: 0; box-shadow: none; min-height: 0; padding: 12px 4px;
-      border-bottom: 1px solid var(--border-card); flex-direction: row; border-radius: 0; }
-    .rank-row .rank-count { font-size: 16px; font-weight: 700; color: var(--text-primary); }
-    .rank-row.zero .rank-count { color: var(--text-meta); font-weight: 500; }
-    .rank-refs { padding: 6px 4px 10px 8px; font-size: 14px; line-height: 1.6; color: var(--text-muted);
-      border-bottom: 1px solid var(--border-card); }
+      border-bottom: 1px solid var(--border-card); flex-direction: row; border-radius: 0; text-align: left; }
+    .vl-row .vl-name { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+    .vl-row .vl-right { display: inline-flex; align-items: center; gap: 8px; }
+    .vl-row .vl-count { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .vl-row.zero .vl-count { color: var(--text-meta); font-weight: 500; }
+    .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
+    .vl-row.open .chev { transform: rotate(90deg); }
+    .vl-verses { border-bottom: 1px solid var(--border-card); padding: 2px 0 6px; }
+    .vl-verse { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 14px;
+      font-size: 15px; color: var(--text-primary); }
+    .vl-verse + .vl-verse { border-top: 1px solid var(--border-card); }
 
     .link-quiet { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
       padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text-muted); align-self: center; }
@@ -797,18 +808,24 @@
         <button type="button" class="btn-restart" id="btnRestart" onclick="restartSession()" style="display: none;">
           Try again
         </button>
-        <button type="button" class="link-quiet" id="btnRanks" onclick="openRanks()" style="display: none;">Your ranks</button>
+        <button type="button" class="link-quiet" id="btnRanks" onclick="openVerseList()" style="display: none;">Verse List</button>
       </div>
     </div>
   </div>
 
-  <div class="picker" id="ranksView">
+  <div class="picker" id="verseListView">
     <div class="picker-head">
-      <span class="picker-title">Your ranks</span>
-      <button type="button" class="picker-close" onclick="closeRanks()">Close</button>
+      <span class="picker-title">Verse List</span>
+      <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
-    <div class="ranks-total" id="ranksTotal"></div>
-    <div class="picker-list" id="ranksList"></div>
+    <div class="vl-bar">
+      <span class="vl-total" id="vlTotal"></span>
+      <div class="vl-seg">
+        <button type="button" id="vlSortBook" class="active" onclick="setVlSort('book')">Book</button>
+        <button type="button" id="vlSortRank" onclick="setVlSort('rank')">Rank</button>
+      </div>
+    </div>
+    <div class="picker-list" id="vlList"></div>
   </div>
 
   <div class="picker" id="picker">
@@ -870,51 +887,175 @@
       if (toG >= 8) el.appendChild(document.createTextNode("  Top rank"));
     }
 
-    function openRanks() {
-      const box = document.getElementById("ranksList");
-      document.getElementById("ranksView").classList.add("open");
-      document.getElementById("ranksTotal").textContent = "Loading…";
-      box.textContent = "";
+    // ── Verse List ──
+    // Books in Bible order, with the names and abbreviations a reference might start with.
+    const BIBLE_BOOKS = [
+      ["Genesis", "gen|ge|gn"], ["Exodus", "exod|exo|ex"], ["Leviticus", "lev|le|lv"], ["Numbers", "num|nu|nm|nb"],
+      ["Deuteronomy", "deut|dt|de"], ["Joshua", "josh|jos|jsh"], ["Judges", "judg|jdg|jg|jdgs"], ["Ruth", "rth|ru"],
+      ["1 Samuel", "1 sam|1 sm|1 sa|1sam|first samuel"], ["2 Samuel", "2 sam|2 sm|2 sa|2sam|second samuel"],
+      ["1 Kings", "1 kgs|1 ki|1kgs|first kings"], ["2 Kings", "2 kgs|2 ki|2kgs|second kings"],
+      ["1 Chronicles", "1 chron|1 chr|1 ch|1chr|first chronicles"], ["2 Chronicles", "2 chron|2 chr|2 ch|2chr|second chronicles"],
+      ["Ezra", "ezr"], ["Nehemiah", "neh|ne"], ["Esther", "esth|est|es"], ["Job", "jb"],
+      ["Psalms", "psalm|ps|psa|pss|psm|pslm"], ["Proverbs", "prov|pro|prv|pr"], ["Ecclesiastes", "eccles|eccl|ecc|ec|qoh"],
+      ["Song of Solomon", "song of songs|song|sos|ss|canticles|cant"], ["Isaiah", "isa|is"], ["Jeremiah", "jer|je|jr"],
+      ["Lamentations", "lam|la"], ["Ezekiel", "ezek|eze|ezk"], ["Daniel", "dan|da|dn"], ["Hosea", "hos|ho"],
+      ["Joel", "jl"], ["Amos", "am"], ["Obadiah", "obad|ob"], ["Jonah", "jon|jnh"], ["Micah", "mic|mi"],
+      ["Nahum", "nah|na"], ["Habakkuk", "hab|hb"], ["Zephaniah", "zeph|zep|zp"], ["Haggai", "hag|hg"],
+      ["Zechariah", "zech|zec|zc"], ["Malachi", "mal|ml"],
+      ["Matthew", "matt|mat|mt"], ["Mark", "mrk|mk|mr"], ["Luke", "luk|lk"], ["John", "jhn|jn"], ["Acts", "act|ac"],
+      ["Romans", "rom|ro|rm"], ["1 Corinthians", "1 cor|1 co|1cor|first corinthians"], ["2 Corinthians", "2 cor|2 co|2cor|second corinthians"],
+      ["Galatians", "gal|ga"], ["Ephesians", "eph|ephes"], ["Philippians", "phil|php|pp"], ["Colossians", "col|co"],
+      ["1 Thessalonians", "1 thess|1 thes|1 th|1thess|first thessalonians"], ["2 Thessalonians", "2 thess|2 thes|2 th|2thess|second thessalonians"],
+      ["1 Timothy", "1 tim|1 ti|1tim|first timothy"], ["2 Timothy", "2 tim|2 ti|2tim|second timothy"],
+      ["Titus", "tit|ti"], ["Philemon", "philem|phlm|phm"], ["Hebrews", "heb"], ["James", "jas|jm"],
+      ["1 Peter", "1 pet|1 pe|1pet|1 pt|first peter"], ["2 Peter", "2 pet|2 pe|2pet|2 pt|second peter"],
+      ["1 John", "1 jn|1 jhn|1john|first john"], ["2 John", "2 jn|2 jhn|2john|second john"], ["3 John", "3 jn|3 jhn|3john|third john"],
+      ["Jude", "jud"], ["Revelation", "rev|re|revelations|apocalypse"]
+    ];
+    const BOOK_INDEX = (function() {
+      const m = {};
+      BIBLE_BOOKS.forEach(function(b, i) {
+        m[normBook(b[0])] = i;
+        b[1].split("|").forEach(function(a) { m[normBook(a)] = i; });
+      });
+      return m;
+    })();
+
+    function normBook(t) {
+      return String(t || "").toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim()
+        .replace(/^(1st|i)\s+/, "1 ").replace(/^(2nd|ii)\s+/, "2 ").replace(/^(3rd|iii)\s+/, "3 ")
+        .replace(/^([123])(?=[a-z])/, "$1 ");
+    }
+
+    // "John 10:27-30" -> { book: index in the Bible (or 999), chapter, verse }
+    function parseRef(ref) {
+      // Optional book number ("1", "II", "2nd"), then the book name, then chapter and verse.
+      const m = String(ref || "").match(/^\s*((?:(?:[1-3]|1st|2nd|3rd)\.?\s*|(?:iii|ii|i)\.?\s+)?[A-Za-z][A-Za-z.\s]*?)\s*(\d+)(?:\s*[:.]\s*(\d+))?/i);
+      let name = ref, chapter = 0, verse = 0;
+      if (m) { name = m[1]; chapter = parseInt(m[2], 10) || 0; verse = parseInt(m[3], 10) || 0; }
+      let key = normBook(name);
+      let idx = BOOK_INDEX[key];
+      if (idx === undefined) idx = 999;
+      return { book: idx, name: idx === 999 ? (String(name).trim() || "Other") : BIBLE_BOOKS[idx][0], chapter: chapter, verse: verse };
+    }
+
+    function compareVerses(a, b) {
+      return (a.p.book - b.p.book) || (a.p.chapter - b.p.chapter) || (a.p.verse - b.p.verse) ||
+        (a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
+    }
+
+    let vlVerses = [];
+    let vlSort = "book";
+    let vlOpen = {};
+
+    function openVerseList() {
+      document.getElementById("verseListView").classList.add("open");
+      document.getElementById("vlTotal").textContent = "Loading…";
+      document.getElementById("vlList").textContent = "";
+      vlSort = "book";
+      vlOpen = {};
+      updateVlSeg();
       google.script.run
         .withSuccessHandler(function(res) {
-          if (!res || !Array.isArray(res.ranks)) { document.getElementById("ranksTotal").textContent = "Couldn't load."; return; }
-          renderRanks(res.ranks);
+          if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f) }; });
+          vlVerses.sort(compareVerses);
+          renderVerseList();
         })
         .withFailureHandler(function() {
-          document.getElementById("ranksTotal").textContent = "Couldn't load.";
+          document.getElementById("vlTotal").textContent = "Couldn't load.";
         })
-        .getRankCollection();
+        .getVerseList();
     }
 
-    function closeRanks() {
-      document.getElementById("ranksView").classList.remove("open");
+    function closeVerseList() {
+      document.getElementById("verseListView").classList.remove("open");
     }
 
-    function renderRanks(ranks) {
-      const box = document.getElementById("ranksList");
+    function setVlSort(mode) {
+      vlSort = mode;
+      vlOpen = {};
+      updateVlSeg();
+      renderVerseList();
+    }
+
+    function updateVlSeg() {
+      document.getElementById("vlSortBook").classList.toggle("active", vlSort === "book");
+      document.getElementById("vlSortRank").classList.toggle("active", vlSort === "rank");
+    }
+
+    function vlGroup(key, label, count, verses, showPills) {
+      const box = document.getElementById("vlList");
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "vl-row" + (count ? "" : " zero") + (vlOpen[key] ? " open" : "");
+      const left = document.createElement("span");
+      left.className = "vl-name";
+      if (typeof label === "string") left.textContent = label; else left.appendChild(label);
+      const right = document.createElement("span");
+      right.className = "vl-right";
+      const n = document.createElement("span");
+      n.className = "vl-count";
+      n.textContent = count;
+      right.appendChild(n);
+      const chev = document.createElement("span");
+      chev.className = "chev";
+      chev.textContent = "›";
+      right.appendChild(chev);
+      row.appendChild(left);
+      row.appendChild(right);
+      box.appendChild(row);
+
+      const list = document.createElement("div");
+      list.className = "vl-verses";
+      list.style.display = vlOpen[key] ? "block" : "none";
+      verses.forEach(function(v) {
+        const item = document.createElement("div");
+        item.className = "vl-verse";
+        const t = document.createElement("span");
+        t.textContent = v.f;
+        item.appendChild(t);
+        if (showPills) item.appendChild(makePill(v.g));
+        list.appendChild(item);
+      });
+      if (count) box.appendChild(list);
+      row.onclick = function() {
+        if (!count) return;
+        vlOpen[key] = !vlOpen[key];
+        row.classList.toggle("open", !!vlOpen[key]);
+        list.style.display = vlOpen[key] ? "block" : "none";
+      };
+    }
+
+    function renderVerseList() {
+      const box = document.getElementById("vlList");
       box.textContent = "";
-      let total = 0;
-      for (let g = 1; g <= 8; g++) total += (ranks[g] || []).length;
-      document.getElementById("ranksTotal").textContent = total + (total === 1 ? " verse" : " verses") + " ranked";
-      for (let g = 8; g >= 1; g--) {
-        const refs = ranks[g] || [];
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "rank-row" + (refs.length ? "" : " zero");
-        row.appendChild(makePill(g));
-        const n = document.createElement("span");
-        n.className = "rank-count";
-        n.textContent = refs.length;
-        row.appendChild(n);
-        box.appendChild(row);
-        if (refs.length) {
-          const list = document.createElement("div");
-          list.className = "rank-refs";
-          list.style.display = "none";
-          list.textContent = refs.join(" · ");
-          box.appendChild(list);
-          row.onclick = function() { list.style.display = list.style.display === "none" ? "block" : "none"; };
+      const total = vlVerses.length;
+      document.getElementById("vlTotal").textContent = total + (total === 1 ? " verse" : " verses");
+      if (total === 0) {
+        const e = document.createElement("div");
+        e.className = "picker-empty";
+        e.textContent = "No verses yet";
+        box.appendChild(e);
+        return;
+      }
+      if (vlSort === "rank") {
+        for (let g = 8; g >= 0; g--) {
+          const vs = vlVerses.filter(function(v) { return v.g === g; });
+          if (g === 0 && vs.length === 0) continue;
+          vlGroup("g" + g, makePill(g), vs.length, vs, false);
         }
+      } else {
+        const groups = [];
+        const byKey = {};
+        vlVerses.forEach(function(v) {
+          const k = v.p.book === 999 ? "x:" + v.p.name : "b:" + v.p.book;
+          if (!byKey[k]) { byKey[k] = { name: v.p.name, verses: [] }; groups.push(byKey[k]); }
+          byKey[k].verses.push(v);
+        });
+        groups.forEach(function(gr, i) {
+          vlGroup("k" + gr.name, gr.name, gr.verses.length, gr.verses, true);
+        });
       }
     }
 
@@ -922,7 +1063,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-8';
+    const CLIENT_BUILD = 'sync-10';
 
     let queue = [];
     let currentIndex = 0;
