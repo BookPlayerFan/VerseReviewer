@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-11'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-12'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -551,7 +551,7 @@ function sanitizeStats_(st) {
 // ───────────── Review log ─────────────
 // Every scored card is added as a row on a "Log" tab (created automatically on first use).
 // Nothing in the app reads it yet; it is for looking back on later. A logging problem never blocks a review.
-const LOG_HEADERS = ['Time', 'Date', 'Reference', 'Result', 'Level Before', 'Level After', 'Rep Before', 'Rep After', 'Try Today', 'Same-Day Repeat'];
+const LOG_HEADERS = ['Time', 'Reference', 'Result', 'Level Before', 'Level After', 'Rep Before', 'Rep After', 'Try Today', 'Same-Day Repeat'];
 const LOG_SHEET = 'Log';
 
 function getLogSheet_() {
@@ -562,7 +562,6 @@ function getLogSheet_() {
     sheet.appendRow(LOG_HEADERS);
     try { sheet.setFrozenRows(1); } catch (e) {}
     try { sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd hh:mm:ss'); } catch (e) {}
-    try { sheet.getRange('B:B').setNumberFormat('yyyy-mm-dd'); } catch (e) {}
   }
   return sheet;
 }
@@ -573,7 +572,7 @@ function logEvent_(info) {
     const sheet = getLogSheet_();
     const now = new Date();
     sheet.appendRow([
-      now, today_(), info.ref, info.result,
+      now, info.ref, info.result,
       info.lb, info.la, info.rb, info.ra,
       info.tries, info.repeat ? 'Yes' : ''
     ]);
@@ -592,10 +591,10 @@ function unlogEvent_(logRef) {
     const last = sheet.getLastRow();
     const first = Math.max(2, last - 40);
     if (last < first) return;
-    const vals = sheet.getRange(first, 1, last - first + 1, 3).getValues();
+    const vals = sheet.getRange(first, 1, last - first + 1, 2).getValues();
     for (let i = vals.length - 1; i >= 0; i--) {
       const t = vals[i][0] instanceof Date ? vals[i][0].getTime() : Number(vals[i][0]);
-      if (t === logRef.t && cleanRef_(vals[i][2]) === logRef.f) {
+      if (t === logRef.t && cleanRef_(vals[i][1]) === logRef.f) {
         sheet.deleteRow(first + i);
         return;
       }
