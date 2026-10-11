@@ -255,6 +255,9 @@
     .notice .rank-badge { vertical-align: middle; }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
+    .vl-row:active, .vl-seg button:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
+    .vl-row, .vl-seg button, .picker-close { transition: none; }
+    .vl-row .chev { transition: transform 0.15s ease; }
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
     .vl-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; gap: 10px; }
     .vl-seg { display: inline-flex; border: 1px solid var(--border-card); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
@@ -271,8 +274,14 @@
     .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
     .vl-row.open .chev { transform: rotate(90deg); }
     .vl-verses { border-bottom: 1px solid var(--border-card); padding: 2px 0 6px; }
-    .vl-verse { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 14px;
-      font-size: 15px; color: var(--text-primary); }
+    .vl-verse { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 14px;
+      font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+    .vl-tip { position: absolute; left: 14px; top: calc(100% - 4px); z-index: 5; max-width: 80%;
+      background: var(--text-primary); color: var(--bg-card); font-size: 13px; font-weight: 500;
+      padding: 6px 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); pointer-events: none; white-space: nowrap; }
+    .vl-tip::before { content: ""; position: absolute; left: 14px; top: -5px; border: 5px solid transparent;
+      border-top: 0; border-bottom-color: var(--text-primary); }
     .vl-verse + .vl-verse { border-top: 1px solid var(--border-card); }
 
     .link-quiet { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
@@ -983,7 +992,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f) }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "" }; });
           vlVerses.sort(compareVerses);
           renderVerseList();
         })
@@ -993,7 +1002,10 @@
         .getVerseList();
     }
 
+    document.addEventListener("click", function() { hideVerseTip(); });
+
     function closeVerseList() {
+      hideVerseTip();
       document.getElementById("verseListView").classList.remove("open");
     }
 
@@ -1037,10 +1049,21 @@
       verses.forEach(function(v) {
         const item = document.createElement("div");
         item.className = "vl-verse";
+        const left = document.createElement("span");
+        left.className = "vl-ref";
         const t = document.createElement("span");
         t.textContent = v.f;
-        item.appendChild(t);
+        left.appendChild(t);
+        const ver = (v.v || "").trim();
+        if (ver && ver.toUpperCase() !== "ESV") {
+          const vb = document.createElement("span");
+          vb.className = "version-badge";
+          vb.textContent = ver;
+          left.appendChild(vb);
+        }
+        item.appendChild(left);
         if (showPills) item.appendChild(makePill(v.g));
+        item.onclick = function(ev) { ev.stopPropagation(); showVerseTip(item, v.w); };
         list.appendChild(item);
       });
       if (count) box.appendChild(list);
@@ -1052,7 +1075,25 @@
       };
     }
 
+    // Small popup under a verse with its first few words.
+    let vlTipTimer = null;
+    function hideVerseTip() {
+      clearTimeout(vlTipTimer);
+      document.querySelectorAll(".vl-tip").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+    }
+    function showVerseTip(item, words) {
+      const had = item.querySelector(".vl-tip");
+      hideVerseTip();
+      if (had) return; // tapping the same verse again closes it
+      const tip = document.createElement("div");
+      tip.className = "vl-tip";
+      tip.textContent = words ? words : "(no text)";
+      item.appendChild(tip);
+      vlTipTimer = setTimeout(hideVerseTip, 3500);
+    }
+
     function renderVerseList() {
+      hideVerseTip();
       const box = document.getElementById("vlList");
       box.textContent = "";
       const refCount = vlVerses.length;
@@ -1092,7 +1133,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-11';
+    const CLIENT_BUILD = 'sync-12';
 
     let queue = [];
     let currentIndex = 0;

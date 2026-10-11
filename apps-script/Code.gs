@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-10'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-11'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -796,7 +796,10 @@ function getVerseList() {
     const str = String(raw === null || raw === undefined ? '' : raw).trim();
     if (str === '' || isNaN(Number(str))) continue;
     const g = Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str))));
-    verses.push({ f: ref, g: g });
+    // First three words of the verse text (verse-number markers like [3] removed).
+    const words = String(data[i][7] || '').replace(/\[\d+\]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    const first = words.slice(0, 3).join(' ') + (words.length > 3 ? '…' : '');
+    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first });
   }
   return { verses: verses };
 }
