@@ -96,10 +96,8 @@
       color: var(--text-primary);
       display: flex;
       flex-direction: column;
-      /* Clock area plus a little extra, so the iOS status-bar blur doesn't reach the top label. */
-      padding-top: calc(max(env(safe-area-inset-top, 0px), 8px) + 10px);
-      /* Half the home-bar inset is enough to clear the home indicator. */
-      padding-bottom: calc(max(calc(env(safe-area-inset-bottom, 0px) * 0.5), 10px) + 4px);
+      padding-top: max(env(safe-area-inset-top, 0px), 8px);
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
       padding-left: max(env(safe-area-inset-left, 0px), 12px);
       padding-right: max(env(safe-area-inset-right, 0px), 12px);
       transition: background-color 0.25s ease, color 0.25s ease;
@@ -582,10 +580,8 @@
     .sb-left {
       display: flex;
       align-items: center;
-      align-self: stretch;
       gap: 6px;
       min-width: 0;
-      min-height: 28px;
     }
 
     .sb-left > span {
@@ -715,8 +711,8 @@
 <body>
 
   <div class="status-bar">
-    <div class="sb-left" onclick="toggleDiag(event)">
-      <span id="queueProgress"></span>
+    <div class="sb-left">
+      <span id="queueProgress" onclick="toggleDiag()"></span>
       <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
     </div>
     <button type="button" class="learning-chip" id="learningChip" onclick="toggleLearning()" style="display: none;"></button>
@@ -926,7 +922,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-10';
+    const CLIENT_BUILD = 'sync-8';
 
     let queue = [];
     let currentIndex = 0;
@@ -2088,26 +2084,10 @@
         " · last check " + (diag.checkedAt || "never") + ": " + diag.result +
         (diag.error ? " · error: " + diag.error : "") +
         " · loaded " + (diag.adopted || "never") +
-        " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "") +
-        " · layout " + layoutInfo();
+        " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "");
     }
 
-    // Window and safe-area sizes, to help debug spacing on the phone.
-    function layoutInfo() {
-      try {
-        const p = document.createElement("div");
-        p.style.cssText = "position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)";
-        document.body.appendChild(p);
-        const cs = getComputedStyle(p);
-        const t = cs.paddingTop, b = cs.paddingBottom;
-        document.body.removeChild(p);
-        return window.innerWidth + "x" + window.innerHeight + " screen " + screen.width + "x" + screen.height + " safe " + t + "/" + b;
-      } catch (e) { return "n/a"; }
-    }
-
-    function toggleDiag(ev) {
-      // Ignore taps on the "unsaved · Retry" button that lives in the same area.
-      if (ev && ev.target && ev.target.closest && ev.target.closest("#syncWarning")) return;
+    function toggleDiag() {
       diagOn = !diagOn;
       const el = document.getElementById("diagLine");
       el.style.display = diagOn ? "block" : "none";
