@@ -47,7 +47,7 @@
       position: fixed;
       inset: 0;
       width: 100%;
-      height: 100%;
+      height: var(--app-h, 100%);
       margin: 0;
       padding: 0;
       overflow: hidden;
@@ -61,7 +61,7 @@
       right: 0;
       bottom: 0;
       width: 100%;
-      height: 100%;
+      height: var(--app-h, 100%);
       border: 0;
       outline: none;
       display: block;
@@ -105,6 +105,20 @@
   <iframe id="appFrame"></iframe>
 
   <script>
+    // iOS home-screen apps with a translucent status bar can report a window that is one status bar
+    // shorter than the screen, leaving a gap at the bottom. In portrait, use the real screen height.
+    function fitHeight() {
+      var h = window.innerHeight;
+      if (window.navigator.standalone && window.innerHeight > window.innerWidth && window.screen && window.screen.height > h) {
+        h = window.screen.height;
+      }
+      document.documentElement.style.setProperty('--app-h', h + 'px');
+    }
+    fitHeight();
+    window.addEventListener('resize', fitHeight);
+    window.addEventListener('orientationchange', function() { setTimeout(fitHeight, 200); });
+    window.addEventListener('pageshow', fitHeight);
+
     var APP_URL = "https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec";
 
     // Optional access key: only used if you add a VR_KEY script property in Apps Script.
