@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="https://bookplayerfan.github.io/VerseReviewer/VerseReview.png?v=15">
   <link rel="manifest" href="manifest.json">
 
-  <!-- Status bar: translucent (page colour shows behind the clock; iframe is offset below it) -->
+  <!-- Status bar: translucent. The app inside already pads its own top for the clock, so the iframe fills the screen. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Verse Review">
@@ -56,13 +56,12 @@
 
     iframe {
       position: fixed;
-      /* Start below the status bar; the page background behind the clock follows light/dark live. */
-      top: env(safe-area-inset-top, 0px);
+      top: 0;
       left: 0;
       right: 0;
       bottom: 0;
       width: 100%;
-      height: calc(100% - env(safe-area-inset-top, 0px));
+      height: 100%;
       border: 0;
       outline: none;
       display: block;
