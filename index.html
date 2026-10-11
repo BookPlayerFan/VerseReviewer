@@ -142,6 +142,27 @@
     });
 
     setTimeout(dismissSplash, 4000);
+
+    // Keep the theme-color tag in step with the system light/dark setting while the app is open.
+    // (Experiment: iOS may or may not re-read it for a home-screen app. Harmless if it doesn't.)
+    (function() {
+      var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+      if (!mq) return;
+      function syncThemeColor() {
+        var color = mq.matches ? '#121212' : '#f8f9fa';
+        var old = document.querySelectorAll('meta[name="theme-color"]');
+        for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+        var m = document.createElement('meta');
+        m.name = 'theme-color';
+        m.content = color;
+        document.head.appendChild(m);
+      }
+      if (mq.addEventListener) mq.addEventListener('change', syncThemeColor);
+      else if (mq.addListener) mq.addListener(syncThemeColor);
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') syncThemeColor();
+      });
+    })();
   </script>
 </body>
 </html>
