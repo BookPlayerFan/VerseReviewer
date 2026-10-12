@@ -721,6 +721,21 @@
     #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
     #verseListView .picker-close { display: none; }
     #picker { z-index: 70; }
+    .pv { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.45); padding: 24px 20px; }
+    .pv.open { display: flex; }
+    .pv-card { background: var(--bg-card); color: var(--text-primary); border-radius: 18px; width: 100%; max-width: 420px;
+      max-height: 78%; display: flex; flex-direction: column; padding: 18px 18px 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+    .pv-head { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 18px; font-weight: 700;
+      color: var(--text-accent); margin-bottom: 10px; }
+    .pv-text { overflow-y: auto; -webkit-overflow-scrolling: touch; font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+      font-size: 17px; line-height: 1.55; user-select: text; padding: 2px 2px 8px; }
+    .pv-text sup, .pv-text .pv-n { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700;
+      color: var(--text-accent); margin-right: 3px; }
+    .pv-btns { display: flex; gap: 10px; margin-top: 10px; }
+    .pv-btns button { flex: 1; min-height: 0; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; flex-direction: row; justify-content: center; }
+    .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
+    .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
     /* Undo: small pill in the card's top-right corner, only while it can be used */
     .undo-link { position: absolute; top: 10px; right: 12px; z-index: 6; margin: 0; padding: 5px 11px;
       border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); opacity: 0; }
@@ -896,6 +911,17 @@
       Verses
     </button>
   </nav>
+
+  <div class="pv" id="pickerPreview" onclick="if (event.target === this) closePreview()">
+    <div class="pv-card">
+      <div class="pv-head"><span id="pvRef"></span><span class="version-badge" id="pvVer" style="display:none"></span></div>
+      <div class="pv-text" id="pvText"></div>
+      <div class="pv-btns">
+        <button type="button" class="pv-close" onclick="closePreview()">Close</button>
+        <button type="button" class="pv-add" id="pvAdd">Add</button>
+      </div>
+    </div>
+  </div>
 
   <div class="picker" id="picker">
     <div class="picker-head">
@@ -1241,7 +1267,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-14';
+    const CLIENT_BUILD = 'sync-15';
 
     let queue = [];
     let currentIndex = 0;
@@ -2255,9 +2281,39 @@
         b.type = "button";
         b.className = "picker-item";
         b.textContent = it.f;
-        b.onclick = function() { chooseVerse(it); };
+        b.onclick = function() { showPreview(it); };
         box.appendChild(b);
       });
+    }
+
+    // Tapping a verse in the list previews its text; adding is a separate button.
+    function showPreview(it) {
+      document.getElementById("pvRef").textContent = it.f;
+      const ver = (it.v || "").trim();
+      const vb = document.getElementById("pvVer");
+      if (ver && ver.toUpperCase() !== "ESV") { vb.textContent = ver; vb.style.display = "inline-block"; } else { vb.style.display = "none"; }
+      const box = document.getElementById("pvText");
+      box.textContent = "";
+      const segs = parseVerseSegments(it.t || "", it.f);
+      if (!segs.length) {
+        box.textContent = "No text saved for this verse.";
+      } else {
+        segs.forEach(function(sg, i) {
+          if (sg.num && segs.length > 1) {
+            const n = document.createElement("span");
+            n.className = "pv-n";
+            n.textContent = sg.num;
+            box.appendChild(n);
+          }
+          box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
+        });
+      }
+      document.getElementById("pvAdd").onclick = function() { closePreview(); chooseVerse(it); };
+      document.getElementById("pickerPreview").classList.add("open");
+    }
+
+    function closePreview() {
+      document.getElementById("pickerPreview").classList.remove("open");
     }
 
     function chooseVerse(it) {

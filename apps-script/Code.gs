@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-16'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-17'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -754,7 +754,7 @@ function listUnassigned() {
     const g = data[i][4];
     const ref = cleanRef_(data[i][5]);
     if (ref && (g === "" || g === null || g === undefined)) {
-      out.push({ r: i + 1, f: ref, v: String(data[i][6] || '').trim() });
+      out.push({ r: i + 1, f: ref, v: String(data[i][6] || '').trim(), t: String(data[i][7] || '').trim() });
     }
   }
   return out;
