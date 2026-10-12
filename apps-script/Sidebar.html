@@ -721,6 +721,16 @@
     #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
     #verseListView .picker-close { display: none; }
     #picker { z-index: 70; }
+    .picker-actions { display: inline-flex; gap: 14px; align-items: center; }
+    #picker .picker-close:first-child { color: var(--text-accent); font-weight: 600; }
+    .picker-note { font-size: 13px; color: var(--badge-pass); min-height: 0; margin: -4px 0 8px; font-weight: 600; }
+    .picker-note:empty { display: none; }
+    .paste-area { width: 100%; min-height: 200px; resize: none; outline: none; border: 1px solid var(--border-card); border-radius: 10px;
+      background: transparent; color: var(--text-primary); font-size: 16px; line-height: 1.4; padding: 10px 12px; user-select: text; }
+    .paste-area:focus { border-color: var(--text-accent); }
+    .paste-hint { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
+    .paste-hint.bad { color: var(--badge-fail); }
+    .paste-hint.ok { color: var(--text-muted); }
     .pv { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
       background: rgba(0,0,0,0.45); padding: 24px 20px; }
     .pv.open { display: flex; }
@@ -923,11 +933,28 @@
     </div>
   </div>
 
+  <div class="pv" id="pasteModal" onclick="if (event.target === this) closePaste()">
+    <div class="pv-card">
+      <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Paste new verse</div>
+      <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="updatePasteHint()"></textarea>
+      <div class="paste-hint" id="pasteHint"></div>
+      <div class="pv-btns">
+        <button type="button" class="pv-close" onclick="closePaste()">Cancel</button>
+        <button type="button" class="pv-add" id="pasteAdd" onclick="submitPaste()">Add</button>
+      </div>
+    </div>
+  </div>
+
   <div class="picker" id="picker">
     <div class="picker-head">
       <span class="picker-title">Choose a verse</span>
-      <button type="button" class="picker-close" onclick="closePicker()">Cancel</button>
+      <span class="picker-actions">
+        <button type="button" class="picker-close" onclick="openPaste()">Paste verse</button>
+        <button type="button" class="picker-close" onclick="closePicker()">Cancel</button>
+      </span>
     </div>
+    <div class="picker-note" id="pickerNote"></div>
     <input type="search" class="picker-search" id="pickerSearch" placeholder="Search" autocomplete="off" oninput="renderPicker()">
     <div class="picker-list" id="pickerList"></div>
   </div>
@@ -1267,7 +1294,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-15';
+    const CLIENT_BUILD = 'sync-16';
 
     let queue = [];
     let currentIndex = 0;
@@ -2244,11 +2271,9 @@
       google.script.run
         .withSuccessHandler(function(list) {
           btn.disabled = false;
-          if (!Array.isArray(list) || list.length === 0) {
-            showSummaryNotice("No unassigned verses left in your sheet.", true);
-            return;
-          }
+          if (!Array.isArray(list)) list = [];
           pickerItems = list;
+          document.getElementById("pickerNote").textContent = "";
           document.getElementById("pickerSearch").value = "";
           document.getElementById("picker").classList.add("open");
           renderPicker();
@@ -2258,6 +2283,74 @@
           showSummaryNotice("Couldn't load verses: " + ((err && err.message) || err), true);
         })
         .listUnassigned();
+    }
+
+
+    // ── Paste a new verse ──
+    // First line: reference and (optionally) version, e.g. "Romans 8:35-37 ESV". The rest is the verse text.
+    function parsePasted(raw) {
+      const lines = String(raw || "").replace(/\r/g, "").split("\n");
+      let i = 0;
+      while (i < lines.length && !lines[i].trim()) i++;
+      if (i >= lines.length) return { empty: true };
+      let head = lines[i].trim().replace(/\s+/g, " ");
+      const body = lines.slice(i + 1).join(" ").replace(/\s+/g, " ").trim();
+      let ver = "";
+      const m = head.match(/^(.*\S)[\s,]+\(?([A-Za-z][A-Za-z0-9]{1,7})\)?$/);
+      if (m && /\d/.test(m[1])) { head = m[1].replace(/[,\s]+$/, ""); ver = m[2].toUpperCase(); }
+      if (!/\d/.test(head) || !/^[A-Za-z0-9]/.test(head)) return { error: "First line should be the reference, like Romans 8:35-37 ESV." };
+      if (!body) return { error: "Add the verse text on the lines below the reference." };
+      return { ref: head, ver: ver || "ESV", defaultVer: !ver, text: body };
+    }
+
+    function openPaste() {
+      document.getElementById("pasteText").value = "";
+      document.getElementById("pasteHint").textContent = "";
+      document.getElementById("pasteHint").className = "paste-hint";
+      document.getElementById("pasteAdd").disabled = false;
+      document.getElementById("pasteModal").classList.add("open");
+      setTimeout(function() { try { document.getElementById("pasteText").focus(); } catch (e) {} }, 50);
+    }
+
+    function closePaste() {
+      document.getElementById("pasteModal").classList.remove("open");
+    }
+
+    function updatePasteHint() {
+      const el = document.getElementById("pasteHint");
+      const p = parsePasted(document.getElementById("pasteText").value);
+      if (p.empty) { el.textContent = ""; el.className = "paste-hint"; return; }
+      if (p.error) { el.textContent = p.error; el.className = "paste-hint bad"; return; }
+      el.textContent = p.ref + " · " + p.ver + (p.defaultVer ? " (no version given)" : "");
+      el.className = "paste-hint ok";
+    }
+
+    function submitPaste() {
+      const el = document.getElementById("pasteHint");
+      const p = parsePasted(document.getElementById("pasteText").value);
+      if (p.empty || p.error) { el.textContent = p.error || "Paste a verse first."; el.className = "paste-hint bad"; return; }
+      const btn = document.getElementById("pasteAdd");
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          if (res && res.success) {
+            closePaste();
+            document.getElementById("pickerNote").textContent = "Added " + res.reference + " (waiting in your list)";
+            google.script.run
+              .withSuccessHandler(function(list) { if (Array.isArray(list)) { pickerItems = list; renderPicker(); } })
+              .listUnassigned();
+          } else {
+            el.textContent = (res && res.message) || "Couldn't add that verse.";
+            el.className = "paste-hint bad";
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          el.textContent = "Couldn't add: " + ((err && err.message) || err);
+          el.className = "paste-hint bad";
+        })
+        .addPastedVerse(p.ref, p.ver, p.text);
     }
 
     function closePicker() {
@@ -2272,7 +2365,7 @@
       if (shown.length === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
-        e.textContent = "No matches";
+        e.textContent = pickerItems.length === 0 ? "No unassigned verses. Tap \u201cPaste verse\u201d to add one." : "No matches";
         box.appendChild(e);
         return;
       }

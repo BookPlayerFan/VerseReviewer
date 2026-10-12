@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-17'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-18'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -873,6 +873,37 @@ function sortVerses_() {
     range.setValues(out);
   } catch (e) {
     console.error('Sort failed: ' + e);
+  }
+}
+
+// Adds a pasted verse as a new row at the top of the Verses tab: reference, version and text filled in,
+// Level left blank (unassigned), and the date it was added in column C.
+function addPastedVerse(reference, version, text) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+    if (!sheet) return { success: false, message: 'Sheet "Verses" not found.' };
+    const ref = cleanRef_(reference).replace(/\s+/g, ' ');
+    const ver = cleanRef_(version).toUpperCase() || 'ESV';
+    const body = String(text === null || text === undefined ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!ref || ref.length > 100 || !/^[A-Za-z0-9]/.test(ref) || !/\d/.test(ref)) return { success: false, message: 'That reference does not look right.' };
+    if (ver.length > 12 || !/^[A-Z0-9]+$/.test(ver)) return { success: false, message: 'That version does not look right.' };
+    if (!body) return { success: false, message: 'No verse text found.' };
+    if (body.length > 20000 || /^[=+\-@]/.test(body)) return { success: false, message: 'That verse text cannot be saved.' };
+    const last = sheet.getLastRow();
+    if (findRowByRef_(sheet, ref)) return { success: false, message: ref + ' is already in your sheet.' };
+    const cols = Math.max(8, sheet.getLastColumn());
+    if (last >= 2) {
+      sheet.insertRowsBefore(2, 1);
+      try { // new row takes the look of the row below it, not the header
+        sheet.getRange(3, 1, 1, cols).copyTo(sheet.getRange(2, 1, 1, cols), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+      } catch (e) {}
+    }
+    sheet.getRange(2, 1, 1, 8).setValues([['', '', today_(), '', '', ref, ver, body]]);
+    return { success: true, reference: ref };
+  } finally {
+    lock.releaseLock();
   }
 }
 
