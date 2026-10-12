@@ -773,7 +773,7 @@
        so they take no room between the verse and the buttons. */
     .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
     .verse-wrap .verse-body { flex: 1; margin-bottom: 0; }
-    #toastNotice { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 5;
+    #toastNotice { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 5;
       width: max-content; max-width: 94%; min-height: 0; margin: 0; padding: 6px 14px; border-radius: 14px;
       background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: 0 4px 14px rgba(0,0,0,0.14);
       pointer-events: none; text-align: center; animation: noticeIn 0.18s ease-out both; }
@@ -839,6 +839,7 @@
   <div id="deckContainer">
     <button type="button" class="corner-add" id="cornerAdd" onclick="addNewVerse()" aria-label="Add a new verse" style="display: none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
     <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">↶ Undo</button>
+    <div class="notice" id="toastNotice"></div>
     <div class="card" id="activeCard">
       <div class="swipe-badge badge-pass" id="badgePass">PASS</div>
       <div class="swipe-badge badge-fail" id="badgeFail">FAIL</div>
@@ -855,7 +856,6 @@
       <div class="verse-wrap">
         <div class="verse-body" id="cardBody" onclick="handleContainerClick(event)">
         </div>
-        <div class="notice" id="toastNotice"></div>
       </div>
 
       <div class="action-container">
@@ -1017,6 +1017,22 @@
     }
 
     // Brief rank-up moment in the toast: old badge, arrow, new badge popping in. Diamond gets a bigger one.
+    // The notice lives outside the card (the card fades away when you score it, and a notice inside it
+    // would fade too), so each time it changes it is lined up with the bottom of the verse box.
+    function placeNotice() {
+      const n = document.getElementById("toastNotice");
+      const card = document.getElementById("activeCard");
+      const wrap = card && card.querySelector(".verse-wrap");
+      const deck = document.getElementById("deckContainer");
+      if (!n || !wrap || !deck || !n.firstChild) return;
+      const bottomEdge = card.offsetTop + wrap.offsetTop + wrap.offsetHeight;
+      n.style.bottom = Math.max(0, deck.clientHeight - bottomEdge + 10) + "px";
+      n.style.left = (card.offsetLeft + wrap.offsetLeft + wrap.offsetWidth / 2) + "px";
+    }
+    try {
+      new MutationObserver(placeNotice).observe(document.getElementById("toastNotice"), { childList: true, characterData: true, subtree: true });
+    } catch (e) {}
+
     function showRankUp(fromG, toG, restored) {
       const el = document.getElementById("toastNotice");
       el.textContent = "";
@@ -1353,7 +1369,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-30';
+    const CLIENT_BUILD = 'sync-31';
 
     let queue = [];
     let currentIndex = 0;
