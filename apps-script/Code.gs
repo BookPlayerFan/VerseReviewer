@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-21'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-22'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -366,6 +366,13 @@ function findRowByRef_(sheet, ref) {
 // Turns the compact stored session into full cards (verse text etc.) from the sheet.
 // If rows were sorted or inserted, cards are matched back up by reference.
 // Also returns the current Level 0 "learning" verses and the last screen you were on.
+function seenFor_(s, learning) {
+  const live = sanitizeSeen_(s.seen);
+  const out = {};
+  learning.forEach(function(c) { if (live[c.reference]) out[c.reference] = live[c.reference]; });
+  return out;
+}
+
 function hydrate_(s, preRead) {
   const data = preRead || readSheetData_();
 
@@ -434,6 +441,7 @@ function hydrate_(s, preRead) {
     stats: s.stats,
     cards: cards,
     learning: learning,
+    seen: seenFor_(s, learning),
     tomorrow: dueTomorrowCount_(data)
   };
 }
@@ -590,6 +598,19 @@ function sanitizeQueue_(q) {
   return out;
 }
 
+// New-verse "Reviewed" marks: { reference: time (ms) until which that verse is counted as looked at }.
+function sanitizeSeen_(obj) {
+  const out = {};
+  if (!obj || typeof obj !== 'object') return out;
+  const now = Date.now();
+  let n = 0;
+  Object.keys(obj).forEach(function(k) {
+    const t = Number(obj[k]);
+    if (n < 200 && k && k.length <= 120 && isFinite(t) && t > now && t < now + 24 * 3600 * 1000) { out[k] = t; n++; }
+  });
+  return out;
+}
+
 function sanitizeStats_(st) {
   st = st || {};
   const n = function(v) { v = Number(v); return (Number.isInteger(v) && v >= 0) ? v : 0; };
@@ -698,6 +719,7 @@ function submitReview(expectedVersion, review, next) {
     s.processed = Math.max(0, Number(next.processed) || 0);
     s.stats = sanitizeStats_(next.stats);
     s.mode = (next.mode === 'learning') ? 'learning' : 'review';
+    if (next.seen !== undefined) s.seen = sanitizeSeen_(next.seen);
     s.version++;
 
     let logRef = null;

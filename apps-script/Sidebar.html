@@ -1163,26 +1163,26 @@
       const rc = document.getElementById("tabReviewCount");
       rc.textContent = left; rc.style.display = left > 0 ? "" : "none";
       const nc = document.getElementById("tabNewCount");
-      const n = learningCards.length;
-      const quiet = newBadgeSnoozed();
-      nc.textContent = n; nc.style.display = (n > 0 && !quiet) ? "" : "none";
+      const n = unseenCount();
+      nc.textContent = n; nc.style.display = n > 0 ? "" : "none";
       scheduleBadgeReturn();
     }
 
-    // "Reviewed" on the last New verse quiets the New tab's count for 3 hours (this device only).
+    // "Reviewed" on a New verse marks it as looked at for 3 hours; the New tab's count only shows verses
+    // that are still waiting. The marks are saved with the session, so every device agrees.
     const NEW_SNOOZE_MS = 3 * 60 * 60 * 1000;
+    let learningSeen = {};
     let badgeTimer = null;
-    function newBadgeUntil() {
-      try { return Number(localStorage.getItem("vr_new_snooze")) || 0; } catch (e) { return 0; }
-    }
-    function newBadgeSnoozed() { return newBadgeUntil() > Date.now(); }
-    function snoozeNewBadge() {
-      try { localStorage.setItem("vr_new_snooze", String(Date.now() + NEW_SNOOZE_MS)); } catch (e) {}
+    function isSeen(ref) { return (learningSeen[ref] || 0) > Date.now(); }
+    function unseenCount() {
+      return learningCards.filter(function(c) { return !isSeen(c.reference); }).length;
     }
     function scheduleBadgeReturn() {
       if (badgeTimer) { clearTimeout(badgeTimer); badgeTimer = null; }
-      const wait = newBadgeUntil() - Date.now();
-      if (wait > 0) badgeTimer = setTimeout(updateTabs, Math.min(wait + 500, 2147483000));
+      const now = Date.now();
+      let next = Infinity;
+      Object.keys(learningSeen).forEach(function(k) { if (learningSeen[k] > now && learningSeen[k] < next) next = learningSeen[k]; });
+      if (next < Infinity) badgeTimer = setTimeout(updateTabs, Math.min(next - now + 500, 2147483000));
     }
     document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
 
@@ -1353,7 +1353,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-29';
+    const CLIENT_BUILD = 'sync-30';
 
     let queue = [];
     let currentIndex = 0;
@@ -1439,6 +1439,7 @@
     function adoptSession(session) {
       queue = session.cards || [];
       learningCards = session.learning || [];
+      learningSeen = session.seen || {};
       learningIndex = 0;
       mode = (session.mode === 'learning') ? 'learning' : 'review';
       baseCount = session.baseCount || 0;
@@ -1536,7 +1537,8 @@
         baseCount: baseCount,
         processed: totalCardsProcessed,
         mode: mode,
-        stats: sessionStats
+        stats: sessionStats,
+        seen: learningSeen
       };
     }
 
@@ -1830,7 +1832,7 @@
       if (passBadge) { passBadge.style.opacity = "0"; passBadge.textContent = "LEVEL UP"; }
 
       const hasNext = learningIndex < learningCards.length - 1;
-      const doneLabel = hasNext ? "Next" : "Reviewed";
+      const doneLabel = "Reviewed";
       if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }
 
       // Learning verses don't count toward today's card numbers or reviewed total.
@@ -2099,12 +2101,14 @@
           snapshot(currentIndex)
         );
         ms = 1200;
-      } else if (learningIndex < learningCards.length - 1) {
-        learningIndex++;
       } else {
-        mode = 'review';
-        learningIndex = 0;
-        snoozeNewBadge();
+        learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
+        if (learningIndex < learningCards.length - 1) {
+          learningIndex++;
+        } else {
+          mode = 'review';
+          learningIndex = 0;
+        }
         enqueueSubmit(null, snapshot(currentIndex));
       }
 
