@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-15'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-16'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -438,7 +438,6 @@ function refreshSession() {
       sortVerses_();
       s = createState_(today);
     } else if (s.currentIndex >= s.queue.length) {
-      sortVerses_();
       const cards = getDueCards();
       s.queue = cards.map(compactCard_);
       s.baseCount = cards.length;
@@ -688,7 +687,6 @@ function submitReview(expectedVersion, review, next) {
     }
 
     writeState_(s);
-    if (review && idx >= queue.length) sortVerses_(); // deck finished: tidy the sheet
     const result = { ok: true, version: s.version, undoId: undoId };
     if (review) result.tomorrow = dueTomorrowCount_(readSheetData_());
     return result;
@@ -781,8 +779,6 @@ function addChosenVerse(rowIndex, reference) {
       return { success: false, message: 'That verse was already added.' };
     }
     sheet.getRange(row, 2, 1, 4).setValues([["", today_(), 1, 0]]);
-    sortVerses_();
-    row = findRowByRef_(sheet, want) || row;
     return { success: true, reference: want, rowIndex: row };
   } finally {
     lock.releaseLock();
@@ -791,8 +787,7 @@ function addChosenVerse(rowIndex, reference) {
 
 // ── Keeping the Verses tab sorted ──
 // Order: verses with no level yet first, then Level 0 (New), then Level 1 up to 8.
-// Within a level, Bible order (book, chapter, verse). Runs at safe moments only: when a new day's
-// deck is built, when you finish the deck, and when you add a verse. Rows are matched by reference
+// Within a level, Bible order (book, chapter, verse). Runs once a day, when the new day's deck is built. Rows are matched by reference
 // everywhere else, so moving them never writes to the wrong verse.
 // Books in Bible order, with the names and abbreviations a reference might start with.
 const BIBLE_BOOKS_ = [
