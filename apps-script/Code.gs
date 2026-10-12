@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-14'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-15'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -790,7 +790,7 @@ function addChosenVerse(rowIndex, reference) {
 }
 
 // ── Keeping the Verses tab sorted ──
-// Order: Level 0 (New) first, then Level 1 up to 8; verses with no level yet go last.
+// Order: verses with no level yet first, then Level 0 (New), then Level 1 up to 8.
 // Within a level, Bible order (book, chapter, verse). Runs at safe moments only: when a new day's
 // deck is built, when you finish the deck, and when you add a verse. Rows are matched by reference
 // everywhere else, so moving them never writes to the wrong verse.
@@ -862,7 +862,7 @@ function sortVerses_() {
       return {
         i: i,
         empty: !ref,
-        level: hasLevel ? Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str)))) : 99,
+        level: hasLevel ? Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str)))) : -1, // unassigned verses sort first
         book: p.book, chapter: p.chapter, verse: p.verse, ref: ref
       };
     });
