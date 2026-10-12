@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-22'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-23'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -1023,7 +1023,7 @@ function getVerseList() {
     // Days from today until the next review (overdue shows as 0); null when there is no review date (Level 0).
     const nd = g > 0 ? toMidnight_(data[i][1]) : null;
     const due = nd ? Math.max(0, Math.round((nd.getTime() - todayMs) / 86400000)) : null;
-    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, d: due });
+    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), d: due });
   }
   return { verses: verses };
 }

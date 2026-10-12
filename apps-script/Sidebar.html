@@ -730,6 +730,15 @@
     .tab.on .tab-count { background: var(--text-accent); }
     #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
     #verseListView .picker-close { display: none; }
+    .vl-iconbtn { background: none; border: 0; box-shadow: none; width: auto; min-height: 0; margin: -6px 0; padding: 6px 4px 6px 12px; }
+    .vl-iconbtn svg { width: 22px; height: 22px; display: block; stroke: var(--text-accent, #1a73e8); fill: none; stroke-width: 2; stroke-linecap: round; }
+    .vl-iconbtn.on svg { stroke: var(--text-muted); }
+    .vl-search { margin: 0 0 2px; }
+    .vl-search .picker-search { margin-bottom: 8px; }
+    .vl-verse.hit { flex-wrap: wrap; }
+    .vl-snip { flex-basis: 100%; margin-top: 3px; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+    .vl-snip.full { color: var(--text-primary); }
+    .vl-snip mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 3px; padding: 0 1px; }
     #picker { z-index: 70; }
     .picker-actions { display: inline-flex; gap: 14px; align-items: center; }
     #picker .picker-close:first-child { color: var(--text-accent); font-weight: 600; }
@@ -918,8 +927,10 @@
   <div class="picker" id="verseListView">
     <div class="picker-head">
       <span class="picker-title" onclick="toggleDiag()">Verse List</span>
+      <button type="button" class="vl-iconbtn" id="vlSearchBtn" onclick="toggleVlSearch()" aria-label="Search verses"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
+    <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
     <div class="vl-bar">
       <span class="vl-total" id="vlTotal"></span>
       <div class="vl-seg">
@@ -1225,6 +1236,7 @@
 
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
+      resetVlSearch();
       updateTabs();
       document.getElementById("vlTotal").textContent = "Loading…";
       document.getElementById("vlList").textContent = "";
@@ -1234,7 +1246,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
           vlVerses.sort(compareVerses);
           renderVerseList();
         })
@@ -1248,6 +1260,7 @@
 
     function closeVerseList() {
       hideVerseTip();
+      resetVlSearch();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
     }
@@ -1336,10 +1349,121 @@
       vlTipTimer = setTimeout(hideVerseTip, 3500);
     }
 
+    // ── Verse List search ──
+    let vlQuery = "";
+    function vlNorm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+    function toggleVlSearch() {
+      const row = document.getElementById("vlSearchRow");
+      const input = document.getElementById("vlSearch");
+      const open = row.style.display === "none";
+      if (open) {
+        row.style.display = "";
+        document.getElementById("vlSearchBtn").classList.add("on");
+        input.focus();
+      } else {
+        resetVlSearch();
+        renderVerseList();
+      }
+    }
+    function resetVlSearch() {
+      vlQuery = "";
+      const input = document.getElementById("vlSearch");
+      if (input) { input.value = ""; input.blur(); }
+      const row = document.getElementById("vlSearchRow");
+      if (row) row.style.display = "none";
+      const btn = document.getElementById("vlSearchBtn");
+      if (btn) btn.classList.remove("on");
+    }
+    function onVlSearch() {
+      vlQuery = document.getElementById("vlSearch").value;
+      renderVerseList();
+    }
+    // Every word typed must appear somewhere in the reference, version or verse text.
+    function vlMatches(q) {
+      const raw = q.toLowerCase().split(/\s+/).filter(Boolean);
+      const toks = raw.map(vlNorm).filter(Boolean);
+      if (!toks.length) return null;
+      const hits = vlVerses.filter(function(v) {
+        const hay = " " + vlNorm(v.f + " " + v.v + " " + v.x) + " ";
+        return toks.every(function(t) { return hay.indexOf(t) !== -1; });
+      });
+      return { hits: hits, raw: raw };
+    }
+    function vlSnippet(text, raw, full) {
+      const box = document.createElement("div");
+      box.className = "vl-snip" + (full ? " full" : "");
+      const low = text.toLowerCase();
+      let at = -1;
+      raw.forEach(function(t) { const i = low.indexOf(t); if (i >= 0 && (at < 0 || i < at)) at = i; });
+      let s = text, pre = false, post = false;
+      if (!full) {
+        const start = Math.max(0, (at < 0 ? 0 : at) - 24);
+        s = text.substr(start, 90);
+        pre = start > 0; post = start + 90 < text.length;
+      }
+      const parts = raw.filter(function(t) { return t.length > 0; }).map(function(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); });
+      if (pre) box.appendChild(document.createTextNode("…"));
+      if (parts.length) {
+        const re = new RegExp("(" + parts.join("|") + ")", "ig");
+        s.split(re).forEach(function(seg, i) {
+          if (i % 2 === 1) { const m = document.createElement("mark"); m.textContent = seg; box.appendChild(m); }
+          else box.appendChild(document.createTextNode(seg));
+        });
+      } else box.appendChild(document.createTextNode(s));
+      if (post) box.appendChild(document.createTextNode("…"));
+      return box;
+    }
+    function renderVlSearch(box) {
+      const res = vlMatches(vlQuery);
+      if (!res) return false;
+      document.getElementById("vlTotal").textContent = res.hits.length + (res.hits.length === 1 ? " match" : " matches");
+      if (!res.hits.length) {
+        const e = document.createElement("div");
+        e.className = "picker-empty";
+        e.textContent = "No matches";
+        box.appendChild(e);
+        return true;
+      }
+      const list = document.createElement("div");
+      list.className = "vl-verses";
+      res.hits.forEach(function(v) {
+        const item = document.createElement("div");
+        item.className = "vl-verse hit";
+        const left = document.createElement("span");
+        left.className = "vl-ref";
+        const t = document.createElement("span");
+        t.textContent = v.f;
+        left.appendChild(t);
+        const ver = (v.v || "").trim();
+        if (ver && ver.toUpperCase() !== "ESV") {
+          const vb = document.createElement("span");
+          vb.className = "version-badge";
+          vb.textContent = ver;
+          left.appendChild(vb);
+        }
+        item.appendChild(left);
+        item.appendChild(makePill(v.g));
+        let snip = vlSnippet(v.x || "", res.raw, false);
+        let isFull = false;
+        item.appendChild(snip);
+        item.onclick = function() { // tap to read the whole verse, tap again to collapse
+          isFull = !isFull;
+          const next = vlSnippet(v.x || "", res.raw, isFull);
+          item.replaceChild(next, snip);
+          snip = next;
+        };
+        list.appendChild(item);
+      });
+      box.appendChild(list);
+      return true;
+    }
+
     function renderVerseList() {
       hideVerseTip();
       const box = document.getElementById("vlList");
       box.textContent = "";
+      document.querySelector("#verseListView .vl-seg").style.visibility = vlQuery.trim() ? "hidden" : "";
+      if (vlQuery.trim() && renderVlSearch(box)) return;
       const refCount = vlVerses.length;
       const verseTotal = vlVerses.reduce(function(sum, v) { return sum + v.n; }, 0);
       document.getElementById("vlTotal").textContent =
@@ -1390,7 +1514,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-34';
+    const CLIENT_BUILD = 'sync-35';
 
     let queue = [];
     let currentIndex = 0;
