@@ -254,14 +254,16 @@
       60%  { box-shadow: 0 0 14px 5px color-mix(in srgb, var(--rc) 45%, transparent); }
       100% { box-shadow: 0 0 0 0 transparent; }
     }
-    .notice.levelup { font-size: 15px; min-height: 34px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
+    .notice.levelup { font-size: 15px; min-height: 34px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 12px; }
     @keyframes rankPop {
       0%   { transform: scale(0.6); opacity: 0; }
       55%  { transform: scale(1.3); opacity: 1; }
       100% { transform: scale(1); opacity: 1; }
     }
-    .rank-arrow { color: var(--text-meta); margin: 0 6px; font-weight: 600; }
+    .rank-arrow { color: var(--text-meta); margin: 0 2px; font-weight: 600; }
     .notice .rank-badge { vertical-align: middle; }
+    .notice .rank-badge.pop, .notice .rank-badge.pop-big { margin: 0 6px; } /* room for the glow */
+    #toastNotice.levelup { padding: 8px 18px; }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
     .vl-row:active, .vl-seg button:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
@@ -1038,7 +1040,11 @@
       el.textContent = "";
       el.classList.add("levelup");
       clearTimeout(showRankUp.t);
-      showRankUp.t = setTimeout(function() { el.classList.remove("levelup"); }, 2500);
+      // Stays up about 1.5 s after the next card appears (the card changes after 1.2 s, or 1.7 s for the top rank).
+      showRankUp.t = setTimeout(function() {
+        el.classList.remove("levelup");
+        if (el.querySelector(".rank-badge")) el.textContent = ""; // leave any newer message alone
+      }, (toG >= 8 ? 1700 : 1200) + 1500);
       if (restored) {
         el.appendChild(document.createTextNode("Restored to "));
       } else if (fromG >= 0) {
@@ -1369,7 +1375,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-31';
+    const CLIENT_BUILD = 'sync-32';
 
     let queue = [];
     let currentIndex = 0;
@@ -1777,6 +1783,7 @@
       else renderCard();
       updateLearningChip();
       updateTabs();
+      placeNotice();
     }
 
     function updateLearningChip() {
@@ -2092,7 +2099,8 @@
       const startedIn = epoch;
       setTimeout(function() {
         if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
-        document.getElementById("toastNotice").textContent = "";
+        const tn = document.getElementById("toastNotice");
+        if (!tn.querySelector(".rank-badge")) tn.textContent = ""; // a level-up notice keeps showing over the next card
         currentIndex++;
         render();
       }, ms);
@@ -2132,7 +2140,8 @@
       const startedIn = epoch;
       setTimeout(function() {
         if (startedIn !== epoch) return;
-        document.getElementById("toastNotice").textContent = "";
+        const tn = document.getElementById("toastNotice");
+        if (!tn.querySelector(".rank-badge")) tn.textContent = "";
         render();
       }, ms);
     }
