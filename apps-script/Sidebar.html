@@ -696,6 +696,41 @@
       flex-shrink: 0;
     }
 
+
+    /* ── Bottom tab bar navigation ── */
+    :root { --tab-h: calc(54px + env(safe-area-inset-bottom, 0px)); }
+    body { padding-bottom: calc(var(--tab-h) + 8px); }
+    .status-bar, .progress-track { display: none !important; }
+    .tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+      display: flex; background: var(--bg-card); border-top: 1px solid var(--border-card);
+      padding: 7px 0 env(safe-area-inset-bottom, 0px); height: var(--tab-h);
+    }
+    .tab { flex: 1; background: none; border: 0; box-shadow: none; min-height: 0; width: auto; padding: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
+      font-size: 11px; font-weight: 600; color: var(--text-muted); position: relative; border-radius: 0;
+      -webkit-tap-highlight-color: transparent; }
+    .tab:active { transform: none; filter: none; }
+    .tab svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round; }
+    .tab.on { color: var(--text-accent); }
+    .tab .tab-count { position: absolute; top: -2px; left: calc(50% + 7px); min-width: 18px; text-align: center;
+      background: var(--text-muted); color: var(--bg-card); font-size: 10px; font-weight: 700;
+      border-radius: 99px; padding: 1px 6px; line-height: 14px; }
+    .tab.on .tab-count { background: var(--text-accent); }
+    #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
+    #verseListView .picker-close { display: none; }
+    #picker { z-index: 70; }
+    /* Undo: small pill in the card's top-right corner, only while it can be used */
+    .undo-link { position: absolute; top: 10px; right: 12px; z-index: 6; margin: 0; padding: 5px 11px;
+      border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); opacity: 0; }
+    .undo-link.show { opacity: 0.95; }
+    .sync-warning { position: fixed; top: max(env(safe-area-inset-top, 0px), 8px); left: 50%; transform: translateX(-50%);
+      z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .diag-line { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tab-h) + 4px); z-index: 60;
+      background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 8px; padding: 6px 8px; margin: 0; }
+    #btnRanks { display: none !important; }
+
     button:disabled { opacity: 0.55; cursor: default; }
     button:disabled:active { transform: none; filter: none; }
 
@@ -740,11 +775,9 @@
   <div class="status-bar">
     <div class="sb-left">
       <span id="queueProgress" onclick="toggleDiag()"></span>
-      <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
     </div>
     <button type="button" class="learning-chip" id="learningChip" onclick="toggleLearning()" style="display: none;"></button>
     <div class="sb-right">
-      <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">Undo</button>
       <span id="sessionStatus"></span>
     </div>
   </div>
@@ -755,7 +788,10 @@
 
   <div class="diag-line" id="diagLine" style="display: none;"></div>
 
+  <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
+
   <div id="deckContainer">
+    <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">↶ Undo</button>
     <div class="card" id="activeCard">
       <div class="swipe-badge badge-pass" id="badgePass">PASS</div>
       <div class="swipe-badge badge-fail" id="badgeFail">FAIL</div>
@@ -831,7 +867,7 @@
 
   <div class="picker" id="verseListView">
     <div class="picker-head">
-      <span class="picker-title">Verse List</span>
+      <span class="picker-title" onclick="toggleDiag()">Verse List</span>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
     <div class="vl-bar">
@@ -844,6 +880,22 @@
     </div>
     <div class="picker-list" id="vlList"></div>
   </div>
+
+
+  <nav class="tabbar" id="tabbar">
+    <button type="button" class="tab on" id="tabReview" onclick="goTab('review')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 12h8"/></svg>
+      Review<span class="tab-count" id="tabReviewCount" style="display:none"></span>
+    </button>
+    <button type="button" class="tab" id="tabNew" onclick="goTab('new')">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      New<span class="tab-count" id="tabNewCount" style="display:none"></span>
+    </button>
+    <button type="button" class="tab" id="tabVerses" onclick="goTab('verses')">
+      <svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>
+      Verses
+    </button>
+  </nav>
 
   <div class="picker" id="picker">
     <div class="picker-head">
@@ -993,8 +1045,38 @@
     let vlSort = "book";
     let vlOpen = {};
 
+
+    // ── Bottom tabs ──
+    function goTab(t) {
+      const listOpen = document.getElementById("verseListView").classList.contains("open");
+      if (t === "verses") {
+        if (!listOpen) openVerseList();
+        updateTabs();
+        return;
+      }
+      if (listOpen) closeVerseList();
+      if (t === "new" && mode !== "learning") toggleLearning();
+      else if (t === "review" && mode === "learning") toggleLearning();
+      updateTabs();
+    }
+
+    function updateTabs() {
+      const listOpen = document.getElementById("verseListView").classList.contains("open");
+      const which = listOpen ? "verses" : (mode === "learning" ? "new" : "review");
+      document.getElementById("tabReview").classList.toggle("on", which === "review");
+      document.getElementById("tabNew").classList.toggle("on", which === "new");
+      document.getElementById("tabVerses").classList.toggle("on", which === "verses");
+      const left = Math.max(0, queue.length - currentIndex);
+      const rc = document.getElementById("tabReviewCount");
+      rc.textContent = left; rc.style.display = left > 0 ? "" : "none";
+      const nc = document.getElementById("tabNewCount");
+      const n = learningCards.length;
+      nc.textContent = n; nc.style.display = n > 0 ? "" : "none";
+    }
+
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
+      updateTabs();
       document.getElementById("vlTotal").textContent = "Loading…";
       document.getElementById("vlList").textContent = "";
       vlSort = "book";
@@ -1018,6 +1100,7 @@
     function closeVerseList() {
       hideVerseTip();
       document.getElementById("verseListView").classList.remove("open");
+      updateTabs();
     }
 
     function setVlSort(mode) {
@@ -1158,7 +1241,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-12';
+    const CLIENT_BUILD = 'sync-13';
 
     let queue = [];
     let currentIndex = 0;
@@ -1560,6 +1643,7 @@
       if (mode === 'learning') renderLearning();
       else renderCard();
       updateLearningChip();
+      updateTabs();
     }
 
     function updateLearningChip() {
