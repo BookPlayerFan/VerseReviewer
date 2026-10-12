@@ -1334,7 +1334,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-27';
+    const CLIENT_BUILD = 'sync-28';
 
     let queue = [];
     let currentIndex = 0;
@@ -2630,6 +2630,7 @@
         " · last check " + (diag.checkedAt || "never") + ": " + diag.result +
         (diag.error ? " · error: " + diag.error : "") +
         " · loaded " + (diag.adopted || "never") +
+        (initialSession && initialSession.ms !== undefined ? " · server load " + initialSession.ms + " ms" : "") +
         " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "");
     }
 

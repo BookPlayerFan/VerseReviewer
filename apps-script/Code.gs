@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-20'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-21'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -167,16 +167,16 @@ function dueTomorrowCount_(data) {
 }
 
 // Verses added before "Day N" existed have no date; stamp them with today so counting starts.
-function stampLearningDates_() {
+function stampLearningDates_(preRead) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
   if (!sheet) return;
-  const data = readSheetData_();
+  const data = preRead || readSheetData_();
   const today = today_();
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5])) continue;
     const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
     if (groupStr === '' || Number(groupStr) !== 0) continue;
-    if (!toMidnight_(data[i][2])) sheet.getRange(i + 1, 3).setValue(today);
+    if (!toMidnight_(data[i][2])) { sheet.getRange(i + 1, 3).setValue(today); data[i][2] = today; }
   }
 }
 
@@ -263,9 +263,10 @@ function readState_() {
   const props = store_();
   const n = Number(props.getProperty(SESSION_KEY + '_N'));
   if (!n) return null;
+  const all = props.getProperties();
   let json = '';
   for (let i = 0; i < n; i++) {
-    const part = props.getProperty(SESSION_KEY + '_' + i);
+    const part = all[SESSION_KEY + '_' + i];
     if (part === null || part === undefined) return null;
     json += part;
   }
@@ -365,10 +366,8 @@ function findRowByRef_(sheet, ref) {
 // Turns the compact stored session into full cards (verse text etc.) from the sheet.
 // If rows were sorted or inserted, cards are matched back up by reference.
 // Also returns the current Level 0 "learning" verses and the last screen you were on.
-function hydrate_(s) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
-  const lastRow = sheet ? sheet.getLastRow() : 0;
-  const data = lastRow >= 2 ? sheet.getRange(1, 1, lastRow, 8).getValues() : [];
+function hydrate_(s, preRead) {
+  const data = preRead || readSheetData_();
 
   const byRef = {};
   const learning = [];
@@ -443,15 +442,19 @@ function hydrate_(s) {
  * Returns today's session, creating it the first time any device asks today.
  */
 function loadSession() {
+  const t0 = Date.now();
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     const today = todayKey_();
-    stampLearningDates_();
     let s = readState_();
-    if (!s || s.date !== today) { sortVerses_(); s = createState_(today); }
+    let data = readSheetData_();
+    stampLearningDates_(data);
+    if (!s || s.date !== today) { if (sortVerses_()) data = readSheetData_(); s = createState_(today); }
     else if (releaseLater_(s, nowMs_())) writeState_(s);
-    return hydrate_(s);
+    const out = hydrate_(s, data);
+    out.ms = Date.now() - t0;
+    return out;
   } finally {
     lock.releaseLock();
   }
@@ -467,8 +470,8 @@ function refreshSession() {
   lock.waitLock(20000);
   try {
     const today = todayKey_();
-    stampLearningDates_();
     let s = readState_();
+    stampLearningDates_();
     let fresh = false;
     if (!s || s.date !== today) {
       sortVerses_();
@@ -942,9 +945,11 @@ function sortVerses_() {
       return vals[it.i].map(function(v, c) { return forms[it.i][c] || v; });
     });
     range.setValues(out);
+    return true;
   } catch (e) {
     console.error('Sort failed: ' + e);
   }
+  return false;
 }
 
 // Adds a pasted verse as a new row at the top of the Verses tab: reference, version and text filled in,
