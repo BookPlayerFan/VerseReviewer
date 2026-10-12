@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-24'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-25'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -614,10 +614,15 @@ function sanitizeSeen_(obj) {
 function sanitizeStats_(st) {
   st = st || {};
   const n = function(v) { v = Number(v); return (Number.isInteger(v) && v >= 0) ? v : 0; };
+  // Missed verses today: { f: reference, g: level it now sits at }. Plain strings (older sessions) are accepted.
   const refs = [];
+  const seen = Object.create(null);
   (Array.isArray(st.failedRefs) ? st.failedRefs : []).forEach(function(r) {
-    r = String(r || '').slice(0, 120);
-    if (r && refs.indexOf(r) === -1 && refs.length < 100) refs.push(r);
+    const f = String((r && typeof r === 'object') ? (r.f || '') : (r || '')).slice(0, 120);
+    if (!f || seen[f] || refs.length >= 100) return;
+    seen[f] = true;
+    const g = (r && typeof r === 'object' && Number.isInteger(r.g) && r.g >= 0 && r.g <= 8) ? r.g : null;
+    refs.push(g === null ? { f: f } : { f: f, g: g });
   });
   return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), failedRefs: refs };
 }

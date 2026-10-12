@@ -578,13 +578,14 @@
     .val-fail { color: var(--btn-fail-text); }
     .stat-box.tappable { cursor: pointer; }
     .stat-box.open { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
-    .fail-list { text-align: left; margin: -6px 0 14px; padding: 10px 14px 8px; background: var(--bg-body); border: 1px solid var(--border-body);
+    .fail-list { text-align: left; margin: -6px 0 14px; padding: 10px 12px 6px; background: var(--bg-body); border: 1px solid var(--border-body);
       border-radius: 12px; color: var(--text-primary); }
-    .fail-list .fail-title { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--text-muted); font-weight: 600; padding-bottom: 7px; margin-bottom: 6px; border-bottom: 1px solid var(--border-body); }
-    .fail-list .fail-inner { display: grid; grid-auto-flow: column; column-gap: 14px; row-gap: 1px; font-size: 14px; line-height: 1.55;
-      max-height: 150px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    .fail-list .fail-inner > div { min-width: 0; overflow-wrap: anywhere; }
+    .fail-list .fail-title { display: block; text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-muted); font-weight: 600; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border-body); }
+    .fail-list .fail-inner { max-height: 180px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .fail-list .fail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 0 4px 0 6px; font-size: 14px; }
+    .fail-list .fail-row + .fail-row { border-top: 1px solid var(--border-body); }
+    .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; }
 
     .summary-btn-stack {
       display: flex;
@@ -1529,7 +1530,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-39';
+    const CLIENT_BUILD = 'sync-40';
 
     let queue = [];
     let currentIndex = 0;
@@ -2389,8 +2390,6 @@
           sessionStats.passed++;
         } else {
           sessionStats.failed++;
-          if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
-          if (sessionStats.failedRefs.indexOf(card.reference) === -1) sessionStats.failedRefs.push(card.reference);
         }
       }
 
@@ -2453,6 +2452,7 @@
 
         // Re-queue a clone for intraday repeat verification
         if (card.group > 0) {
+          recordFail(card.reference, newGroup);
           queue.push(Object.assign({}, card, {
             group: newGroup,
             rep: newRep,
@@ -2532,27 +2532,58 @@
       }
     }
 
+    // Remember a missed verse and the level it now sits at (a verse missed twice is listed once).
+    function recordFail(ref, g) {
+      if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
+      const list = sessionStats.failedRefs;
+      for (let i = 0; i < list.length; i++) {
+        const f = typeof list[i] === "string" ? list[i] : list[i].f;
+        if (f === ref) { list[i] = { f: ref, g: g }; return; }
+      }
+      list.push({ f: ref, g: g });
+    }
+
     // Tap the Repeats box to see which verses were missed today.
     function updateFailList() {
       const box = document.getElementById("statFailBox");
       const list = document.getElementById("failList");
-      const refs = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
+      const refs = failedItems();
       const can = refs.length > 0;
       box.classList.toggle("tappable", can);
       box.classList.remove("open");
       if (!can) { list.style.display = "none"; list.innerHTML = ""; return; }
-      // Two columns, reading down the left column first, then the right.
-      const cols = refs.length > 1 ? 2 : 1;
-      const rows = Math.ceil(refs.length / cols);
-      let html = '<span class="fail-title">Missed today</span>' +
-        '<div class="fail-inner" style="grid-template-columns: repeat(' + cols + ', minmax(0, 1fr)); grid-template-rows: repeat(' + rows + ', auto);">';
-      refs.forEach(function(r) { html += "<div>" + escapeHtml(r) + "</div>"; });
-      list.innerHTML = html + "</div>";
+      list.innerHTML = '<span class="fail-title">Repeats</span><div class="fail-inner"></div>';
+      const inner = list.querySelector(".fail-inner");
+      refs.forEach(function(it) {
+        const row = document.createElement("div");
+        row.className = "fail-row";
+        const name = document.createElement("span");
+        name.className = "fail-ref";
+        name.textContent = it.f;
+        row.appendChild(name);
+        if (it.g !== null) row.appendChild(makePill(it.g));
+        inner.appendChild(row);
+      });
       list.style.display = "none";
     }
 
+    // Missed verses, highest level first, then Bible order.
+    function failedItems() {
+      const raw = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
+      const items = raw.map(function(r) {
+        const f = typeof r === "string" ? r : String((r && r.f) || "");
+        const g = (r && typeof r === "object" && Number.isInteger(r.g)) ? Math.max(0, Math.min(8, r.g)) : null;
+        return { f: f, g: g, p: parseRef(f) };
+      }).filter(function(it) { return it.f; });
+      items.sort(function(a, b) {
+        const ga = a.g === null ? -1 : a.g, gb = b.g === null ? -1 : b.g;
+        return (gb - ga) || (a.p.book - b.p.book) || (a.p.chapter - b.p.chapter) || (a.p.verse - b.p.verse);
+      });
+      return items;
+    }
+
     function toggleFailList() {
-      const refs = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
+      const refs = failedItems();
       if (!refs.length) return;
       const list = document.getElementById("failList");
       const open = list.style.display === "none";
