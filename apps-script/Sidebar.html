@@ -914,11 +914,11 @@
           <div class="stat-val val-pass" id="statPassed">0</div>
           <div class="stat-lbl">Flawless</div>
         </div>
-        <div class="stat-box">
+        <div class="stat-box" id="statGradBox" onclick="toggleStatList('grad')">
           <div class="stat-val val-grad" id="statGraduated">0</div>
           <div class="stat-lbl">Leveled Up</div>
         </div>
-        <div class="stat-box" id="statFailBox" onclick="toggleFailList()">
+        <div class="stat-box" id="statFailBox" onclick="toggleStatList('fail')">
           <div class="stat-val val-fail" id="statFailed">0</div>
           <div class="stat-lbl">Repeats</div>
         </div>
@@ -1530,7 +1530,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-40';
+    const CLIENT_BUILD = 'sync-41';
 
     let queue = [];
     let currentIndex = 0;
@@ -1553,7 +1553,7 @@
     let segmentStates = [];
 
     // Today's session. The server is the source of truth so every device shows the same session.
-    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [] };
+    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [] };
     let sessionVersion = 0;
     let sessionDate = "";
     // Which screen you are on: 'review' (the daily deck) or 'learning' (Level 0 verses).
@@ -1668,6 +1668,7 @@
       currentIndex = session.currentIndex || 0;
       sessionStats = session.stats || { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
       if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
+      if (!Array.isArray(sessionStats.gradRefs)) sessionStats.gradRefs = [];
       totalCardsProcessed = session.processed || 0;
       sessionVersion = session.version;
       sessionDate = session.date;
@@ -1760,7 +1761,7 @@
         baseCount: baseCount,
         processed: totalCardsProcessed,
         mode: mode,
-        stats: Object.assign({}, sessionStats, { failedRefs: (sessionStats.failedRefs || []).slice() }),
+        stats: Object.assign({}, sessionStats, { failedRefs: (sessionStats.failedRefs || []).slice(), gradRefs: (sessionStats.gradRefs || []).slice() }),
         seen: learningSeen
       };
     }
@@ -2452,7 +2453,7 @@
 
         // Re-queue a clone for intraday repeat verification
         if (card.group > 0) {
-          recordFail(card.reference, newGroup);
+          recordStatRef('failedRefs', card.reference, newGroup);
           queue.push(Object.assign({}, card, {
             group: newGroup,
             rep: newRep,
@@ -2463,6 +2464,7 @@
 
       if (graduated && card.group > 0) {
         sessionStats.graduated++;
+        recordStatRef('gradRefs', card.reference, newGroup);
       }
 
       const nextConfig = GROUP_CONFIG[newGroup] || GROUP_CONFIG[1];
@@ -2528,14 +2530,15 @@
         document.getElementById("statPassed").textContent = sessionStats.passed;
         document.getElementById("statGraduated").textContent = sessionStats.graduated;
         document.getElementById("statFailed").textContent = sessionStats.failed;
-        updateFailList();
+        updateStatLists();
       }
     }
 
-    // Remember a missed verse and the level it now sits at (a verse missed twice is listed once).
-    function recordFail(ref, g) {
-      if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
-      const list = sessionStats.failedRefs;
+    // Remember a verse for the Repeats / Leveled Up lists with the level it now sits at
+    // (a verse recorded twice is listed once).
+    function recordStatRef(key, ref, g) {
+      if (!Array.isArray(sessionStats[key])) sessionStats[key] = [];
+      const list = sessionStats[key];
       for (let i = 0; i < list.length; i++) {
         const f = typeof list[i] === "string" ? list[i] : list[i].f;
         if (f === ref) { list[i] = { f: ref, g: g }; return; }
@@ -2543,33 +2546,15 @@
       list.push({ f: ref, g: g });
     }
 
-    // Tap the Repeats box to see which verses were missed today.
-    function updateFailList() {
-      const box = document.getElementById("statFailBox");
-      const list = document.getElementById("failList");
-      const refs = failedItems();
-      const can = refs.length > 0;
-      box.classList.toggle("tappable", can);
-      box.classList.remove("open");
-      if (!can) { list.style.display = "none"; list.innerHTML = ""; return; }
-      list.innerHTML = '<span class="fail-title">Repeats</span><div class="fail-inner"></div>';
-      const inner = list.querySelector(".fail-inner");
-      refs.forEach(function(it) {
-        const row = document.createElement("div");
-        row.className = "fail-row";
-        const name = document.createElement("span");
-        name.className = "fail-ref";
-        name.textContent = it.f;
-        row.appendChild(name);
-        if (it.g !== null) row.appendChild(makePill(it.g));
-        inner.appendChild(row);
-      });
-      list.style.display = "none";
-    }
+    const STAT_LISTS = {
+      fail: { key: "failedRefs", box: "statFailBox", title: "Repeats" },
+      grad: { key: "gradRefs", box: "statGradBox", title: "Leveled Up" }
+    };
+    let openStatList = null;
 
-    // Missed verses, highest level first, then Bible order.
-    function failedItems() {
-      const raw = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
+    // Verses for a list, highest level first, then Bible order.
+    function statItems(kind) {
+      const raw = Array.isArray(sessionStats[STAT_LISTS[kind].key]) ? sessionStats[STAT_LISTS[kind].key] : [];
       const items = raw.map(function(r) {
         const f = typeof r === "string" ? r : String((r && r.f) || "");
         const g = (r && typeof r === "object" && Number.isInteger(r.g)) ? Math.max(0, Math.min(8, r.g)) : null;
@@ -2582,13 +2567,51 @@
       return items;
     }
 
-    function toggleFailList() {
-      const refs = failedItems();
-      if (!refs.length) return;
+    // Tapping Repeats or Leveled Up shows the verses behind the number; the other box closes.
+    function updateStatLists() {
+      Object.keys(STAT_LISTS).forEach(function(k) {
+        const box = document.getElementById(STAT_LISTS[k].box);
+        box.classList.toggle("tappable", statItems(k).length > 0);
+        box.classList.remove("open");
+      });
+      openStatList = null;
       const list = document.getElementById("failList");
-      const open = list.style.display === "none";
-      list.style.display = open ? "block" : "none";
-      document.getElementById("statFailBox").classList.toggle("open", open);
+      list.style.display = "none";
+      list.innerHTML = "";
+    }
+
+    function toggleStatList(kind) {
+      const cfg = STAT_LISTS[kind];
+      const items = statItems(kind);
+      const list = document.getElementById("failList");
+      if (!items.length) return;
+      Object.keys(STAT_LISTS).forEach(function(k) { document.getElementById(STAT_LISTS[k].box).classList.remove("open"); });
+      if (openStatList === kind) {
+        openStatList = null;
+        list.style.display = "none";
+        return;
+      }
+      openStatList = kind;
+      document.getElementById(cfg.box).classList.add("open");
+      list.innerHTML = "";
+      const title = document.createElement("span");
+      title.className = "fail-title";
+      title.textContent = cfg.title;
+      const inner = document.createElement("div");
+      inner.className = "fail-inner";
+      items.forEach(function(it) {
+        const row = document.createElement("div");
+        row.className = "fail-row";
+        const name = document.createElement("span");
+        name.className = "fail-ref";
+        name.textContent = it.f;
+        row.appendChild(name);
+        if (it.g !== null) row.appendChild(makePill(it.g));
+        inner.appendChild(row);
+      });
+      list.appendChild(title);
+      list.appendChild(inner);
+      list.style.display = "block";
     }
 
     // Refresh: saves anything pending, then asks the server for the current session.
