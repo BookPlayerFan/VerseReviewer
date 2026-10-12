@@ -733,6 +733,11 @@
     .vl-iconbtn { background: none; border: 0; box-shadow: none; width: auto; min-height: 0; margin: -6px 0; padding: 6px 4px 6px 12px; }
     .vl-iconbtn svg { width: 22px; height: 22px; display: block; stroke: var(--text-accent, #1a73e8); fill: none; stroke-width: 2; stroke-linecap: round; }
     .vl-iconbtn.on svg { stroke: var(--text-muted); }
+    #verseListView .picker-head { gap: 10px; }
+    #verseListView .picker-title { flex: none; }
+    #verseListView .vl-total { flex: 1; min-width: 0; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #verseListView .vl-bar .vl-seg { width: 100%; }
+    #verseListView .vl-bar .vl-seg button { flex: 1; }
     .vl-search { margin: 0 0 2px; }
     .vl-search .picker-search { margin-bottom: 8px; }
     .vl-verse.hit { flex-wrap: wrap; }
@@ -927,12 +932,12 @@
   <div class="picker" id="verseListView">
     <div class="picker-head">
       <span class="picker-title" onclick="toggleDiag()">Verse List</span>
+      <span class="vl-total" id="vlTotal"></span>
       <button type="button" class="vl-iconbtn" id="vlSearchBtn" onclick="toggleVlSearch()" aria-label="Search verses"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
     <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
     <div class="vl-bar">
-      <span class="vl-total" id="vlTotal"></span>
       <div class="vl-seg">
         <button type="button" id="vlSortBook" class="active" onclick="setVlSort('book')">Book</button>
         <button type="button" id="vlSortRank" onclick="setVlSort('rank')">Rank</button>
@@ -1514,7 +1519,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-35';
+    const CLIENT_BUILD = 'sync-36';
 
     let queue = [];
     let currentIndex = 0;
@@ -1568,6 +1573,51 @@
         fetchSession();
       }
     };
+
+    // ── Early view hand-off ──
+    // The GitHub shell page keeps a copy of your New verses and shows them while this page loads.
+    // Each time the list changes we send it a fresh copy, and when it asks (right after we say we're ready)
+    // we open the New tab on the verse it was showing, with the same parts revealed.
+    const SHELL_ORIGIN = 'https://bookplayerfan.github.io';
+    let cacheSig = "";
+    function postCache() {
+      try {
+        const cards = learningCards.slice(0, 40).map(function(c) {
+          return {
+            f: c.reference, v: c.version || "", day: c.day || 0,
+            segs: parseVerseSegments(c.text, c.reference).map(function(s) { return { n: s.num, t: s.text }; })
+          };
+        });
+        const sig = JSON.stringify(cards);
+        if (sig === cacheSig) return;
+        cacheSig = sig;
+        window.top.postMessage({ type: 'VR_CACHE', cards: cards }, '*');
+      } catch (e) {}
+    }
+
+    function applyEarly(d) {
+      try {
+        if (learningCards.length) {
+          const at = learningCards.findIndex(function(c) { return c.reference === d.f; });
+          if (mode !== 'learning') setMode('learning'); // saved like tapping the New tab
+          learningIndex = at >= 0 ? at : 0;
+          render();
+          const shown = Array.isArray(d.revealed) ? d.revealed : [];
+          if (at >= 0 && shown.length && parsedSegments.length) {
+            segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; });
+            syncFlipState();
+            renderCardBody();
+          }
+        }
+      } catch (e) {}
+      try { window.top.postMessage({ type: 'VR_APPLIED' }, '*'); } catch (e) {}
+    }
+
+    window.addEventListener("message", function(e) {
+      const d = e.data;
+      if (!d || d.type !== "VR_EARLY" || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
+      applyEarly(d);
+    });
 
     function notifyReady() {
       // Apps Script nests this page in its own wrapper iframe, so the PWA shell is window.top.
@@ -1925,6 +1975,7 @@
       updateTabs();
       placeNotice();
       placeUndo();
+      postCache();
     }
 
     function updateLearningChip() {
