@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-18'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-19'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -290,8 +290,42 @@ function writeState_(s) {
   }
   batch[SESSION_KEY + '_N'] = String(count);
   batch[SESSION_VER_KEY] = s.date + '|' + s.version;
+  const laterTimes = (Array.isArray(s.later) ? s.later : []).map(function(e) { return e.at; });
+  batch[LATER_KEY] = laterTimes.length ? String(Math.min.apply(null, laterTimes)) : '0';
   props.setProperties(batch);
   for (let i = count; i < oldCount; i++) props.deleteProperty(SESSION_KEY + '_' + i);
+}
+
+// ── Evening practice card ──
+// After the first review of a Bronze verse (Level 1, rep 1) is passed, one extra practice card is held
+// back and added to the deck later that day: at 5 pm, or an hour after the pass if that is already past 5 pm.
+// It behaves like a same-day repeat: never written to the sheet, no rep, no demotion.
+const LATER_KEY = 'VR_LATER_AT'; // earliest release time (ms), so polling only needs one tiny read
+const LATER_HOUR = 17;
+const LATER_DELAY_MS = 60 * 60 * 1000;
+
+function nowMs_() { return Date.now(); }
+
+// When the evening card should appear, or 0 if that would be after today ends.
+function laterAt_() {
+  const tz = Session.getScriptTimeZone();
+  const now = nowMs_();
+  const nowD = new Date(now);
+  const secs = Number(Utilities.formatDate(nowD, tz, 'H')) * 3600 + Number(Utilities.formatDate(nowD, tz, 'm')) * 60 + Number(Utilities.formatDate(nowD, tz, 's'));
+  const at = secs < LATER_HOUR * 3600 ? now + (LATER_HOUR * 3600 - secs) * 1000 : now + LATER_DELAY_MS;
+  return Utilities.formatDate(new Date(at), tz, 'yyyy-MM-dd') === Utilities.formatDate(nowD, tz, 'yyyy-MM-dd') ? at : 0;
+}
+
+// Moves any evening cards whose time has come onto the end of the deck. Returns true if it changed anything.
+function releaseLater_(s, now) {
+  if (!s || !Array.isArray(s.later) || s.later.length === 0) return false;
+  const due = s.later.filter(function(e) { return e.at <= now; });
+  if (due.length === 0) return false;
+  due.forEach(function(e) { s.queue.push({ r: e.r, f: e.f, g: 1, p: 2, l: 1 }); });
+  s.later = s.later.filter(function(e) { return e.at > now; });
+  delete s.undo; // the deck changed, so the old undo no longer lines up
+  s.version++;
+  return true;
 }
 
 function compactCard_(c) {
@@ -416,6 +450,7 @@ function loadSession() {
     stampLearningDates_();
     let s = readState_();
     if (!s || s.date !== today) { sortVerses_(); s = createState_(today); }
+    else if (releaseLater_(s, nowMs_())) writeState_(s);
     return hydrate_(s);
   } finally {
     lock.releaseLock();
@@ -434,10 +469,15 @@ function refreshSession() {
     const today = todayKey_();
     stampLearningDates_();
     let s = readState_();
+    let fresh = false;
     if (!s || s.date !== today) {
       sortVerses_();
       s = createState_(today);
-    } else if (s.currentIndex >= s.queue.length) {
+      fresh = true;
+    } else if (releaseLater_(s, nowMs_())) {
+      writeState_(s); // an evening practice card is now due
+    }
+    if (!fresh && s.currentIndex >= s.queue.length) {
       const cards = getDueCards();
       s.queue = cards.map(compactCard_);
       s.baseCount = cards.length;
@@ -456,6 +496,21 @@ function refreshSession() {
  * Cheap poll so a device can tell whether another device has moved the session along.
  */
 function checkSession(clientVersion, clientDate) {
+  const laterAt = Number(store_().getProperty(LATER_KEY) || 0);
+  if (laterAt && nowMs_() >= laterAt) {
+    const lock = LockService.getScriptLock();
+    let got = true;
+    try { lock.waitLock(5000); } catch (e) { got = false; }
+    if (got) {
+      try {
+        const st = readState_();
+        if (st && st.date === todayKey_() && releaseLater_(st, nowMs_())) writeState_(st);
+        else store_().setProperty(LATER_KEY, '0'); // nothing (more) to release; stop checking
+      } finally {
+        lock.releaseLock();
+      }
+    }
+  }
   const marker = store_().getProperty(SESSION_VER_KEY); // "date|version"
   const today = todayKey_();
   const changed = !marker ||
@@ -670,6 +725,16 @@ function submitReview(expectedVersion, review, next) {
       }
     }
 
+    let laterRef = null;
+    if (review && review.later === true && Number(review.group) === 1 && Number(review.rep) === 2 && written) {
+      const at = laterAt_();
+      if (at) {
+        s.later = (Array.isArray(s.later) ? s.later : []).filter(function(e) { return e.f !== written.f; });
+        s.later.push({ r: written.r, f: written.f, at: at });
+        laterRef = written.f;
+      }
+    }
+
     let undoId = null;
     if (isScore) {
       undoId = s.version;
@@ -682,7 +747,8 @@ function submitReview(expectedVersion, review, next) {
         processed: prev.processed,
         row: written,
         log: logRef,
-        tryRef: logRef ? logRef.f : null
+        tryRef: logRef ? logRef.f : null,
+        later: laterRef
       };
     }
 
@@ -728,6 +794,7 @@ function undoLast(undoId) {
 
     unlogEvent_(u.log);
     if (u.tryRef && s.tries && s.tries[u.tryRef]) s.tries[u.tryRef]--;
+    if (u.later && Array.isArray(s.later)) s.later = s.later.filter(function(e) { return e.f !== u.later; });
 
     for (let i = 0; i < u.pushed; i++) s.queue.pop();
     s.currentIndex = u.idx;

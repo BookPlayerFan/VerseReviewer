@@ -1306,7 +1306,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-17';
+    const CLIENT_BUILD = 'sync-18';
 
     let queue = [];
     let currentIndex = 0;
@@ -2187,7 +2187,9 @@
 
       // The server computes the due date and stores the session; we send the new level and rep.
       enqueueSubmit(
-        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup },
+        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup,
+          // first Bronze review passed: ask the server for the evening practice card
+          later: (action === "Pass" && card.group === 1 && card.rep === 1) ? true : undefined },
         snapshot(currentIndex + 1)
       );
 
