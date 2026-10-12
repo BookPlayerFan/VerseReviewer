@@ -1324,7 +1324,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-24';
+    const CLIENT_BUILD = 'sync-25';
 
     let queue = [];
     let currentIndex = 0;
@@ -2575,7 +2575,23 @@
     }
 
     window.addEventListener("keydown", function(e) {
+      // Never act while typing in a box, or with Cmd/Ctrl/Alt held (browser shortcuts).
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
+      // Tabs: 1 Review, 2 New, 3 Verses (not while a popup is open)
+      const popupOpen = ["picker", "pickerPreview", "pasteModal"].some(function(id) {
+        return document.getElementById(id).classList.contains("open");
+      });
+      if (popupOpen) return;
+      if (key === "1" || key === "2" || key === "3") {
+        e.preventDefault();
+        goTab(key === "1" ? "review" : key === "2" ? "new" : "verses");
+        return;
+      }
+      // Card shortcuts only apply when a card is on screen, not over the Verse List
+      if (document.getElementById("verseListView").classList.contains("open")) return;
       if (e.code === "Space") {
         e.preventDefault();
         handleContainerClick(e);
