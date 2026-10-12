@@ -723,8 +723,8 @@
     #picker { z-index: 70; }
     .picker-actions { display: inline-flex; gap: 14px; align-items: center; }
     #picker .picker-close:first-child { color: var(--text-accent); font-weight: 600; }
-    #pickerList .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; text-align: left; }
-    .picker-age { font-size: 12px; font-weight: 600; color: var(--text-meta); white-space: nowrap; }
+    .picker-divider { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-meta);
+      padding: 16px 4px 6px; border-bottom: 1px solid var(--border-card); }
     .picker-note { font-size: 13px; color: var(--badge-pass); min-height: 0; margin: -4px 0 8px; font-weight: 600; }
     .picker-note:empty { display: none; }
     .paste-area { width: 100%; min-height: 200px; resize: none; outline: none; border: 1px solid var(--border-card); border-radius: 10px;
@@ -932,7 +932,6 @@
   <div class="pv" id="pickerPreview" onclick="if (event.target === this) closePreview()">
     <div class="pv-card">
       <div class="pv-head"><span id="pvRef"></span><span class="version-badge" id="pvVer" style="display:none"></span></div>
-      <div class="paste-hint" id="pvWait" style="margin: -4px 0 8px; text-align: center;"></div>
       <div class="pv-text" id="pvText"></div>
       <div class="pv-btns">
         <button type="button" class="pv-close" onclick="closePreview()">Close</button>
@@ -1310,7 +1309,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-20';
+    const CLIENT_BUILD = 'sync-21';
 
     let queue = [];
     let currentIndex = 0;
@@ -2390,39 +2389,38 @@
         box.appendChild(e);
         return;
       }
-      shown.forEach(function(it) {
+      // Verses that have waited more than 30 days go below a divider (Bible order is kept within each group).
+      const LONG_WAIT = 30;
+      const recent = shown.filter(function(it) { return !(it.d > LONG_WAIT); });
+      const old = shown.filter(function(it) { return it.d > LONG_WAIT; });
+      const ordered = recent.concat(old);
+      ordered.forEach(function(it, idx) {
+        if (old.length && recent.length && idx === recent.length) {
+          const dv = document.createElement("div");
+          dv.className = "picker-divider";
+          dv.textContent = "Waiting over 30 days";
+          box.appendChild(dv);
+        } else if (old.length && !recent.length && idx === 0) {
+          const dv = document.createElement("div");
+          dv.className = "picker-divider";
+          dv.textContent = "Waiting over 30 days";
+          box.appendChild(dv);
+        }
         const b = document.createElement("button");
         b.type = "button";
         b.className = "picker-item";
-        const nm = document.createElement("span");
-        nm.textContent = it.f;
-        b.appendChild(nm);
-        const wt = waitingLabel(it);
-        if (wt) {
-          const w = document.createElement("span");
-          w.className = "picker-age";
-          w.textContent = wt;
-          b.appendChild(w);
-        }
+        b.textContent = it.f;
         b.onclick = function() { showPreview(it); };
         box.appendChild(b);
       });
     }
 
     // Tapping a verse in the list previews its text; adding is a separate button.
-    // "Added today", "1 day", "12 days": how long a verse has been waiting (from the date in column C).
-    function waitingLabel(it) {
-      if (it.d === null || it.d === undefined) return "";
-      return it.d === 0 ? "Added today" : it.d + (it.d === 1 ? " day" : " days");
-    }
-
     function showPreview(it) {
       document.getElementById("pvRef").textContent = it.f;
       const ver = (it.v || "").trim();
       const vb = document.getElementById("pvVer");
       if (ver && ver.toUpperCase() !== "ESV") { vb.textContent = ver; vb.style.display = "inline-block"; } else { vb.style.display = "none"; }
-      const wl = waitingLabel(it);
-      document.getElementById("pvWait").textContent = wl ? (it.d === 0 ? "Added today" : "Waiting " + wl) : "";
       const box = document.getElementById("pvText");
       box.textContent = "";
       const segs = parseVerseSegments(it.t || "", it.f);
