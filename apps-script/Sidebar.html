@@ -228,7 +228,10 @@
     .rank-badge {
       --rc: var(--rl);
       display: inline-block;
-      padding: 2px 10px;
+      padding: 2px 0;
+      min-width: 86px; /* same width for every rank */
+      text-align: center;
+      text-transform: uppercase;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 800;
@@ -244,8 +247,8 @@
       }
     }
     .rank-badge.is-new { --rc: var(--text-meta); font-weight: 700; }
-    .rank-badge.pop { animation: rankPop 0.6s ease-out both, rankGlow 1s ease-out 0.15s both; font-size: 14px; padding: 4px 14px; }
-    .rank-badge.pop-big { animation: rankPop 0.8s ease-out both, rankGlow 1.4s ease-out 0.15s both; font-size: 16px; padding: 5px 18px; }
+    .rank-badge.pop { animation: rankPop 0.6s ease-out both, rankGlow 1s ease-out 0.15s both; }
+    .rank-badge.pop-big { animation: rankPop 0.8s ease-out both, rankGlow 1.4s ease-out 0.15s both; }
     @keyframes rankGlow {
       0%   { box-shadow: 0 0 0 0 var(--rc); }
       60%  { box-shadow: 0 0 14px 5px color-mix(in srgb, var(--rc) 45%, transparent); }
@@ -761,6 +764,17 @@
     .diag-line { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tab-h) + 4px); z-index: 60;
       background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 8px; padding: 6px 8px; margin: 0; }
     #btnRanks { display: none !important; }
+    /* Notices (level up, "Added to end of queue", errors) float over the bottom of the verse box,
+       so they take no room between the verse and the buttons. */
+    .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
+    .verse-wrap .verse-body { flex: 1; margin-bottom: 0; }
+    #toastNotice { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 5;
+      width: max-content; max-width: 94%; min-height: 0; margin: 0; padding: 6px 14px; border-radius: 14px;
+      background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+      pointer-events: none; text-align: center; animation: noticeIn 0.18s ease-out both; }
+    #toastNotice:empty { display: none; }
+    #toastNotice.levelup { min-height: 0; margin: 0; flex-wrap: wrap; justify-content: center; }
+    @keyframes noticeIn { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
     button:disabled { opacity: 0.55; cursor: default; }
     button:disabled:active { transform: none; filter: none; }
@@ -837,10 +851,11 @@
         <div class="pips-container" id="cardPips"></div>
       </div>
 
-      <div class="verse-body" id="cardBody" onclick="handleContainerClick(event)">
+      <div class="verse-wrap">
+        <div class="verse-body" id="cardBody" onclick="handleContainerClick(event)">
+        </div>
+        <div class="notice" id="toastNotice"></div>
       </div>
-
-      <div class="notice" id="toastNotice"></div>
 
       <div class="action-container">
         <div class="btn-row">
@@ -1309,7 +1324,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-22';
+    const CLIENT_BUILD = 'sync-24';
 
     let queue = [];
     let currentIndex = 0;
