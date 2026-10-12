@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-19'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-20'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -817,11 +817,15 @@ function listUnassigned() {
   if (lastRow < 2) return [];
   const data = sheet.getRange(1, 1, lastRow, 8).getValues();
   const out = [];
+  const todayMs = today_().getTime();
   for (let i = 1; i < data.length; i++) {
     const g = data[i][4];
     const ref = cleanRef_(data[i][5]);
     if (ref && (g === "" || g === null || g === undefined)) {
-      out.push({ r: i + 1, f: ref, v: String(data[i][6] || '').trim(), t: String(data[i][7] || '').trim() });
+      // Days since the date in column C (when it was added), or null if there is none.
+      const added = toMidnight_(data[i][2]);
+      const waiting = added ? Math.max(0, Math.round((todayMs - added.getTime()) / 86400000)) : null;
+      out.push({ r: i + 1, f: ref, v: String(data[i][6] || '').trim(), t: String(data[i][7] || '').trim(), d: waiting });
     }
   }
   return out;
