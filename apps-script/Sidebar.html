@@ -1164,8 +1164,27 @@
       rc.textContent = left; rc.style.display = left > 0 ? "" : "none";
       const nc = document.getElementById("tabNewCount");
       const n = learningCards.length;
-      nc.textContent = n; nc.style.display = n > 0 ? "" : "none";
+      const quiet = newBadgeSnoozed();
+      nc.textContent = n; nc.style.display = (n > 0 && !quiet) ? "" : "none";
+      scheduleBadgeReturn();
     }
+
+    // "Reviewed" on the last New verse quiets the New tab's count for 3 hours (this device only).
+    const NEW_SNOOZE_MS = 3 * 60 * 60 * 1000;
+    let badgeTimer = null;
+    function newBadgeUntil() {
+      try { return Number(localStorage.getItem("vr_new_snooze")) || 0; } catch (e) { return 0; }
+    }
+    function newBadgeSnoozed() { return newBadgeUntil() > Date.now(); }
+    function snoozeNewBadge() {
+      try { localStorage.setItem("vr_new_snooze", String(Date.now() + NEW_SNOOZE_MS)); } catch (e) {}
+    }
+    function scheduleBadgeReturn() {
+      if (badgeTimer) { clearTimeout(badgeTimer); badgeTimer = null; }
+      const wait = newBadgeUntil() - Date.now();
+      if (wait > 0) badgeTimer = setTimeout(updateTabs, Math.min(wait + 500, 2147483000));
+    }
+    document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
 
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
@@ -1334,7 +1353,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-28';
+    const CLIENT_BUILD = 'sync-29';
 
     let queue = [];
     let currentIndex = 0;
@@ -1811,7 +1830,7 @@
       if (passBadge) { passBadge.style.opacity = "0"; passBadge.textContent = "LEVEL UP"; }
 
       const hasNext = learningIndex < learningCards.length - 1;
-      const doneLabel = hasNext ? "Next" : "Done";
+      const doneLabel = hasNext ? "Next" : "Reviewed";
       if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }
 
       // Learning verses don't count toward today's card numbers or reviewed total.
@@ -2085,6 +2104,7 @@
       } else {
         mode = 'review';
         learningIndex = 0;
+        snoozeNewBadge();
         enqueueSubmit(null, snapshot(currentIndex));
       }
 
