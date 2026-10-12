@@ -585,6 +585,8 @@
     .fail-list .fail-inner { max-height: 180px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .fail-list .fail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 0 4px 0 6px; font-size: 14px; }
     .fail-list .fail-row + .fail-row { border-top: 1px solid var(--border-body); }
+    .fail-list .fail-note { padding: 8px 6px; font-size: 12px; color: var(--text-muted); text-align: center; }
+    .fail-list .fail-row + .fail-note { border-top: 1px solid var(--border-body); }
     .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; }
 
     .summary-btn-stack {
@@ -1530,7 +1532,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-41';
+    const CLIENT_BUILD = 'sync-42';
 
     let queue = [];
     let currentIndex = 0;
@@ -2547,8 +2549,8 @@
     }
 
     const STAT_LISTS = {
-      fail: { key: "failedRefs", box: "statFailBox", title: "Repeats" },
-      grad: { key: "gradRefs", box: "statGradBox", title: "Leveled Up" }
+      fail: { key: "failedRefs", box: "statFailBox", title: "Repeats", count: "failed" },
+      grad: { key: "gradRefs", box: "statGradBox", title: "Leveled Up", count: "graduated" }
     };
     let openStatList = null;
 
@@ -2571,7 +2573,7 @@
     function updateStatLists() {
       Object.keys(STAT_LISTS).forEach(function(k) {
         const box = document.getElementById(STAT_LISTS[k].box);
-        box.classList.toggle("tappable", statItems(k).length > 0);
+        box.classList.toggle("tappable", (sessionStats[STAT_LISTS[k].count] || 0) > 0 || statItems(k).length > 0);
         box.classList.remove("open");
       });
       openStatList = null;
@@ -2584,7 +2586,8 @@
       const cfg = STAT_LISTS[kind];
       const items = statItems(kind);
       const list = document.getElementById("failList");
-      if (!items.length) return;
+      const missing = Math.max(0, (sessionStats[cfg.count] || 0) - items.length);
+      if (!items.length && !missing) return;
       Object.keys(STAT_LISTS).forEach(function(k) { document.getElementById(STAT_LISTS[k].box).classList.remove("open"); });
       if (openStatList === kind) {
         openStatList = null;
@@ -2609,6 +2612,14 @@
         if (it.g !== null) row.appendChild(makePill(it.g));
         inner.appendChild(row);
       });
+      if (missing) {
+        const note = document.createElement("div");
+        note.className = "fail-note";
+        note.textContent = items.length
+          ? "+ " + missing + " earlier today (names weren't saved)"
+          : "Names weren't saved for today's earlier reviews. New ones will be listed.";
+        inner.appendChild(note);
+      }
       list.appendChild(title);
       list.appendChild(inner);
       list.style.display = "block";
