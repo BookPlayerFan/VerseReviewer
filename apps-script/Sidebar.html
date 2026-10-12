@@ -578,12 +578,13 @@
     .val-fail { color: var(--btn-fail-text); }
     .stat-box.tappable { cursor: pointer; }
     .stat-box.open { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
-    .fail-list { margin: -6px 0 14px; padding: 10px 14px; background: var(--bg-body); border: 1px solid var(--border-body);
-      border-radius: 12px; font-size: 14px; line-height: 1.7; color: var(--text-primary);
-      max-height: 168px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    .fail-list .fail-inner { display: table; margin: 0 auto; text-align: left; }
+    .fail-list { text-align: left; margin: -6px 0 14px; padding: 10px 14px 8px; background: var(--bg-body); border: 1px solid var(--border-body);
+      border-radius: 12px; color: var(--text-primary); }
     .fail-list .fail-title { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--text-muted); font-weight: 600; margin-bottom: 2px; text-align: center; }
+      color: var(--text-muted); font-weight: 600; padding-bottom: 7px; margin-bottom: 6px; border-bottom: 1px solid var(--border-body); }
+    .fail-list .fail-inner { display: grid; grid-auto-flow: column; column-gap: 14px; row-gap: 1px; font-size: 14px; line-height: 1.55;
+      max-height: 150px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .fail-list .fail-inner > div { min-width: 0; overflow-wrap: anywhere; }
 
     .summary-btn-stack {
       display: flex;
@@ -1528,7 +1529,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-38';
+    const CLIENT_BUILD = 'sync-39';
 
     let queue = [];
     let currentIndex = 0;
@@ -2540,7 +2541,11 @@
       box.classList.toggle("tappable", can);
       box.classList.remove("open");
       if (!can) { list.style.display = "none"; list.innerHTML = ""; return; }
-      let html = '<span class="fail-title">Missed today</span><div class="fail-inner">';
+      // Two columns, reading down the left column first, then the right.
+      const cols = refs.length > 1 ? 2 : 1;
+      const rows = Math.ceil(refs.length / cols);
+      let html = '<span class="fail-title">Missed today</span>' +
+        '<div class="fail-inner" style="grid-template-columns: repeat(' + cols + ', minmax(0, 1fr)); grid-template-rows: repeat(' + rows + ', auto);">';
       refs.forEach(function(r) { html += "<div>" + escapeHtml(r) + "</div>"; });
       list.innerHTML = html + "</div>";
       list.style.display = "none";
