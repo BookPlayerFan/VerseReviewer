@@ -703,7 +703,10 @@
     /* ── Bottom tab bar navigation ── */
     :root { --tab-h: calc(53px + max(env(safe-area-inset-bottom, 0px) - 14px, 0px)); }
     body { padding-bottom: calc(var(--tab-h) + 4px); }
-    .status-bar, .progress-track { display: none !important; }
+    .status-bar { display: none !important; }
+    /* Blue progress bar: only while reviewing cards (hidden on New, Verses and Review Complete) */
+    .progress-track { display: none; margin-bottom: 6px; }
+    .progress-track.show { display: block; }
     .tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
       display: flex; background: var(--bg-card); border-top: 1px solid var(--border-card);
@@ -1142,8 +1145,16 @@
       b.style.display = (mode === "learning" && cardUp) ? "flex" : "none"; // flex keeps the plus centered
     }
 
+    function updateProgressBar() {
+      const tr = document.querySelector(".progress-track");
+      if (!tr) return;
+      const cardUp = document.getElementById("activeCard").style.display !== "none";
+      tr.classList.toggle("show", mode !== "learning" && cardUp);
+    }
+
     function updateTabs() {
       updateCornerAdd();
+      updateProgressBar();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       const which = listOpen ? "verses" : (mode === "learning" ? "new" : "review");
       document.getElementById("tabReview").classList.toggle("on", which === "review");
@@ -1324,7 +1335,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-25';
+    const CLIENT_BUILD = 'sync-26';
 
     let queue = [];
     let currentIndex = 0;
