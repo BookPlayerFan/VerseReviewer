@@ -758,8 +758,8 @@
     .pv-btns button { flex: 1; min-height: 0; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; flex-direction: row; justify-content: center; }
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
-    /* Undo: small pill in the card's top-right corner, only while it can be used */
-    .undo-link { position: absolute; top: 10px; right: 12px; z-index: 6; margin: 0; padding: 5px 11px;
+    /* Undo: small pill just above the Reveal button, only while it can be used */
+    .undo-link { position: absolute; top: -33px; right: 6px; z-index: 6; margin: 0; padding: 5px 11px;
       border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); opacity: 0; }
     .undo-link.show { opacity: 0.95; }
     .corner-add { position: absolute; top: 10px; left: 12px; z-index: 6; margin: 0; width: 30px; min-height: 0; height: 30px;
@@ -840,7 +840,6 @@
 
   <div id="deckContainer">
     <button type="button" class="corner-add" id="cornerAdd" onclick="addNewVerse()" aria-label="Add a new verse" style="display: none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
-    <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">↶ Undo</button>
     <div class="notice" id="toastNotice"></div>
     <div class="card" id="activeCard">
       <div class="swipe-badge badge-pass" id="badgePass">PASS</div>
@@ -856,6 +855,7 @@
       </div>
 
       <div class="verse-wrap">
+        <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">↶ Undo</button>
         <div class="verse-body" id="cardBody" onclick="handleContainerClick(event)">
         </div>
       </div>
@@ -1375,7 +1375,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-32';
+    const CLIENT_BUILD = 'sync-33';
 
     let queue = [];
     let currentIndex = 0;
@@ -1391,7 +1391,7 @@
     let tomorrowCount = null;
     let undoId = null;
     let undoTimer = null;
-    const UNDO_SHOW_MS = 10000;
+    const UNDO_SHOW_MS = 5000;
     let epoch = 0; // bumps whenever the server's session replaces ours, cancelling in-flight card animations
 
     let parsedSegments = [];
