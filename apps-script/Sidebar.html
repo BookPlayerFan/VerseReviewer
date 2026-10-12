@@ -576,6 +576,12 @@
     .val-pass { color: var(--btn-pass-text); }
     .val-grad { color: var(--text-accent); }
     .val-fail { color: var(--btn-fail-text); }
+    .stat-box.tappable { cursor: pointer; }
+    .stat-caret { display: inline-block; margin-left: 4px; font-size: 9px; }
+    .fail-list { margin: -6px 0 14px; padding: 10px 14px; background: var(--bg-body); border: 1px solid var(--border-body);
+      border-radius: 12px; font-size: 14px; line-height: 1.7; color: var(--text-primary); text-align: center; }
+    .fail-list .fail-title { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
 
     .summary-btn-stack {
       display: flex;
@@ -908,11 +914,12 @@
           <div class="stat-val val-grad" id="statGraduated">0</div>
           <div class="stat-lbl">Leveled Up</div>
         </div>
-        <div class="stat-box">
+        <div class="stat-box" id="statFailBox" onclick="toggleFailList()">
           <div class="stat-val val-fail" id="statFailed">0</div>
-          <div class="stat-lbl">Repeats</div>
+          <div class="stat-lbl">Repeats<span class="stat-caret" id="statFailCaret"></span></div>
         </div>
       </div>
+      <div class="fail-list" id="failList" style="display: none;"></div>
 
       <div class="tomorrow-note" id="tomorrowNote" style="display: none;"></div>
 
@@ -1519,7 +1526,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-36';
+    const CLIENT_BUILD = 'sync-37';
 
     let queue = [];
     let currentIndex = 0;
@@ -1542,7 +1549,7 @@
     let segmentStates = [];
 
     // Today's session. The server is the source of truth so every device shows the same session.
-    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
+    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [] };
     let sessionVersion = 0;
     let sessionDate = "";
     // Which screen you are on: 'review' (the daily deck) or 'learning' (Level 0 verses).
@@ -1656,6 +1663,7 @@
       baseCount = session.baseCount || 0;
       currentIndex = session.currentIndex || 0;
       sessionStats = session.stats || { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
+      if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
       totalCardsProcessed = session.processed || 0;
       sessionVersion = session.version;
       sessionDate = session.date;
@@ -1748,7 +1756,7 @@
         baseCount: baseCount,
         processed: totalCardsProcessed,
         mode: mode,
-        stats: sessionStats,
+        stats: Object.assign({}, sessionStats, { failedRefs: (sessionStats.failedRefs || []).slice() }),
         seen: learningSeen
       };
     }
@@ -2378,6 +2386,8 @@
           sessionStats.passed++;
         } else {
           sessionStats.failed++;
+          if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
+          if (sessionStats.failedRefs.indexOf(card.reference) === -1) sessionStats.failedRefs.push(card.reference);
         }
       }
 
@@ -2515,7 +2525,32 @@
         document.getElementById("statPassed").textContent = sessionStats.passed;
         document.getElementById("statGraduated").textContent = sessionStats.graduated;
         document.getElementById("statFailed").textContent = sessionStats.failed;
+        updateFailList();
       }
+    }
+
+    // Tap the Repeats box to see which verses were missed today.
+    function updateFailList() {
+      const box = document.getElementById("statFailBox");
+      const list = document.getElementById("failList");
+      const caret = document.getElementById("statFailCaret");
+      const refs = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
+      const can = refs.length > 0;
+      box.classList.toggle("tappable", can);
+      caret.textContent = can ? "▾" : "";
+      if (!can) { list.style.display = "none"; list.innerHTML = ""; return; }
+      let html = '<span class="fail-title">Missed today</span>';
+      refs.forEach(function(r) { html += "<div>" + escapeHtml(r) + "</div>"; });
+      list.innerHTML = html;
+    }
+
+    function toggleFailList() {
+      const refs = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
+      if (!refs.length) return;
+      const list = document.getElementById("failList");
+      const open = list.style.display === "none";
+      list.style.display = open ? "block" : "none";
+      document.getElementById("statFailCaret").textContent = open ? "▴" : "▾";
     }
 
     // Refresh: saves anything pending, then asks the server for the current session.

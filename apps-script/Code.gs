@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-23'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-24'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -334,7 +334,7 @@ function compactCard_(c) {
 }
 
 function emptyStats_() {
-  return { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
+  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [] };
 }
 
 function createState_(dateKey) {
@@ -614,7 +614,12 @@ function sanitizeSeen_(obj) {
 function sanitizeStats_(st) {
   st = st || {};
   const n = function(v) { v = Number(v); return (Number.isInteger(v) && v >= 0) ? v : 0; };
-  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated) };
+  const refs = [];
+  (Array.isArray(st.failedRefs) ? st.failedRefs : []).forEach(function(r) {
+    r = String(r || '').slice(0, 120);
+    if (r && refs.indexOf(r) === -1 && refs.length < 100) refs.push(r);
+  });
+  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), failedRefs: refs };
 }
 
 /**
