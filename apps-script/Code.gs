@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-13'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-14'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -415,7 +415,7 @@ function loadSession() {
     const today = todayKey_();
     stampLearningDates_();
     let s = readState_();
-    if (!s || s.date !== today) s = createState_(today);
+    if (!s || s.date !== today) { sortVerses_(); s = createState_(today); }
     return hydrate_(s);
   } finally {
     lock.releaseLock();
@@ -435,8 +435,10 @@ function refreshSession() {
     stampLearningDates_();
     let s = readState_();
     if (!s || s.date !== today) {
+      sortVerses_();
       s = createState_(today);
     } else if (s.currentIndex >= s.queue.length) {
+      sortVerses_();
       const cards = getDueCards();
       s.queue = cards.map(compactCard_);
       s.baseCount = cards.length;
@@ -686,6 +688,7 @@ function submitReview(expectedVersion, review, next) {
     }
 
     writeState_(s);
+    if (review && idx >= queue.length) sortVerses_(); // deck finished: tidy the sheet
     const result = { ok: true, version: s.version, undoId: undoId };
     if (review) result.tomorrow = dueTomorrowCount_(readSheetData_());
     return result;
@@ -778,9 +781,103 @@ function addChosenVerse(rowIndex, reference) {
       return { success: false, message: 'That verse was already added.' };
     }
     sheet.getRange(row, 2, 1, 4).setValues([["", today_(), 1, 0]]);
+    sortVerses_();
+    row = findRowByRef_(sheet, want) || row;
     return { success: true, reference: want, rowIndex: row };
   } finally {
     lock.releaseLock();
+  }
+}
+
+// ── Keeping the Verses tab sorted ──
+// Order: Level 0 (New) first, then Level 1 up to 8; verses with no level yet go last.
+// Within a level, Bible order (book, chapter, verse). Runs at safe moments only: when a new day's
+// deck is built, when you finish the deck, and when you add a verse. Rows are matched by reference
+// everywhere else, so moving them never writes to the wrong verse.
+// Books in Bible order, with the names and abbreviations a reference might start with.
+const BIBLE_BOOKS_ = [
+  ["Genesis", "gen|ge|gn"], ["Exodus", "exod|exo|ex"], ["Leviticus", "lev|le|lv"], ["Numbers", "num|nu|nm|nb"],
+  ["Deuteronomy", "deut|dt|de"], ["Joshua", "josh|jos|jsh"], ["Judges", "judg|jdg|jg|jdgs"], ["Ruth", "rth|ru"],
+  ["1 Samuel", "1 sam|1 sm|1 sa|1sam|first samuel"], ["2 Samuel", "2 sam|2 sm|2 sa|2sam|second samuel"],
+  ["1 Kings", "1 kgs|1 ki|1kgs|first kings"], ["2 Kings", "2 kgs|2 ki|2kgs|second kings"],
+  ["1 Chronicles", "1 chron|1 chr|1 ch|1chr|first chronicles"], ["2 Chronicles", "2 chron|2 chr|2 ch|2chr|second chronicles"],
+  ["Ezra", "ezr"], ["Nehemiah", "neh|ne"], ["Esther", "esth|est|es"], ["Job", "jb"],
+  ["Psalms", "psalm|ps|psa|pss|psm|pslm"], ["Proverbs", "prov|pro|prv|pr"], ["Ecclesiastes", "eccles|eccl|ecc|ec|qoh"],
+  ["Song of Solomon", "song of songs|song|sos|ss|canticles|cant"], ["Isaiah", "isa|is"], ["Jeremiah", "jer|je|jr"],
+  ["Lamentations", "lam|la"], ["Ezekiel", "ezek|eze|ezk"], ["Daniel", "dan|da|dn"], ["Hosea", "hos|ho"],
+  ["Joel", "jl"], ["Amos", "am"], ["Obadiah", "obad|ob"], ["Jonah", "jon|jnh"], ["Micah", "mic|mi"],
+  ["Nahum", "nah|na"], ["Habakkuk", "hab|hb"], ["Zephaniah", "zeph|zep|zp"], ["Haggai", "hag|hg"],
+  ["Zechariah", "zech|zec|zc"], ["Malachi", "mal|ml"],
+  ["Matthew", "matt|mat|mt"], ["Mark", "mrk|mk|mr"], ["Luke", "luk|lk"], ["John", "jhn|jn"], ["Acts", "act|ac"],
+  ["Romans", "rom|ro|rm"], ["1 Corinthians", "1 cor|1 co|1cor|first corinthians"], ["2 Corinthians", "2 cor|2 co|2cor|second corinthians"],
+  ["Galatians", "gal|ga"], ["Ephesians", "eph|ephes"], ["Philippians", "phil|php|pp"], ["Colossians", "col|co"],
+  ["1 Thessalonians", "1 thess|1 thes|1 th|1thess|first thessalonians"], ["2 Thessalonians", "2 thess|2 thes|2 th|2thess|second thessalonians"],
+  ["1 Timothy", "1 tim|1 ti|1tim|first timothy"], ["2 Timothy", "2 tim|2 ti|2tim|second timothy"],
+  ["Titus", "tit|ti"], ["Philemon", "philem|phlm|phm"], ["Hebrews", "heb"], ["James", "jas|jm"],
+  ["1 Peter", "1 pet|1 pe|1pet|1 pt|first peter"], ["2 Peter", "2 pet|2 pe|2pet|2 pt|second peter"],
+  ["1 John", "1 jn|1 jhn|1john|first john"], ["2 John", "2 jn|2 jhn|2john|second john"], ["3 John", "3 jn|3 jhn|3john|third john"],
+  ["Jude", "jud"], ["Revelation", "rev|re|revelations|apocalypse"]
+];
+
+const BOOK_INDEX_ = (function() {
+  const m = {};
+  BIBLE_BOOKS_.forEach(function(b, i) {
+    m[normBook_(b[0])] = i;
+    b[1].split('|').forEach(function(a) { m[normBook_(a)] = i; });
+  });
+  return m;
+})();
+
+function normBook_(t) {
+  return String(t || '').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim()
+    .replace(/^(1st|i)\s+/, '1 ').replace(/^(2nd|ii)\s+/, '2 ').replace(/^(3rd|iii)\s+/, '3 ')
+    .replace(/^([123])(?=[a-z])/, '$1 ');
+}
+
+// "John 10:27-30" -> { book: index in the Bible (999 if unknown), chapter, verse }
+function parseRef_(ref) {
+  const m = String(ref || '').match(/^\s*((?:(?:[1-3]|1st|2nd|3rd)\.?\s*|(?:iii|ii|i)\.?\s+)?[A-Za-z][A-Za-z.\s]*?)\s*(\d+)(?:\s*[:.]\s*(\d+))?/i);
+  let name = ref, chapter = 0, verse = 0;
+  if (m) { name = m[1]; chapter = parseInt(m[2], 10) || 0; verse = parseInt(m[3], 10) || 0; }
+  let idx = BOOK_INDEX_[normBook_(name)];
+  if (idx === undefined) idx = 999;
+  return { book: idx, chapter: chapter, verse: verse };
+}
+
+function sortVerses_() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+    if (!sheet) return;
+    const last = sheet.getLastRow();
+    const cols = sheet.getLastColumn();
+    if (last < 3 || cols < 8) return;
+    const range = sheet.getRange(2, 1, last - 1, cols);
+    const vals = range.getValues();
+    const forms = range.getFormulas();
+    const items = vals.map(function(row, i) {
+      const ref = cleanRef_(row[5]);
+      const str = String(row[4] === null || row[4] === undefined ? '' : row[4]).trim();
+      const hasLevel = str !== '' && !isNaN(Number(str));
+      const p = parseRef_(ref);
+      return {
+        i: i,
+        empty: !ref,
+        level: hasLevel ? Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str)))) : 99,
+        book: p.book, chapter: p.chapter, verse: p.verse, ref: ref
+      };
+    });
+    const sorted = items.slice().sort(function(a, b) {
+      return (a.empty - b.empty) || (a.level - b.level) || (a.book - b.book) ||
+        (a.chapter - b.chapter) || (a.verse - b.verse) ||
+        (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0) || (a.i - b.i);
+    });
+    if (sorted.every(function(it, k) { return it.i === k; })) return; // already in order
+    const out = sorted.map(function(it) {
+      return vals[it.i].map(function(v, c) { return forms[it.i][c] || v; });
+    });
+    range.setValues(out);
+  } catch (e) {
+    console.error('Sort failed: ' + e);
   }
 }
 
