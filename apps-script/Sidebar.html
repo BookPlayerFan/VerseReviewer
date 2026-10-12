@@ -374,7 +374,7 @@
       justify-content: flex-start;
       align-items: stretch;
       padding: 12px 14px;
-      margin-bottom: 5px;
+      margin-bottom: 0;
       overflow-y: auto;
       overflow-x: hidden;
       min-height: 0;
@@ -698,13 +698,13 @@
 
 
     /* ── Bottom tab bar navigation ── */
-    :root { --tab-h: calc(48px + max(env(safe-area-inset-bottom, 0px) - 14px, 0px)); }
+    :root { --tab-h: calc(53px + max(env(safe-area-inset-bottom, 0px) - 14px, 0px)); }
     body { padding-bottom: calc(var(--tab-h) + 4px); }
     .status-bar, .progress-track { display: none !important; }
     .tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
       display: flex; background: var(--bg-card); border-top: 1px solid var(--border-card);
-      padding: 9px 0 max(env(safe-area-inset-bottom, 0px) - 14px, 0px); height: var(--tab-h);
+      padding: 14px 0 max(env(safe-area-inset-bottom, 0px) - 14px, 0px); height: var(--tab-h);
     }
     .tab { flex: 1; background: none; border: 0; box-shadow: none; min-height: 0; width: auto; padding: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1px;
@@ -1309,7 +1309,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-21';
+    const CLIENT_BUILD = 'sync-22';
 
     let queue = [];
     let currentIndex = 0;
