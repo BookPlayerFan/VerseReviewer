@@ -577,11 +577,13 @@
     .val-grad { color: var(--text-accent); }
     .val-fail { color: var(--btn-fail-text); }
     .stat-box.tappable { cursor: pointer; }
-    .stat-caret { display: inline-block; margin-left: 4px; font-size: 9px; }
+    .stat-box.open { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
     .fail-list { margin: -6px 0 14px; padding: 10px 14px; background: var(--bg-body); border: 1px solid var(--border-body);
-      border-radius: 12px; font-size: 14px; line-height: 1.7; color: var(--text-primary); text-align: center; }
+      border-radius: 12px; font-size: 14px; line-height: 1.7; color: var(--text-primary);
+      max-height: 168px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .fail-list .fail-inner { display: table; margin: 0 auto; text-align: left; }
     .fail-list .fail-title { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
+      color: var(--text-muted); font-weight: 600; margin-bottom: 2px; text-align: center; }
 
     .summary-btn-stack {
       display: flex;
@@ -916,7 +918,7 @@
         </div>
         <div class="stat-box" id="statFailBox" onclick="toggleFailList()">
           <div class="stat-val val-fail" id="statFailed">0</div>
-          <div class="stat-lbl">Repeats<span class="stat-caret" id="statFailCaret"></span></div>
+          <div class="stat-lbl">Repeats</div>
         </div>
       </div>
       <div class="fail-list" id="failList" style="display: none;"></div>
@@ -1526,7 +1528,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-37';
+    const CLIENT_BUILD = 'sync-38';
 
     let queue = [];
     let currentIndex = 0;
@@ -2533,15 +2535,15 @@
     function updateFailList() {
       const box = document.getElementById("statFailBox");
       const list = document.getElementById("failList");
-      const caret = document.getElementById("statFailCaret");
       const refs = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
       const can = refs.length > 0;
       box.classList.toggle("tappable", can);
-      caret.textContent = can ? "▾" : "";
+      box.classList.remove("open");
       if (!can) { list.style.display = "none"; list.innerHTML = ""; return; }
-      let html = '<span class="fail-title">Missed today</span>';
+      let html = '<span class="fail-title">Missed today</span><div class="fail-inner">';
       refs.forEach(function(r) { html += "<div>" + escapeHtml(r) + "</div>"; });
-      list.innerHTML = html;
+      list.innerHTML = html + "</div>";
+      list.style.display = "none";
     }
 
     function toggleFailList() {
@@ -2550,7 +2552,7 @@
       const list = document.getElementById("failList");
       const open = list.style.display === "none";
       list.style.display = open ? "block" : "none";
-      document.getElementById("statFailCaret").textContent = open ? "▴" : "▾";
+      document.getElementById("statFailBox").classList.toggle("open", open);
     }
 
     // Refresh: saves anything pending, then asks the server for the current session.
