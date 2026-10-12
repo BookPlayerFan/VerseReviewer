@@ -759,7 +759,7 @@
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
     /* Undo: small pill just above the Reveal button, only while it can be used */
-    .undo-link { position: absolute; top: -33px; right: 6px; z-index: 6; margin: 0; padding: 5px 11px;
+    .undo-link { position: absolute; top: -38px; right: 6px; z-index: 6; margin: 0; padding: 5px 11px;
       border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); opacity: 0; }
     .undo-link.show { opacity: 0.95; }
     .corner-add { position: absolute; top: 10px; left: 12px; z-index: 6; margin: 0; width: 30px; min-height: 0; height: 30px;
@@ -1031,6 +1031,21 @@
       n.style.bottom = Math.max(0, deck.clientHeight - bottomEdge + 10) + "px";
       n.style.left = (card.offsetLeft + wrap.offsetLeft + wrap.offsetWidth / 2) + "px";
     }
+    // Undo is centered over the Reveal button (its width changes with the label, so measure it).
+    function placeUndo() {
+      const u = document.getElementById("undoBtn");
+      const wrap = document.querySelector(".verse-wrap");
+      const rv = document.querySelector("#cardBody .btn-reveal-all");
+      if (!u || !wrap || !rv) return;
+      const wr = wrap.getBoundingClientRect(), rr = rv.getBoundingClientRect();
+      if (!rr.width) return;
+      u.style.right = "auto";
+      u.style.left = Math.round(rr.left + rr.width / 2 - wr.left - u.offsetWidth / 2) + "px";
+    }
+    window.addEventListener("resize", placeUndo);
+    try {
+      new MutationObserver(placeUndo).observe(document.getElementById("cardBody"), { childList: true, subtree: true, characterData: true });
+    } catch (e) {}
     try {
       new MutationObserver(placeNotice).observe(document.getElementById("toastNotice"), { childList: true, characterData: true, subtree: true });
     } catch (e) {}
@@ -1375,7 +1390,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-33';
+    const CLIENT_BUILD = 'sync-34';
 
     let queue = [];
     let currentIndex = 0;
@@ -1659,6 +1674,7 @@
       undoId = id;
       const b = document.getElementById("undoBtn");
       if (b) b.classList.add("show");
+      placeUndo();
       clearTimeout(undoTimer);
       undoTimer = setTimeout(hideUndo, UNDO_SHOW_MS);
     }
@@ -1784,6 +1800,7 @@
       updateLearningChip();
       updateTabs();
       placeNotice();
+      placeUndo();
     }
 
     function updateLearningChip() {
