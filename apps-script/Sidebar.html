@@ -543,7 +543,8 @@
       color: var(--btn-fail-text); 
       font-size: 16px; 
     }
-    .btn-fail.seen { opacity: 0.7; }
+    .btn-fail.review { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
+    .btn-fail.seen { opacity: 0.6; }
 
     .btn-pass { 
       flex: 1; 
@@ -1567,7 +1568,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-63';
+    const CLIENT_BUILD = 'sync-64';
 
     let queue = [];
     let currentIndex = 0;
@@ -2109,6 +2110,7 @@
       document.getElementById("btnPassText").textContent = "Level Up";
       document.getElementById("btnFailText").textContent = doneLabel;
       document.getElementById("btnFail").style.display = "flex";
+      document.getElementById("btnFail").classList.add("review");
       document.getElementById("btnFail").classList.toggle("seen", isSeen(card.reference));
 
       document.getElementById("cardRef").textContent = card.reference;
@@ -2132,7 +2134,7 @@
       const metaTag = document.getElementById("cardMeta");
       const versionBadge = document.getElementById("cardVersion");
       const btnFail = document.getElementById("btnFail");
-      btnFail.classList.remove("seen");
+      btnFail.classList.remove("seen", "review");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
       const passBadge = document.getElementById("badgePass");
