@@ -1585,7 +1585,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-85';
+    const CLIENT_BUILD = 'sync-86';
 
     let queue = [];
     let currentIndex = 0;
@@ -2455,6 +2455,8 @@
         setTimeout(fadeOutLevelUp, ms - 140);
       } else {
         learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
+        // ask the server for a push when this snooze ends (it is cancelled if the verse is finished first)
+        try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).pushSnooze(card.reference, learningSeen[card.reference]); } catch (e) {}
         learningIndex = (learningIndex + 1) % learningCards.length; // loops back to the first verse
         enqueueSubmit(null, snapshot(currentIndex));
         if (learningCards.length === 1) {

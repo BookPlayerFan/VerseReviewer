@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-29'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-30'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -807,6 +807,7 @@ function submitReview(expectedVersion, review, next) {
     }
 
     writeState_(s);
+    if (review && written) cancelSnoozePush_(written.f); // the new verse was done, so its reminder isn't needed
     const result = { ok: true, version: s.version, undoId: undoId };
     if (review) result.tomorrow = dueTomorrowCount_(readSheetData_());
     return result;
@@ -1055,4 +1056,144 @@ function getVerseList() {
     verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due });
   }
   return { verses: verses };
+}
+
+
+// ─────────────────────────── Push reminders (OneSignal) ───────────────────────────
+//
+// Setup, once:  1) Script Property ONESIGNAL_KEY = your OneSignal REST API key.
+//               2) Run installDailyPush() from the editor (creates the ~6:30 AM trigger; approve the permissions).
+//               3) Run testPush() to send yourself a test.
+// Two kinds of reminder:
+//   - New verse snooze: when you press Review on a New verse, the app asks for a push at the end of its 2 hour
+//     snooze (pushSnooze). Finishing the verse cancels it (submitReview -> cancelSnoozePush_).
+//   - Daily: around 6:30 AM, if any reviews are due (dailyPush).
+// Nothing is sent between QUIET_START and QUIET_END; a push due then goes out when quiet hours end.
+
+const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
+const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
+const QUIET_START = 21; // 9 PM
+const QUIET_END = 5;    // 5 AM
+const PUSH_PENDING_KEY = 'VR_PUSH_PENDING'; // { reference: notificationId }
+const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
+const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
+
+function osCall_(method, path, body) {
+  const key = PropertiesService.getScriptProperties().getProperty('ONESIGNAL_KEY');
+  if (!key) return { ok: false, text: 'ONESIGNAL_KEY is not set' };
+  const opts = {
+    method: method,
+    muteHttpExceptions: true,
+    headers: { 'Authorization': 'Key ' + key, 'accept': 'application/json' }
+  };
+  if (body) { opts.contentType = 'application/json'; opts.payload = JSON.stringify(body); }
+  let res;
+  try { res = UrlFetchApp.fetch('https://api.onesignal.com' + path, opts); }
+  catch (err) { return { ok: false, text: String(err) }; }
+  const code = res.getResponseCode();
+  const text = res.getContentText();
+  let json = null;
+  try { json = JSON.parse(text); } catch (e) {}
+  const ok = code >= 200 && code < 300 && !(json && json.errors && !json.id);
+  try { PropertiesService.getScriptProperties().setProperty(PUSH_LAST_KEY, new Date().toISOString() + ' ' + code + ' ' + text.slice(0, 300)); } catch (e) {}
+  return { ok: ok, code: code, text: text, json: json };
+}
+
+// If a time falls inside quiet hours, moves it to when they end.
+function afterQuiet_(ms) {
+  const tz = Session.getScriptTimeZone();
+  const hour = Number(Utilities.formatDate(new Date(ms), tz, 'H'));
+  const inQuiet = QUIET_START > QUIET_END ? (hour >= QUIET_START || hour < QUIET_END) : (hour >= QUIET_START && hour < QUIET_END);
+  if (!inQuiet) return ms;
+  let t = ms;
+  for (let i = 0; i < 30; i++) { // step forward until the local hour reaches QUIET_END
+    t += 30 * 60 * 1000;
+    if (Number(Utilities.formatDate(new Date(t), tz, 'H')) === QUIET_END) {
+      // back up to the top of that hour
+      const mins = Number(Utilities.formatDate(new Date(t), tz, 'm'));
+      return t - mins * 60 * 1000;
+    }
+  }
+  return ms;
+}
+
+function osSend_(heading, message, whenMs, topic) {
+  const body = {
+    app_id: ONESIGNAL_APP_ID,
+    target_channel: 'push',
+    included_segments: ['Total Subscriptions'],
+    headings: { en: heading },
+    contents: { en: message },
+    url: PUSH_URL,
+    web_push_topic: topic || 'verse-review'
+  };
+  if (whenMs && whenMs > Date.now() + 30000) {
+    body.send_after = Utilities.formatDate(new Date(whenMs), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+  }
+  return osCall_('post', '/notifications?c=push', body);
+}
+
+function pendingPush_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(PUSH_PENDING_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function setPendingPush_(map) {
+  PropertiesService.getScriptProperties().setProperty(PUSH_PENDING_KEY, JSON.stringify(map));
+}
+
+function cancelSnoozePush_(ref) {
+  try {
+    const map = pendingPush_();
+    const id = map[ref];
+    if (!id) return;
+    delete map[ref];
+    setPendingPush_(map);
+    osCall_('delete', '/notifications/' + encodeURIComponent(id) + '?app_id=' + ONESIGNAL_APP_ID);
+  } catch (e) { console.error('cancelSnoozePush_ failed: ' + e); }
+}
+
+// Called by the app (fire and forget) when a New verse is marked Reviewed. endMs = when its snooze ends.
+function pushSnooze(reference, endMs) {
+  try {
+    const ref = cleanRef_(reference);
+    const end = Number(endMs);
+    if (!ref || !end || end < Date.now() || end > Date.now() + 6 * 60 * 60 * 1000) return { ok: false };
+    cancelSnoozePush_(ref);
+    const when = afterQuiet_(end);
+    const r = osSend_('New verse ready', ref + ' is ready to review again.', when, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''));
+    if (r.ok && r.json && r.json.id) {
+      const map = pendingPush_();
+      map[ref] = r.json.id;
+      setPendingPush_(map);
+    }
+    return { ok: !!r.ok };
+  } catch (e) { console.error('pushSnooze failed: ' + e); return { ok: false }; }
+}
+
+// Runs from the daily trigger (installDailyPush). Sends one push if reviews are due and none was sent today.
+function dailyPush() {
+  const props = PropertiesService.getScriptProperties();
+  const today = todayKey_();
+  if (props.getProperty(PUSH_DAILY_KEY) === today) return;
+  const due = getDueCards(false).length;
+  if (due < 1) return;
+  const send = afterQuiet_(Date.now()) === Date.now();
+  if (!send) return; // inside quiet hours: the next trigger run (or tomorrow) handles it
+  const r = osSend_('Reviews ready', due === 1 ? '1 review is ready today.' : due + ' reviews are ready today.', 0, 'vr-daily');
+  if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
+}
+
+// Run once from the editor.
+function installDailyPush() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'dailyPush') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dailyPush').timeBased().atHour(6).nearMinute(30).everyDays(1).create();
+  console.log('Daily push trigger created for about 6:30 AM.');
+}
+
+// Run from the editor to check the connection. View -> Logs shows the answer.
+function testPush() {
+  const r = osSend_('Verse Review', 'Test reminder: push is working.', 0, 'vr-test');
+  console.log('ok=' + r.ok + ' code=' + r.code + ' ' + r.text);
 }
