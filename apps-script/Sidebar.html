@@ -1534,7 +1534,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-44';
+    const CLIENT_BUILD = 'sync-45';
 
     let queue = [];
     let currentIndex = 0;
@@ -2178,13 +2178,6 @@
         if (failBadge) failBadge.textContent = "FAIL";
 
         pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
-      } else if (card.group === 0) {
-        setRankBadge(metaTag, 0);
-        btnFailText.textContent = "Skip";
-        btnPassText.textContent = "Level Up";
-        btnFail.style.display = "flex";
-        if (passBadge) passBadge.textContent = "LEVEL UP";
-        if (failBadge) failBadge.textContent = "SKIP";
       } else {
         setRankBadge(metaTag, card.group);
         btnFailText.textContent = "Fail";
@@ -2519,11 +2512,6 @@
         document.getElementById("summaryIcon").textContent = "✨";
         document.getElementById("summaryTitle").textContent = "All Caught Up!";
         document.getElementById("summarySubtitle").textContent = "No verses are due for review right now.";
-        document.getElementById("summaryStats").style.display = "none";
-      } else if (sessionStats.reviewed === 0) {
-        document.getElementById("summaryIcon").textContent = "🎉";
-        document.getElementById("summaryTitle").textContent = "Session Complete!";
-        document.getElementById("summarySubtitle").textContent = "You introduced your new verses for today.";
         document.getElementById("summaryStats").style.display = "none";
       } else {
         document.getElementById("summaryIcon").textContent = "🏆";
