@@ -779,6 +779,11 @@
     .pv { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
       background: rgba(0,0,0,0.45); padding: 24px 20px; }
     .pv.open { display: flex; }
+    .help-sub { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin: 4px 0 2px; }
+    .help-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 15px; border-top: 1px solid var(--border-card); }
+    .help-row:first-of-type { border-top: 0; }
+    .help-row kbd { font: 600 13px -apple-system, Helvetica, Arial, sans-serif; min-width: 26px; text-align: center; padding: 3px 8px; border-radius: 6px;
+      background: var(--bg-body); border: 1px solid var(--border-card); border-bottom-width: 2px; color: var(--text-primary); }
     .pv-card { background: var(--bg-card); color: var(--text-primary); border-radius: 18px; width: 100%; max-width: 420px;
       max-height: 78%; display: flex; flex-direction: column; padding: 18px 18px 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
     .pv-head { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 18px; font-weight: 700;
@@ -886,11 +891,11 @@
         <div class="btn-row">
           <button type="button" class="btn-fail" id="btnFail" onclick="scoreCard('Fail')" style="display: none;">
             <span id="btnFailText">Fail</span>
-            <span class="shortcut-hint">[F]</span>
+            <span class="shortcut-hint">[D]</span>
           </button>
           <button type="button" class="btn-pass" id="btnPass" onclick="scoreCard('Pass')">
             <span id="btnPassText">Pass</span>
-            <span class="shortcut-hint">[S]</span>
+            <span class="shortcut-hint">[F]</span>
           </button>
         </div>
       </div>
@@ -981,6 +986,19 @@
         <button type="button" class="pv-close" onclick="closePreview()">Close</button>
         <button type="button" class="pv-add" id="pvAdd">Add</button>
       </div>
+    </div>
+  </div>
+
+  <div class="pv" id="helpModal" onclick="if (event.target === this) toggleHelp(false)">
+    <div class="pv-card">
+      <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Keyboard shortcuts</div>
+      <div class="help-sub">Review tab</div>
+      <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
+      <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
+      <div class="help-row"><span>Pass</span><kbd>F</kbd></div>
+      <div class="help-row"><span>Fail</span><kbd>D</kbd></div>
+      <div class="help-row"><span>Undo</span><kbd>Z</kbd></div>
+      <div class="help-row"><span>Show / hide this menu</span><kbd>?</kbd></div>
     </div>
   </div>
 
@@ -1568,7 +1586,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-64';
+    const CLIENT_BUILD = 'sync-65';
 
     let queue = [];
     let currentIndex = 0;
@@ -2995,11 +3013,17 @@
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
+      const helpEl = document.getElementById("helpModal");
+      if (helpEl.classList.contains("open")) {
+        if (e.key === "?" || e.key === "Escape") { e.preventDefault(); toggleHelp(false); }
+        return;
+      }
       // Not while a popup is open
       const popupOpen = ["picker", "pickerPreview", "pasteModal"].some(function(id) {
         return document.getElementById(id).classList.contains("open");
       });
       if (popupOpen) return;
+      if (e.key === "?") { e.preventDefault(); toggleHelp(true); return; }
       // Shortcuts are for the Review cards only: not the New screen, not over the Verse List
       if (mode === "learning") return;
       if (document.getElementById("verseListView").classList.contains("open")) return;
@@ -3009,14 +3033,18 @@
       } else if (key === "r") {
         e.preventDefault();
         toggleRevealAll(e);
-      } else if (key === "f") {
+      } else if (key === "d") {
         scoreCard("Fail");
-      } else if (key === "s") {
+      } else if (key === "f") {
         scoreCard("Pass");
-      } else if (key === "u") {
+      } else if (key === "z") {
         undoLast();
       }
     });
+
+    function toggleHelp(open) {
+      document.getElementById("helpModal").classList.toggle("open", open);
+    }
 
     // ───────────── Staying in sync with your other device ─────────────
     // We ask the server whether the session has moved on: when you come back to the app,
