@@ -1281,7 +1281,7 @@
       Object.keys(learningSeen).forEach(function(k) { if (learningSeen[k] > now && learningSeen[k] < next) next = learningSeen[k]; });
       if (next < Infinity) badgeTimer = setTimeout(updateTabs, Math.min(next - now + 500, 2147483000));
     }
-    document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
+    document.addEventListener("visibilitychange", function() { if (!document.hidden) { lastIconBadge = -1; updateTabs(); } }); // a push may have changed the icon badge while we were away
 
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
@@ -1596,7 +1596,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-88';
+    const CLIENT_BUILD = 'sync-89';
 
     let queue = [];
     let currentIndex = 0;
