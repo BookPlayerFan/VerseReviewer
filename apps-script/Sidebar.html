@@ -142,28 +142,10 @@
       flex-direction: column;
       justify-content: space-between;
       box-shadow: 0 4px 14px var(--card-shadow);
-      touch-action: pan-y;
       will-change: transform, opacity;
       box-sizing: border-box;
       min-height: 0;
     }
-
-    .swipe-badge {
-      position: absolute;
-      top: 18px;
-      padding: 6px 14px;
-      font-size: 18px;
-      font-weight: 800;
-      border-radius: 8px;
-      text-transform: uppercase;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 10;
-      transition: opacity 0.1s ease;
-    }
-
-    .badge-pass { left: 18px; color: var(--badge-pass); border: 3px solid var(--badge-pass); transform: rotate(-12deg); }
-    .badge-fail { right: 18px; color: var(--badge-fail); border: 3px solid var(--badge-fail); transform: rotate(12deg); }
 
     .card-header-group {
       flex-shrink: 0;
@@ -234,27 +216,13 @@
       }
     }
     .rank-badge.is-new { --rc: var(--text-meta); font-weight: 700; }
-    .rank-badge.pop { animation: rankPop 0.6s ease-out both, rankGlow 1s ease-out 0.15s both; }
-    .rank-badge.pop-big { animation: rankPop 0.8s ease-out both, rankGlow 1.4s ease-out 0.15s both; }
     @keyframes rankGlow {
       0%   { box-shadow: 0 0 0 0 var(--rc); }
       60%  { box-shadow: 0 0 14px 5px color-mix(in srgb, var(--rc) 45%, transparent); }
       100% { box-shadow: 0 0 0 0 transparent; }
     }
-    .notice.levelup { font-size: 15px; min-height: 34px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 12px; }
-    @keyframes rankPop {
-      0%   { transform: scale(0.6); opacity: 0; }
-      55%  { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-    .rank-arrow { color: var(--text-meta); margin: 0 2px; font-weight: 600; }
-    .notice .rank-badge { vertical-align: middle; }
-    .notice .rank-badge.pop, .notice .rank-badge.pop-big { margin: 0 6px; } /* room for the glow */
-    #toastNotice.levelup { padding: 8px 18px; }
-    /* Level-up toast: heading on top, old rank -> new rank below. Higher ranks add a ring and sparkles around the new pill. */
-    #toastNotice.levelup.lu-stack { flex-direction: column; flex-wrap: nowrap; gap: 8px; padding: 12px 22px; }
-    .lu-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; color: var(--badge-pass); }
-    .lu-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    @keyframes luSettle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+    .lu-settle { animation: luSettle 0.55s ease-out 0.45s both; }
     .lu-fx { position: relative; display: inline-block; --rc: var(--rl); }
     @media (prefers-color-scheme: dark) { .lu-fx { --rc: var(--rd); } }
     .lu-ring { position: absolute; inset: -1px; border-radius: 999px; border: 2px solid var(--rc); opacity: 0; pointer-events: none;
@@ -817,7 +785,6 @@
       background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: 0 4px 14px rgba(0,0,0,0.14);
       pointer-events: none; text-align: center; animation: noticeIn 0.18s ease-out both; }
     #toastNotice:empty { display: none; }
-    #toastNotice.levelup { min-height: 0; margin: 0; flex-wrap: wrap; justify-content: center; }
     @keyframes noticeIn { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
     button:disabled { opacity: 0.55; cursor: default; }
@@ -869,8 +836,6 @@
     <button type="button" class="corner-add" id="cornerAdd" onclick="addNewVerse()" aria-label="Add a new verse" style="display: none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
     <div class="notice" id="toastNotice"></div>
     <div class="card" id="activeCard">
-      <div class="swipe-badge badge-pass" id="badgePass">PASS</div>
-      <div class="swipe-badge badge-fail" id="badgeFail">FAIL</div>
 
       <div class="card-header-group">
         <div class="ref-header-row">
@@ -1061,7 +1026,6 @@
       return b;
     }
 
-    // Brief rank-up moment in the toast: old badge, arrow, new badge popping in. Diamond gets a bigger one.
     // The notice lives outside the card (the card fades away when you score it, and a notice inside it
     // would fade too), so each time it changes it is lined up with the bottom of the verse box.
     function placeNotice() {
@@ -1093,64 +1057,91 @@
       new MutationObserver(placeNotice).observe(document.getElementById("toastNotice"), { childList: true, characterData: true, subtree: true });
     } catch (e) {}
 
-    function showRankUp(fromG, toG, restored) {
-      const el = document.getElementById("toastNotice");
-      el.textContent = "";
-      el.classList.add("levelup");
-      clearTimeout(showRankUp.t);
-      // Stays up about 1.5 s after the next card appears (the card changes after 1.2 s, or 1.7 s for the top rank).
-      showRankUp.t = setTimeout(function() {
-        el.classList.remove("levelup");
-        if (el.querySelector(".rank-badge")) el.textContent = ""; // leave any newer message alone
-      }, (toG >= 8 ? 1700 : 1200) + 1500);
-      if (restored) {
-        el.classList.remove("lu-stack");
-        el.appendChild(document.createTextNode("Restored to "));
-        el.appendChild(makePill(toG, "pop"));
-        return;
+    // Level-up moment: the card itself turns into the new rank (badge, dots, outline and tint cross-fade),
+    // settles with a small bounce, then fades away. Higher ranks add a ring and sparkles around the new badge.
+    let luOverlay = null;
+    function clearLevelUp() {
+      if (luOverlay) { luOverlay.remove(); luOverlay = null; }
+    }
+    function playLevelUp(toG, rep) {
+      clearLevelUp();
+      const card = document.getElementById("activeCard");
+      const deck = document.getElementById("deckContainer");
+      if (!card || !deck) return;
+      const clone = card.cloneNode(true);
+      clone.querySelectorAll("[id]").forEach(function(n) { n.removeAttribute("id"); });
+      clone.removeAttribute("id");
+      clone.querySelectorAll("button").forEach(function(n) { n.removeAttribute("onclick"); });
+      setCardRank(clone, toG);
+      const meta = clone.querySelector(".meta-tag");
+      if (meta) { meta.className = "meta-tag"; setRankBadge(meta, toG); }
+      const pips = clone.querySelector(".pips-container");
+      if (pips) {
+        pips.innerHTML = "";
+        if (toG >= 8) {
+          pips.innerHTML = '<span class="dia-mark">\u25C6</span>';
+        } else {
+          const cfg = GROUP_CONFIG[toG] || { repsNeeded: 1 };
+          const filled = rep >= 1 && rep <= cfg.repsNeeded ? rep : 1;
+          for (let i = 1; i <= cfg.repsNeeded; i++) {
+            const p = document.createElement("div");
+            p.className = "pip" + (i <= filled ? " filled" : "");
+            pips.appendChild(p);
+          }
+        }
       }
-      // Heading above, old rank -> new rank below. Higher ranks get a ring and a few sparkles around the new pill:
-      // Platinum/Sapphire: 1 ring + 5, Emerald/Ruby: 1 ring + 8, Diamond: 2 rings + 12.
-      el.classList.add("lu-stack");
-      const title = document.createElement("div");
-      title.className = "lu-title";
-      title.textContent = toG >= 8 ? "Verse mastered!" : "Level up!";
-      const row = document.createElement("div");
-      row.className = "lu-row";
-      if (fromG >= 0) {
-        row.appendChild(makePill(fromG));
-        const a = document.createElement("span");
-        a.className = "rank-arrow";
-        a.textContent = "→";
-        row.appendChild(a);
+      const badge = meta && meta.querySelector(".rank-badge");
+      if (badge) badge.style.animation = "rankGlow 1s ease-out 0.45s both";
+      if (badge && toG >= 4) {
+        const fx = document.createElement("span");
+        fx.className = "lu-fx rank-" + Math.min(8, toG);
+        badge.parentNode.insertBefore(fx, badge);
+        const rings = toG >= 8 ? 2 : 1;
+        const sparks = toG >= 8 ? 12 : toG >= 6 ? 8 : 5;
+        for (let r = 0; r < rings; r++) {
+          const ring = document.createElement("span");
+          ring.className = "lu-ring";
+          ring.style.setProperty("--rd2", (0.4 + r * 0.18) + "s");
+          fx.appendChild(ring);
+        }
+        fx.appendChild(badge);
+        for (let i = 0; i < sparks; i++) {
+          const sp = document.createElement("span");
+          const ang = (i / sparks) * Math.PI * 2 + 0.4;
+          const ex = Math.cos(ang) * 46, ey = Math.sin(ang) * 11, more = 10 + ((i * 7) % 9);
+          sp.className = "lu-spark" + (i % 3 === 0 ? " dot" : "");
+          sp.textContent = i % 3 === 0 ? "\u25CF" : "\u2726";
+          sp.style.setProperty("--ex", Math.round(ex) + "px");
+          sp.style.setProperty("--ey", Math.round(ey) + "px");
+          sp.style.setProperty("--dx", Math.round(ex + Math.cos(ang) * more) + "px");
+          sp.style.setProperty("--dy", Math.round(ey + Math.sin(ang) * more * 0.6) + "px");
+          sp.style.setProperty("--sd", (0.4 + (i % 3) * 0.06) + "s");
+          fx.appendChild(sp);
+        }
       }
-      const fx = document.createElement("span");
-      fx.className = "lu-fx rank-" + Math.min(8, toG);
-      const rings = toG >= 8 ? 2 : toG >= 4 ? 1 : 0;
-      const sparks = toG >= 8 ? 12 : toG >= 6 ? 8 : toG >= 4 ? 5 : 0;
-      for (let r = 0; r < rings; r++) {
-        const ring = document.createElement("span");
-        ring.className = "lu-ring";
-        ring.style.setProperty("--rd2", (0.22 + r * 0.18) + "s");
-        fx.appendChild(ring);
-      }
-      fx.appendChild(makePill(toG, toG >= 8 ? "pop-big" : "pop"));
-      for (let i = 0; i < sparks; i++) {
-        const sp = document.createElement("span");
-        const ang = (i / sparks) * Math.PI * 2 + 0.4;
-        const ex = Math.cos(ang) * 46, ey = Math.sin(ang) * 11, more = 10 + ((i * 7) % 9);
-        sp.className = "lu-spark" + (i % 3 === 0 ? " dot" : "");
-        sp.textContent = i % 3 === 0 ? "●" : "✦";
-        sp.style.setProperty("--ex", Math.round(ex) + "px");
-        sp.style.setProperty("--ey", Math.round(ey) + "px");
-        sp.style.setProperty("--dx", Math.round(ex + Math.cos(ang) * more) + "px");
-        sp.style.setProperty("--dy", Math.round(ey + Math.sin(ang) * more * 0.6) + "px");
-        sp.style.setProperty("--sd", (0.2 + (i % 3) * 0.06) + "s");
-        fx.appendChild(sp);
-      }
-      row.appendChild(fx);
-      el.appendChild(title);
-      el.appendChild(row);
+      const dr = deck.getBoundingClientRect(), cr = card.getBoundingClientRect();
+      clone.style.position = "absolute";
+      clone.style.left = (cr.left - dr.left) + "px";
+      clone.style.top = (cr.top - dr.top) + "px";
+      clone.style.width = cr.width + "px";
+      clone.style.height = cr.height + "px";
+      clone.style.flex = "none";
+      clone.style.margin = "0";
+      clone.style.pointerEvents = "none";
+      clone.style.zIndex = "6";
+      clone.style.opacity = "0";
+      clone.style.transition = "opacity 0.45s ease";
+      deck.appendChild(clone);
+      luOverlay = clone;
+      void clone.offsetWidth;
+      clone.style.opacity = "1";
+      card.classList.add("lu-settle");
+      clone.classList.add("lu-settle");
+    }
+    function fadeOutLevelUp() {
+      const card = document.getElementById("activeCard");
+      if (card) { card.style.transition = "opacity 0.12s ease-out"; card.style.opacity = "0"; }
+      if (luOverlay) { luOverlay.style.transition = "opacity 0.12s ease-out"; luOverlay.style.opacity = "0"; }
     }
 
     // ── Verse List ──
@@ -1586,7 +1577,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-66';
+    const CLIENT_BUILD = 'sync-67';
 
     let queue = [];
     let currentIndex = 0;
@@ -1596,7 +1587,6 @@
     let isFetching = false;
     let isRefreshing = false;
     let totalCardsProcessed = 0;
-    let didSwipeMove = false;
     let progressHigh = 0;
     let loadedAt = 0;
     let tomorrowCount = null;
@@ -1635,7 +1625,6 @@
     const initialSession = <?!= initialSessionJson ?>;
 
     window.onload = function() {
-      attachSwipeGestures();
       if (initialSession && Array.isArray(initialSession.cards)) {
         adoptSession(initialSession);
       } else {
@@ -2034,6 +2023,7 @@
     }
 
     function render() {
+      clearLevelUp();
       if (mode === 'learning') renderLearning();
       else renderCard();
       updateFailLock();
@@ -2097,12 +2087,9 @@
       cardEl.style.transform = "translate(0, 0) rotate(0deg)";
       cardEl.style.opacity = "1";
 
-      const passBadge = document.getElementById("badgePass");
-      const failBadge = document.getElementById("badgeFail");
-      if (passBadge) { passBadge.style.opacity = "0"; passBadge.textContent = "LEVEL UP"; }
 
       const doneLabel = "Review";
-      if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }      document.getElementById("sessionProgressFill").style.width = "0%";
+      document.getElementById("sessionProgressFill").style.width = "0%";
 
       const metaTag = document.getElementById("cardMeta");
       metaTag.className = "meta-tag";
@@ -2156,8 +2143,6 @@
       btnFail.classList.remove("seen", "review");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
-      const passBadge = document.getElementById("badgePass");
-      const failBadge = document.getElementById("badgeFail");
 
       if (currentIndex >= queue.length) {
         renderEndOfDayScreen();
@@ -2179,8 +2164,6 @@
       cardEl.style.transform = "translate(0, 0) rotate(0deg)";
       cardEl.style.opacity = "1";
 
-      if (passBadge) passBadge.style.opacity = "0";
-      if (failBadge) failBadge.style.opacity = "0";
       // Progress through today's deck, worked out only from the synced position, so every device shows the
       // same bar. Repeat cards added after a Fail come after the deck and never move it backwards.
       const percent = baseCount > 0 ? (Math.min(currentIndex, baseCount) / baseCount) * 100 : 0;
@@ -2205,8 +2188,6 @@
         btnFailText.textContent = "Repeat";
         btnPassText.textContent = "Clear";
         btnFail.style.display = "flex";
-        if (passBadge) passBadge.textContent = "CLEAR";
-        if (failBadge) failBadge.textContent = "REPEAT";
       } else if (fastTrackTarget) {
         // ⚡ Fast-Track Recovery Mode
         metaTag.textContent = `⚡ Fast-Track · back to ${rankName(fastTrackTarget)}`;
@@ -2214,8 +2195,6 @@
         btnFailText.textContent = "Fail";
         btnPassText.textContent = "Pass";
         btnFail.style.display = "flex";
-        if (passBadge) passBadge.textContent = "RESTORE";
-        if (failBadge) failBadge.textContent = "FAIL";
 
         pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
       } else {
@@ -2223,8 +2202,6 @@
         btnFailText.textContent = "Fail";
         btnPassText.textContent = "Pass";
         btnFail.style.display = "flex";
-        if (passBadge) passBadge.textContent = "PASS";
-        if (failBadge) failBadge.textContent = "FAIL";
 
         if (card.group === 8) {
           // Diamond is the top rank, so a plain "1 of 1" dot says nothing; show the gem instead.
@@ -2294,10 +2271,6 @@
     }
 
     function handleContainerClick(event) {
-      if (didSwipeMove) {
-        didSwipeMove = false;
-        return;
-      }
       if (isScoring || !hasActiveCard()) return;
 
       const nextHiddenIdx = segmentStates.findIndex(s => s === 'hidden');
@@ -2337,27 +2310,20 @@
 
     // ───────────── Scoring ─────────────
 
-    // Swiping the verse slides it away; the buttons and keyboard just fade it out in place.
-    function animateOut(action, viaSwipe) {
+    // Buttons and keys fade the card out in place.
+    function animateOut() {
       const cardEl = document.getElementById("activeCard");
-      if (!viaSwipe) {
-        cardEl.style.transition = "opacity 0.12s ease-out";
-        cardEl.style.opacity = "0";
-        return;
-      }
-      cardEl.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
-      cardEl.style.transform = action === "Pass"
-        ? "translate(350px, 30px) rotate(20deg)"
-        : "translate(-350px, 30px) rotate(-20deg)";
+      cardEl.style.transition = "opacity 0.12s ease-out";
       cardEl.style.opacity = "0";
     }
+
+    const LEVELUP_MS = 1100; // how long the card shows its new rank before moving on
 
     function advanceAfter(ms) {
       const startedIn = epoch;
       setTimeout(function() {
         if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
-        const tn = document.getElementById("toastNotice");
-        if (!tn.querySelector(".rank-badge")) tn.textContent = ""; // a level-up notice keeps showing over the next card
+        document.getElementById("toastNotice").textContent = "";
         currentIndex++;
         if (currentIndex >= queue.length && totalCardsProcessed > 0) countUpPending = true; // just finished: play the count-up once
         render();
@@ -2365,7 +2331,7 @@
     }
 
     // Learning screen: "Level Up" promotes the verse to Level 1; "Next" / "Done" just move on.
-    function scoreLearning(action, viaSwipe) {
+    function scoreLearning(action) {
       if (isScoring) return;
       const card = learningCards[learningIndex];
       if (!card) return;
@@ -2375,32 +2341,32 @@
       let ms = 160;
 
       if (action === "Pass") {
-        showRankUp(0, 1, false);
+        playLevelUp(1, 1);
         learningCards.splice(learningIndex, 1);
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
         enqueueSubmit(
           { rowIndex: card.rowIndex, reference: card.reference, rep: 1, group: 1 },
           snapshot(currentIndex)
         );
-        ms = 1200;
+        ms = LEVELUP_MS;
+        setTimeout(fadeOutLevelUp, ms - 140);
       } else {
+        animateOut();
         learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
         learningIndex = (learningIndex + 1) % learningCards.length; // loops back to the first verse
         enqueueSubmit(null, snapshot(currentIndex));
       }
 
-      animateOut(action, viaSwipe);
       const startedIn = epoch;
       setTimeout(function() {
         if (startedIn !== epoch) return;
-        const tn = document.getElementById("toastNotice");
-        if (!tn.querySelector(".rank-badge")) tn.textContent = "";
+        document.getElementById("toastNotice").textContent = "";
         render();
       }, ms);
     }
 
-    function scoreCard(action, viaSwipe) {
-      if (mode === 'learning') { scoreLearning(action, viaSwipe); return; }
+    function scoreCard(action) {
+      if (mode === 'learning') { scoreLearning(action); return; }
       if (isScoring || currentIndex >= queue.length) return;
       if (action === "Fail" && !canFail()) return;
 
@@ -2420,7 +2386,7 @@
           notice.textContent = "🔄 Re-queued for repeat";
         }
         enqueueSubmit(null, snapshot(currentIndex + 1));
-        animateOut(action, viaSwipe);
+        animateOut();
         advanceAfter(320);
         return;
       }
@@ -2523,18 +2489,17 @@
         snapshot(currentIndex + 1)
       );
 
-      animateOut(action, viaSwipe);
-
-      if (isFastTrackRestored) {
-        showRankUp(card.group, newGroup, true);
-        advanceAfter(1200);
-      } else if (graduated) {
-        showRankUp(card.group, newGroup, false);
-        advanceAfter(newGroup >= 8 ? 1700 : 1200);
+      if (isFastTrackRestored || graduated) {
+        playLevelUp(newGroup, newRep);
+        const ms = newGroup >= 8 ? LEVELUP_MS + 500 : LEVELUP_MS;
+        setTimeout(fadeOutLevelUp, ms - 140);
+        advanceAfter(ms);
       } else if (action === "Fail" && card.group > 0) {
+        animateOut();
         notice.textContent = "Added to end of queue";
         advanceAfter(320);
       } else {
+        animateOut();
         advanceAfter(160);
       }
     }
@@ -2917,99 +2882,6 @@
           showSummaryNotice("Error adding verse: " + ((err && err.message) || err), true);
         })
         .addChosenVerse(it.r, it.f);
-    }
-
-    // ───────────── Gestures ─────────────
-
-    function attachSwipeGestures() {
-      const deckContainer = document.getElementById("deckContainer");
-      let startX = 0, startY = 0, deltaX = 0, deltaY = 0;
-      let isDragging = false;
-      let axis = null; // 'x' | 'y' | null (undecided)
-      const SWIPE_THRESHOLD = 80;
-      const AXIS_LOCK_PX = 8;
-
-      function springBack() {
-        const cardEl = document.getElementById("activeCard");
-        const badgePass = document.getElementById("badgePass");
-        const badgeFail = document.getElementById("badgeFail");
-        if (cardEl) {
-          cardEl.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-          cardEl.style.transform = "translate(0, 0) rotate(0deg)";
-        }
-        if (badgePass) badgePass.style.opacity = 0;
-        if (badgeFail) badgeFail.style.opacity = 0;
-      }
-
-      deckContainer.addEventListener("touchstart", function(e) {
-        const cardEl = document.getElementById("activeCard");
-        if (isScoring || !cardEl || !hasActiveCard() || e.target.closest("button")) {
-          isDragging = false;
-          return;
-        }
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        deltaX = 0; deltaY = 0;
-        axis = null;
-        isDragging = true;
-        didSwipeMove = false;
-        cardEl.style.transition = "none";
-      }, { passive: true });
-
-      deckContainer.addEventListener("touchmove", function(e) {
-        const cardEl = document.getElementById("activeCard");
-        const badgePass = document.getElementById("badgePass");
-        const badgeFail = document.getElementById("badgeFail");
-
-        if (!isDragging || !cardEl) return;
-        deltaX = e.touches[0].clientX - startX;
-        deltaY = e.touches[0].clientY - startY;
-
-        // Lock to one axis on the first real movement: vertical = scroll the verse, horizontal = swipe.
-        if (!axis && (Math.abs(deltaX) > AXIS_LOCK_PX || Math.abs(deltaY) > AXIS_LOCK_PX)) {
-          axis = Math.abs(deltaX) > Math.abs(deltaY) ? 'x' : 'y';
-          didSwipeMove = true;
-        }
-        if (axis !== 'x') return;
-
-        if (e.cancelable) e.preventDefault();
-
-        const failAllowed = canFail();
-        const effectiveDeltaX = (deltaX < 0 && !failAllowed) ? deltaX * 0.2 : deltaX;
-
-        cardEl.style.transform = `translate(${effectiveDeltaX}px, ${deltaY * 0.25}px) rotate(${effectiveDeltaX * 0.08}deg)`;
-
-        if (deltaX > 20 && badgePass) {
-          badgePass.style.opacity = Math.min((deltaX - 20) / 50, 1);
-          if (badgeFail) badgeFail.style.opacity = 0;
-        } else if (deltaX < -20 && badgeFail && failAllowed) {
-          badgeFail.style.opacity = Math.min((-deltaX - 20) / 50, 1);
-          if (badgePass) badgePass.style.opacity = 0;
-        } else {
-          if (badgePass) badgePass.style.opacity = 0;
-          if (badgeFail) badgeFail.style.opacity = 0;
-        }
-      }, { passive: false });
-
-      deckContainer.addEventListener("touchend", function() {
-        if (!isDragging) return;
-        isDragging = false;
-        if (axis !== 'x') return; // taps and vertical scrolls never score
-
-        if (deltaX > SWIPE_THRESHOLD) {
-          scoreCard("Pass", true);
-        } else if (deltaX < -SWIPE_THRESHOLD && canFail()) {
-          scoreCard("Fail", true);
-        }
-        if (!isScoring) springBack();
-      });
-
-      // iOS can cancel a touch (system gesture, notification, etc.); never leave the card stuck off-center.
-      deckContainer.addEventListener("touchcancel", function() {
-        if (!isDragging) return;
-        isDragging = false;
-        if (axis === 'x') springBack();
-      });
     }
 
     window.addEventListener("keydown", function(e) {
