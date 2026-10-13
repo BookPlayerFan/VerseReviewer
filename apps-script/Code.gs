@@ -1052,7 +1052,7 @@ function getVerseList() {
     // Days from today until the next review (overdue shows as 0); null when there is no review date (Level 0).
     const nd = g > 0 ? toMidnight_(data[i][1]) : null;
     const due = nd ? Math.max(0, Math.round((nd.getTime() - todayMs) / 86400000)) : null;
-    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), d: due });
+    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due });
   }
   return { verses: verses };
 }

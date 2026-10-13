@@ -260,6 +260,9 @@
     .vl-verse { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 14px;
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+    .vl-verse, .verse-body { -webkit-touch-callout: none; }
+    .vl-verse { -webkit-user-select: none; user-select: none; }
+    .vl-verse.lp-down { background: var(--btn-restart-bg); }
     .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
       background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
       padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
@@ -361,7 +364,8 @@
     }
 
     .verse-body {
-      user-select: text;
+      -webkit-user-select: none;
+      user-select: none;
       flex: 1;
       background: var(--bg-body);
       border: 1px solid var(--border-body);
@@ -1312,7 +1316,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
           vlVerses.sort(compareVerses);
           renderVerseList();
         })
@@ -1386,7 +1390,15 @@
         }
         item.appendChild(left);
         if (showPills) item.appendChild(makePill(v.g));
-        item.onclick = function(ev) { ev.stopPropagation(); showVerseTip(item, v.w); };
+        const heldRow = attachLongPress(item, function() {
+          hideVerseTip();
+          showPreview({ f: v.f, v: v.v, t: v.t || v.x }, true);
+        });
+        item.onclick = function(ev) {
+          ev.stopPropagation();
+          if (heldRow()) return; // the hold already opened the full verse
+          showVerseTip(item, v.w);
+        };
         list.appendChild(item);
       });
       if (count) box.appendChild(list);
@@ -1396,6 +1408,27 @@
         row.classList.toggle("open", !!vlOpen[key]);
         list.style.display = vlOpen[key] ? "block" : "none";
       };
+    }
+
+    // Press and hold (about half a second) on an element. A press that moves or lifts early does nothing.
+    // Returns held(): true once if the hold fired, so the click that follows it can be ignored.
+    const LONG_PRESS_MS = 450;
+    function attachLongPress(el, onHold, canStart) {
+      let timer = null, sx = 0, sy = 0, fired = false;
+      function cancel() { if (timer) { clearTimeout(timer); timer = null; } el.classList.remove("lp-down"); }
+      el.addEventListener("pointerdown", function(e) {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        if (canStart && !canStart(e)) return;
+        fired = false; sx = e.clientX; sy = e.clientY; cancel();
+        el.classList.add("lp-down");
+        timer = setTimeout(function() { timer = null; fired = true; el.classList.remove("lp-down"); onHold(e); }, LONG_PRESS_MS);
+      });
+      el.addEventListener("pointermove", function(e) {
+        if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
+      });
+      ["pointerup", "pointercancel", "pointerleave"].forEach(function(n) { el.addEventListener(n, cancel); });
+      el.addEventListener("contextmenu", function(e) { if (timer || fired) e.preventDefault(); });
+      return function held() { const f = fired; fired = false; return f; };
     }
 
     // Small popup under a verse with its first few words.
@@ -1580,7 +1613,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-73';
+    const CLIENT_BUILD = 'sync-74';
 
     let queue = [];
     let currentIndex = 0;
@@ -1628,6 +1661,7 @@
     const initialSession = <?!= initialSessionJson ?>;
 
     window.onload = function() {
+      attachRevealHold();
       if (initialSession && Array.isArray(initialSession.cards)) {
         adoptSession(initialSession);
       } else {
@@ -2272,6 +2306,20 @@
       html += '</div>';
 
       body.innerHTML = html;
+    }
+
+    // Press and hold anywhere in the verse box to reveal everything (hold again to hide it all).
+    let heldBody = null;
+    function attachRevealHold() {
+      const body = document.getElementById("cardBody");
+      heldBody = attachLongPress(body, function() {
+        if (isScoring || !hasActiveCard()) return;
+        toggleRevealAll();
+      }, function(e) { return !e.target.closest("button"); });
+      // the click that ends a hold must not also reveal or hide a piece
+      body.addEventListener("click", function(e) {
+        if (heldBody()) { e.stopImmediatePropagation(); e.preventDefault(); }
+      }, true);
     }
 
     function handleVerseClick(index, event) {
@@ -2929,7 +2977,7 @@
     }
 
     // Tapping a verse in the list previews its text; adding is a separate button.
-    function showPreview(it) {
+    function showPreview(it, noAdd) {
       document.getElementById("pvRef").textContent = it.f;
       const ver = (it.v || "").trim();
       const vb = document.getElementById("pvVer");
@@ -2950,7 +2998,9 @@
           box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
         });
       }
-      document.getElementById("pvAdd").onclick = function() { closePreview(); chooseVerse(it); };
+      const addBtn = document.getElementById("pvAdd");
+      addBtn.style.display = noAdd ? "none" : "";
+      addBtn.onclick = function() { closePreview(); chooseVerse(it); };
       document.getElementById("pickerPreview").classList.add("open");
     }
 
