@@ -563,6 +563,7 @@
       color: var(--btn-fail-text); 
       font-size: 16px; 
     }
+    .btn-fail.seen { opacity: 0.4; }
 
     .btn-pass { 
       flex: 1; 
@@ -1625,7 +1626,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-48';
+    const CLIENT_BUILD = 'sync-49';
 
     let queue = [];
     let currentIndex = 0;
@@ -2155,7 +2156,7 @@
       if (passBadge) { passBadge.style.opacity = "0"; passBadge.textContent = "LEVEL UP"; }
 
       const hasNext = learningIndex < learningCards.length - 1;
-      const doneLabel = "Reviewed";
+      const doneLabel = "Review";
       if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }
 
       // Learning verses don't count toward today's card numbers or reviewed total.
@@ -2183,6 +2184,7 @@
       document.getElementById("btnPassText").textContent = "Level Up";
       document.getElementById("btnFailText").textContent = doneLabel;
       document.getElementById("btnFail").style.display = "flex";
+      document.getElementById("btnFail").classList.toggle("seen", isSeen(card.reference));
 
       document.getElementById("cardRef").textContent = card.reference;
       renderCardBody();
@@ -2200,6 +2202,7 @@
       const metaTag = document.getElementById("cardMeta");
       const versionBadge = document.getElementById("cardVersion");
       const btnFail = document.getElementById("btnFail");
+      btnFail.classList.remove("seen");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
       const passBadge = document.getElementById("badgePass");
@@ -2422,9 +2425,6 @@
         learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
         if (learningIndex < learningCards.length - 1) {
           learningIndex++;
-        } else {
-          mode = 'review';
-          learningIndex = 0;
         }
         enqueueSubmit(null, snapshot(currentIndex));
       }
