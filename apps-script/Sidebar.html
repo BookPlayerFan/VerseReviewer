@@ -1254,15 +1254,6 @@
       const n = unseenCount();
       nc.textContent = n; nc.style.display = n > 0 ? "" : "none";
       scheduleBadgeReturn();
-      sendIconBadge(left + n);
-    }
-
-    // Home-screen icon badge: reviews left today + New verses waiting. The shell page sets it (it can't be set from this frame).
-    let badgeReady = false, lastIconBadge = -1;
-    function sendIconBadge(total) {
-      if (!badgeReady || total === lastIconBadge) return;
-      lastIconBadge = total;
-      try { window.top.postMessage({ type: 'VR_BADGE', n: total }, '*'); } catch (e) {}
     }
 
     // "Reviewed" on a New verse marks it as looked at for 2 hours; the New tab's count only shows verses
@@ -1281,7 +1272,7 @@
       Object.keys(learningSeen).forEach(function(k) { if (learningSeen[k] > now && learningSeen[k] < next) next = learningSeen[k]; });
       if (next < Infinity) badgeTimer = setTimeout(updateTabs, Math.min(next - now + 500, 2147483000));
     }
-    document.addEventListener("visibilitychange", function() { if (!document.hidden) { lastIconBadge = -1; updateTabs(); } }); // a push may have changed the icon badge while we were away
+    document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
 
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
@@ -1596,7 +1587,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-89';
+    const CLIENT_BUILD = 'sync-90';
 
     let queue = [];
     let currentIndex = 0;
@@ -1759,7 +1750,6 @@
       if (typeof session.tomorrow === 'number') tomorrowCount = session.tomorrow;
       hideUndo();
       serverBuild = session.build || "(old server code)";
-      badgeReady = true;
       diag.adopted = new Date().toLocaleTimeString();
       renderDiag();
       progressHigh = 0;

@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-32'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-33'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -1069,7 +1069,6 @@ function getVerseList() {
 //     snooze (pushSnooze). Finishing the verse cancels it (submitReview -> cancelSnoozePush_).
 //   - Daily: around 6:30 AM, if any reviews are due (dailyPush). Sent once a day.
 // New-verse pushes only go out between 7:30 AM and 8:30 PM (see newVerseWindow_). The daily push is once, at about 6:30 AM.
-// Every push also carries a badge number (reviews due + new verses waiting) that the app sets on the home-screen icon.
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
@@ -1118,10 +1117,6 @@ function newVerseWindow_(endMs, nowMs) {
   return endMs + (1440 - m + first) * MIN;
 }
 
-function badgeCount_() {
-  try { return getDueCards(true).length; } catch (e) { return 0; }
-}
-
 function osSend_(heading, message, whenMs, topic) {
   const body = {
     app_id: ONESIGNAL_APP_ID,
@@ -1131,7 +1126,6 @@ function osSend_(heading, message, whenMs, topic) {
     contents: { en: message },
     url: PUSH_URL,
     web_push_topic: topic || 'verse-review',
-    data: { vrbadge: badgeCount_() },
     priority: 10, // high priority: delivered right away, even when the phone is idle
     ttl: 4 * 60 * 60 // if the phone is unreachable, drop it after 4 hours instead of delivering a stale reminder
   };
