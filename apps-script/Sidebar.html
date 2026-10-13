@@ -612,6 +612,21 @@
     @media (prefers-color-scheme: dark) { :root { --gold-bg-a: rgba(242, 201, 76, 0.18); --gold-bg-b: rgba(200, 150, 20, 0.10); --gold-num: #ffd54a; } }
     .stat-box.gold { background: linear-gradient(180deg, var(--gold-bg-a), var(--gold-bg-b)); }
     .stat-box.gold .stat-val { color: var(--gold-num); font-weight: 900; }
+
+    /* Review cards take their verse's rank color: a thin outline, a faint tint at the top, colored progress dots.
+       (Rank colors come from the .rank-N classes above; the tint needs color-mix, older browsers just skip it.) */
+    .card.ranked { --rc: var(--rl); }
+    @media (prefers-color-scheme: dark) { .card.ranked { --rc: var(--rd); } }
+    .card.ranked .pip.filled { background: var(--rc); border-color: var(--rc); }
+    .dia-mark { color: var(--rc, var(--text-accent)); font-size: 13px; line-height: 14px; font-weight: 800; text-shadow: 0 0 7px var(--rc, var(--text-accent)); }
+    @supports (color: color-mix(in srgb, red 50%, blue)) {
+      .card.ranked {
+        border-color: color-mix(in srgb, var(--rc) 60%, var(--border-card));
+        background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 8%, var(--bg-card)), var(--bg-card) 38%);
+      }
+      .card.ranked .pip.filled { box-shadow: 0 0 5px color-mix(in srgb, var(--rc) 55%, transparent); }
+      .dia-mark { text-shadow: 0 0 7px color-mix(in srgb, var(--rc) 70%, transparent); }
+    }
     .fail-list { text-align: left; margin: -6px 0 14px; padding: 10px 12px 6px; background: var(--bg-body); border: 1px solid var(--border-body);
       border-radius: 12px; color: var(--text-primary); }
     .fail-list .fail-title { display: block; text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
@@ -1546,7 +1561,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-57';
+    const CLIENT_BUILD = 'sync-58';
 
     let queue = [];
     let currentIndex = 0;
@@ -1560,6 +1575,8 @@
     let progressHigh = 0;
     let loadedAt = 0;
     let tomorrowCount = null;
+    let countUpPending = false;
+    let countUpToken = 0;
     let undoId = null;
     let undoTimer = null;
     const UNDO_SHOW_MS = 5000;
@@ -2042,6 +2059,7 @@
       if (!card) { renderEmptyLearning(); return; }
 
       cardEl.style.display = "flex";
+      setCardRank(cardEl, 0);
       summaryEl.style.display = "none";
 
       isFlipped = false;
@@ -2090,6 +2108,13 @@
       renderCardBody();
     }
 
+    // Gives the verse card its rank's color theme (no theme for New verses).
+    function setCardRank(cardEl, g) {
+      for (let i = 1; i <= 8; i++) cardEl.classList.remove("rank-" + i);
+      cardEl.classList.toggle("ranked", g >= 1 && g <= 8);
+      if (g >= 1 && g <= 8) cardEl.classList.add("rank-" + g);
+    }
+
     function renderCard() {
       isScoring = false;
 
@@ -2112,6 +2137,7 @@
       }
 
       cardEl.style.display = "flex";
+      setCardRank(cardEl, queue[currentIndex].group);
       summaryEl.style.display = "none";
 
       const card = queue[currentIndex];
@@ -2171,10 +2197,15 @@
         if (passBadge) passBadge.textContent = "PASS";
         if (failBadge) failBadge.textContent = "FAIL";
 
-        for (let i = 1; i <= card.repsNeeded; i++) {
-          const pip = document.createElement("div");
-          pip.className = "pip" + (i <= card.rep ? " filled" : "");
-          pipsContainer.appendChild(pip);
+        if (card.group === 8) {
+          // Diamond is the top rank, so a plain "1 of 1" dot says nothing; show the gem instead.
+          pipsContainer.innerHTML = '<span class="dia-mark" title="Diamond">\u25C6</span>';
+        } else {
+          for (let i = 1; i <= card.repsNeeded; i++) {
+            const pip = document.createElement("div");
+            pip.className = "pip" + (i <= card.rep ? " filled" : "");
+            pipsContainer.appendChild(pip);
+          }
         }
       }
 
@@ -2289,6 +2320,7 @@
         const tn = document.getElementById("toastNotice");
         if (!tn.querySelector(".rank-badge")) tn.textContent = ""; // a level-up notice keeps showing over the next card
         currentIndex++;
+        if (currentIndex >= queue.length && totalCardsProcessed > 0) countUpPending = true; // just finished: play the count-up once
         render();
       }, ms);
     }
@@ -2502,7 +2534,48 @@
         // A day with reviews and no repeats gets the gold badge.
         document.getElementById("flawlessBadge").style.display = (sessionStats.reviewed > 0 && sessionStats.failed === 0) ? "block" : "none";
         updateStatLists();
+        if (countUpPending) { countUpPending = false; runCountUp(); }
       }
+    }
+
+    // When you finish the deck, the four numbers count up one after another (once; reopening the app shows them straight away).
+    function runCountUp() {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const items = [
+        ["statReviewed", sessionStats.reviewed], ["statPassed", sessionStats.passed],
+        ["statGraduated", sessionStats.graduated], ["statFailed", sessionStats.failed]
+      ];
+      const gold = document.getElementById("statGradBox");
+      const token = ++countUpToken;
+      const DUR = 900, GAP = 100;
+      let start = Date.now();
+      const plan = []; let t = 0;
+      items.forEach(function(it) {
+        const d = it[1] > 0 ? DUR : 0;
+        plan.push({ id: it[0], v: it[1], from: t, d: d });
+        t += d + (it[1] > 0 ? GAP : 0);
+      });
+      plan.forEach(function(p) { document.getElementById(p.id).textContent = 0; });
+      gold.classList.remove("gold");
+      function finish() {
+        plan.forEach(function(p) { document.getElementById(p.id).textContent = p.v; });
+        gold.classList.toggle("gold", sessionStats.graduated >= 5);
+      }
+      (function tick() {
+        const summary = document.getElementById("summaryView");
+        if (token !== countUpToken || summary.style.display === "none") { finish(); return; }
+        const now = Date.now() - start;
+        let done = true;
+        plan.forEach(function(p) {
+          let v;
+          if (now < p.from) { v = 0; done = false; }
+          else if (p.d === 0 || now >= p.from + p.d) { v = p.v; }
+          else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); done = false; }
+          document.getElementById(p.id).textContent = v;
+        });
+        gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 5);
+        if (!done) setTimeout(tick, 33);
+      })();
     }
 
     // Remember a verse for the Repeats / Leveled Up lists with the level it now sits at
