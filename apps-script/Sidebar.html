@@ -697,7 +697,7 @@
 
     /* ── Bottom tab bar navigation ── */
     :root { --tab-h: calc(53px + max(env(safe-area-inset-bottom, 0px) - 14px, 0px)); }
-    body { padding-bottom: calc(var(--tab-h) + 7px); }
+    body { padding-bottom: calc(var(--tab-h) + 6px); }
     /* Blue progress line along the top of the tab bar: only while reviewing cards (hidden on New, Verses and Review Complete) */
     .progress-track { display: none; position: absolute; top: -1px; left: 0; right: 0; height: 3px; margin: 0;
       background: transparent; border-radius: 0; z-index: 2; }
@@ -1541,7 +1541,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-55';
+    const CLIENT_BUILD = 'sync-56';
 
     let queue = [];
     let currentIndex = 0;
