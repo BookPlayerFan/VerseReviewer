@@ -311,6 +311,32 @@
       .rank-badge.is-new { --rc: var(--text-meta); }
     }
 
+    /* Top ranks get a soft glint that sweeps across the pill now and then:
+       Diamond every 3 s, Ruby every 5 s, Emerald (fainter) every 8 s. */
+    .rank-badge.rank-6, .rank-badge.rank-7, .rank-badge.rank-8 { position: relative; overflow: hidden; }
+    .rank-badge.rank-6::after, .rank-badge.rank-7::after, .rank-badge.rank-8::after {
+      content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 38%; pointer-events: none;
+      transform: translateX(-110%);
+      background: linear-gradient(105deg, transparent, rgba(255, 255, 255, var(--sh)), transparent);
+      animation: rankShimmer var(--per) ease-in-out infinite;
+    }
+    .rank-badge.rank-8 { --per: 3s; --sh: 0.8; }
+    .rank-badge.rank-7 { --per: 5s; --sh: 0.65; }
+    .rank-badge.rank-6 { --per: 8s; --sh: 0.45; }
+    @media (prefers-color-scheme: dark) {
+      .rank-badge.rank-8 { --sh: 0.44; }
+      .rank-badge.rank-7 { --sh: 0.36; }
+      .rank-badge.rank-6 { --sh: 0.25; }
+    }
+    @keyframes rankShimmer {
+      0%   { transform: translateX(-110%); }
+      30%  { transform: translateX(290%); }
+      100% { transform: translateX(290%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rank-badge.rank-6::after, .rank-badge.rank-7::after, .rank-badge.rank-8::after { display: none; }
+    }
+
     .meta-tag.is-lapse-badge {
       color: var(--text-lapse);
       font-weight: 700;
@@ -667,6 +693,15 @@
     /* Tiny muted line pinned to the bottom of the Review Complete card. */
     .summary-card { position: relative; }
     /* Content starts near the top so opening the Repeats / Leveled Up list doesn't move the boxes. */
+    /* Gold badge floating at the top of the card on a day with no repeats; it doesn't move anything. */
+    .flawless-badge { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+      padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.9px; text-transform: uppercase;
+      color: #b88a00; border: 1px solid rgba(184, 138, 0, 0.45);
+      background: linear-gradient(110deg, rgba(184, 138, 0, 0.12) 30%, rgba(255, 215, 90, 0.45) 50%, rgba(184, 138, 0, 0.12) 70%); }
+    @media (prefers-color-scheme: dark) {
+      .flawless-badge { color: #f2c94c; border-color: rgba(242, 201, 76, 0.45);
+        background: linear-gradient(110deg, rgba(242, 201, 76, 0.12) 30%, rgba(255, 230, 140, 0.35) 50%, rgba(242, 201, 76, 0.12) 70%); }
+    }
     .summary-card.top { justify-content: flex-start; padding-top: clamp(36px, 11vh, 110px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .tomorrow-note {
       position: absolute;
@@ -903,6 +938,7 @@
     </div>
 
     <div class="summary-card" id="summaryView" style="display: none;">
+      <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Flawless day</div>
       <div class="summary-header">
         <div class="crown-icon" id="summaryIcon">🏆</div>
         <h2 id="summaryTitle">Review Complete!</h2>
@@ -1534,7 +1570,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-46';
+    const CLIENT_BUILD = 'sync-47';
 
     let queue = [];
     let currentIndex = 0;
@@ -2509,6 +2545,7 @@
 
       // Both end-of-day screens start at the same height, so the trophy / sparkle and title line up.
       document.getElementById("summaryView").classList.add("top");
+      document.getElementById("flawlessBadge").style.display = "none";
       if (totalCardsProcessed === 0) {
         document.getElementById("summaryIcon").textContent = "✨";
         document.getElementById("summaryTitle").textContent = "All Caught Up!";
@@ -2524,6 +2561,8 @@
         document.getElementById("statPassed").textContent = sessionStats.passed;
         document.getElementById("statGraduated").textContent = sessionStats.graduated;
         document.getElementById("statFailed").textContent = sessionStats.failed;
+        // A day with reviews and no repeats gets the gold badge.
+        document.getElementById("flawlessBadge").style.display = (sessionStats.reviewed > 0 && sessionStats.failed === 0) ? "block" : "none";
         updateStatLists();
       }
     }
