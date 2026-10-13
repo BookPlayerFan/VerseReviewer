@@ -616,14 +616,14 @@
     .card.ranked .pip.filled { background: var(--rc); border-color: var(--rc); }
     .dia-mark { color: var(--rc, var(--text-accent)); font-size: 13px; line-height: 14px; font-weight: 800; text-shadow: 0 0 7px var(--rc, var(--text-accent)); }
     /* Strength grows with rank: --rb outline, --rt top tint, --rg outer glow (Silver and Platinum are greys, so they get a little extra). */
-    .rank-1 { --rb: 30%; --rt: 3%;   --rg: 0%; }
-    .rank-2 { --rb: 55%; --rt: 10%;  --rg: 0%; }
-    .rank-3 { --rb: 46%; --rt: 5%;   --rg: 0%; }
-    .rank-4 { --rb: 66%; --rt: 12%;  --rg: 0%; }
-    .rank-5 { --rb: 62%; --rt: 7.5%; --rg: 0%; }
-    .rank-6 { --rb: 72%; --rt: 9%;   --rg: 10%; }
-    .rank-7 { --rb: 82%; --rt: 11%;  --rg: 18%; }
-    .rank-8 { --rb: 95%; --rt: 14%;  --rg: 28%; }
+    .rank-1 { --rb: 20%; --rt: 3%;   --rg: 0%; }
+    .rank-2 { --rb: 30%; --rt: 10%;  --rg: 0%; }
+    .rank-3 { --rb: 40%; --rt: 5%;   --rg: 0%; }
+    .rank-4 { --rb: 50%; --rt: 12%;  --rg: 0%; }
+    .rank-5 { --rb: 60%; --rt: 7.5%; --rg: 0%; }
+    .rank-6 { --rb: 70%; --rt: 9%;   --rg: 10%; }
+    .rank-7 { --rb: 80%; --rt: 11%;  --rg: 18%; }
+    .rank-8 { --rb: 90%; --rt: 14%;  --rg: 28%; }
     @supports (color: color-mix(in srgb, red 50%, blue)) {
       .card.ranked {
         border-color: color-mix(in srgb, var(--rc) var(--rb), var(--border-card));
@@ -1567,7 +1567,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-61';
+    const CLIENT_BUILD = 'sync-62';
 
     let queue = [];
     let currentIndex = 0;
