@@ -607,6 +607,11 @@
     .val-fail { color: var(--btn-fail-text); }
     .stat-box.tappable { cursor: pointer; }
     .stat-box.open { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
+    /* Leveled Up with 5 or more: soft gold fill and a bold gold number (the blue "open" border still wins when tapped). */
+    :root { --gold-bg-a: rgba(255, 208, 70, 0.22); --gold-bg-b: rgba(214, 158, 20, 0.13); --gold-num: #a87400; }
+    @media (prefers-color-scheme: dark) { :root { --gold-bg-a: rgba(242, 201, 76, 0.18); --gold-bg-b: rgba(200, 150, 20, 0.10); --gold-num: #ffd54a; } }
+    .stat-box.gold { background: linear-gradient(180deg, var(--gold-bg-a), var(--gold-bg-b)); }
+    .stat-box.gold .stat-val { color: var(--gold-num); font-weight: 900; }
     .fail-list { text-align: left; margin: -6px 0 14px; padding: 10px 12px 6px; background: var(--bg-body); border: 1px solid var(--border-body);
       border-radius: 12px; color: var(--text-primary); }
     .fail-list .fail-title { display: block; text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
@@ -1541,7 +1546,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-56';
+    const CLIENT_BUILD = 'sync-57';
 
     let queue = [];
     let currentIndex = 0;
@@ -2492,6 +2497,7 @@
         document.getElementById("statReviewed").textContent = sessionStats.reviewed;
         document.getElementById("statPassed").textContent = sessionStats.passed;
         document.getElementById("statGraduated").textContent = sessionStats.graduated;
+        document.getElementById("statGradBox").classList.toggle("gold", sessionStats.graduated >= 5);
         document.getElementById("statFailed").textContent = sessionStats.failed;
         // A day with reviews and no repeats gets the gold badge.
         document.getElementById("flawlessBadge").style.display = (sessionStats.reviewed > 0 && sessionStats.failed === 0) ? "block" : "none";
