@@ -756,9 +756,11 @@
     .ref-header { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
     .ref-header.lp-down, .ref-header.um-open { background: var(--btn-restart-bg); border-radius: 14px; }
     .card-header-group { position: relative; }
-    .undo-menu { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); z-index: 30; white-space: nowrap;
+    .undo-menu { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 30; white-space: nowrap;
       background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.22);
       padding: 4px; font-size: 15px; font-weight: 600; }
+    .undo-menu::before { content: ""; position: absolute; left: 50%; top: -6px; width: 12px; height: 12px; background: var(--bg-card);
+      border-left: 1px solid var(--border-card); border-top: 1px solid var(--border-card); transform: translateX(-50%) rotate(45deg); }
     .undo-menu button { display: block; border: 0; background: none; color: var(--text-primary); font: inherit; padding: 11px 16px; border-radius: 10px; margin: 0; min-height: 0; box-shadow: none; }
     .undo-menu button:active { background: var(--btn-restart-bg); }
     .undo-menu button.off { color: var(--text-muted); font-weight: 500; }
@@ -1951,6 +1953,7 @@
       m.appendChild(b);
       const grp = ref.closest(".card-header-group") || ref.parentNode;
       grp.appendChild(m);
+      m.style.top = (ref.getBoundingClientRect().bottom - grp.getBoundingClientRect().top + 8) + "px";
       ref.classList.add("um-open");
       setTimeout(function() { document.addEventListener("pointerdown", onUndoOutside, true); }, 0);
     }
