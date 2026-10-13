@@ -22,9 +22,9 @@
       --text-muted: #5f6368;
       --text-meta: #70757a;
       --text-accent: #1a73e8;
-      --text-lapse: #d97706;
+      --text-repeat: #d97706;
       --text-fasttrack: #b45309;
-      --badge-lapse-bg: #fef3c7;
+      --badge-repeat-bg: #fef3c7;
       --badge-fasttrack-bg: #fef3c7;
       --badge-version-bg: rgba(95, 99, 104, 0.12);
       --btn-fail-bg: #fce8e6;
@@ -53,9 +53,9 @@
         --text-muted: #9aa0a6;
         --text-meta: #9aa0a6;
         --text-accent: #8ab4f8;
-        --text-lapse: #fbbf24;
+        --text-repeat: #fbbf24;
         --text-fasttrack: #fcd34d;
-        --badge-lapse-bg: #451a03;
+        --badge-repeat-bg: #451a03;
         --badge-fasttrack-bg: #451a03;
         --badge-version-bg: rgba(255, 255, 255, 0.12);
         --btn-fail-bg: #4a1d1b;
@@ -142,7 +142,7 @@
       flex-direction: column;
       justify-content: space-between;
       box-shadow: 0 4px 14px var(--card-shadow);
-      will-change: transform, opacity;
+      will-change: opacity;
       box-sizing: border-box;
       min-height: 0;
     }
@@ -303,10 +303,10 @@
       100% { transform: translateX(290%); }
     }
 
-    .meta-tag.is-lapse-badge {
-      color: var(--text-lapse);
+    .meta-tag.is-repeat-badge {
+      color: var(--text-repeat);
       font-weight: 700;
-      background: var(--badge-lapse-bg);
+      background: var(--badge-repeat-bg);
       padding: 2px 8px;
       border-radius: 6px;
     }
@@ -689,15 +689,6 @@
       pointer-events: none;
     }
 
-    .diag-line {
-      font-size: 10px;
-      line-height: 1.35;
-      color: var(--text-muted);
-      margin: -4px 4px 6px 4px;
-      word-break: break-all;
-      user-select: text;
-      flex-shrink: 0;
-    }
 
 
     /* ── Bottom tab bar navigation ── */
@@ -784,9 +775,11 @@
     .corner-add svg { width: 16px; height: 16px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
     .sync-warning { position: fixed; top: max(env(safe-area-inset-top, 0px), 8px); left: 50%; transform: translateX(-50%);
       z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    /* Status readout (tap "Verse List" to show it) */
     .diag-line { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tab-h) + 4px); z-index: 60;
+      font-size: 10px; line-height: 1.35; color: var(--text-muted); word-break: break-all; user-select: text; flex-shrink: 0;
       background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 8px; padding: 6px 8px; margin: 0; }
-    /* Notices (level up, "Added to end of queue", errors) float over the bottom of the verse box,
+    /* Notices (Cleared / Re-queued, errors) float over the bottom of the verse box,
        so they take no room between the verse and the buttons. */
     .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
     .verse-wrap .verse-body { flex: 1; margin-bottom: 0; }
@@ -831,8 +824,8 @@
       border-radius: 8px;
       font-size: 11px;
       font-weight: 700;
-      background: var(--badge-lapse-bg);
-      color: var(--text-lapse);
+      background: var(--badge-repeat-bg);
+      color: var(--text-repeat);
     }
   </style>
 </head>
@@ -1587,7 +1580,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-70';
+    const CLIENT_BUILD = 'sync-71';
 
     let queue = [];
     let currentIndex = 0;
@@ -1809,7 +1802,7 @@
     function snapshot(nextIndex) {
       return {
         queue: queue.map(function(c) {
-          return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isLapse ? 1 : 0, h: c.isHeld ? 1 : 0 };
+          return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isRepeat ? 1 : 0, h: c.isHeld ? 1 : 0 };
         }),
         currentIndex: nextIndex,
         baseCount: baseCount,
@@ -2104,7 +2097,7 @@
       segmentStates = parsedSegments.map(() => 'hidden');
 
       cardEl.style.transition = "none";
-      cardEl.style.transform = "translate(0, 0) rotate(0deg)";
+      cardEl.classList.remove("lu-settle");
       cardEl.style.opacity = "1";
 
 
@@ -2181,7 +2174,7 @@
       segmentStates = parsedSegments.map(() => 'hidden');
 
       cardEl.style.transition = "none";
-      cardEl.style.transform = "translate(0, 0) rotate(0deg)";
+      cardEl.classList.remove("lu-settle");
       cardEl.style.opacity = "1";
 
       // Progress through today's deck, worked out only from the synced position, so every device shows the
@@ -2202,9 +2195,9 @@
 
       const fastTrackTarget = getFastTrackTarget(card);
 
-      if (card.isLapse) {
-        metaTag.textContent = `Lapse Retry · ${rankName(card.group)}`;
-        metaTag.classList.add("is-lapse-badge");
+      if (card.isRepeat) {
+        metaTag.textContent = `Repeat · ${rankName(card.group)}`;
+        metaTag.classList.add("is-repeat-badge");
         btnFailText.textContent = "Repeat";
         btnPassText.textContent = "Clear";
         btnFail.style.display = "flex";
@@ -2402,7 +2395,7 @@
       totalCardsProcessed++;
 
       // Intraday retries are never written to the sheet.
-      if (card.isLapse) {
+      if (card.isRepeat) {
         if (action === "Pass") {
           noteCleared(card.reference);
           notice.textContent = "🎉 Cleared for today!";
@@ -2496,7 +2489,7 @@
           queue.push(Object.assign({}, card, {
             group: newGroup,
             rep: newRep,
-            isLapse: true,
+            isRepeat: true,
             isHeld: true // waits for the Practice button on the Review Complete screen
           }));
         }
@@ -2685,8 +2678,8 @@
       failed.forEach(function(r) {
         const ref = typeof r === "string" ? r : r.f;
         for (let i = queue.length - 1; i >= 0; i--) {
-          if (queue[i].isLapse && queue[i].reference === ref) {
-            fresh.push(Object.assign({}, queue[i], { isLapse: true, isHeld: false }));
+          if (queue[i].isRepeat && queue[i].reference === ref) {
+            fresh.push(Object.assign({}, queue[i], { isRepeat: true, isHeld: false }));
             return;
           }
         }
@@ -2702,7 +2695,7 @@
 
     function canPracticeAgain() {
       if (heldCount() > 0 || !allRepeatsCleared()) return false;
-      return queue.some(function(c) { return c.isLapse; });
+      return queue.some(function(c) { return c.isRepeat; });
     }
 
     function toggleStatList(kind) {

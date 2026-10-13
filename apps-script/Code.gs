@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-28'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-29'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -334,7 +334,7 @@ function releaseLater_(s, now) {
 }
 
 function compactCard_(c) {
-  return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isLapse ? 1 : 0 };
+  return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isRepeat ? 1 : 0 };
 }
 
 // Where the active deck ends: held repeats (h) sit after it and are not part of the deck until practice starts.
@@ -404,7 +404,7 @@ function hydrate_(s, preRead) {
         groupName: GROUP_CONFIG[0].name,
         rep: Number(data[i][3]) || 1,
         repsNeeded: GROUP_CONFIG[0].repsNeeded,
-        isLapse: false,
+        isRepeat: false,
         day: learningDay_(data[i][2])
       });
     }
@@ -436,7 +436,7 @@ function hydrate_(s, preRead) {
       groupName: info.name,
       rep: e.p,
       repsNeeded: info.repsNeeded,
-      isLapse: !!e.l,
+      isRepeat: !!e.l,
       isHeld: !!e.h
     });
   });
