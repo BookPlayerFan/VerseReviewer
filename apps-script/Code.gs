@@ -1067,13 +1067,14 @@ function getVerseList() {
 // Two kinds of reminder:
 //   - New verse snooze: when you press Review on a New verse, the app asks for a push at the end of its 2 hour
 //     snooze (pushSnooze). Finishing the verse cancels it (submitReview -> cancelSnoozePush_).
-//   - Daily: around 6:30 AM, if any reviews are due (dailyPush).
-// Nothing is sent between QUIET_START and QUIET_END; a push due then goes out when quiet hours end.
+//   - Daily: around 6:30 AM, if any reviews are due (dailyPush). Sent once a day.
+// New-verse pushes only go out between 7:30 AM and 8:30 PM (see newVerseWindow_). The daily push is once, at about 6:30 AM.
+// Every push also carries a badge number (reviews due + new verses waiting) that the app sets on the home-screen icon.
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
-const QUIET_START = 21; // 9 PM
-const QUIET_END = 5;    // 5 AM
+const NEW_PUSH_FROM = 7 * 60 + 30;  // New-verse pushes: no earlier than 7:30 AM
+const NEW_PUSH_TO = 20 * 60 + 30;   // ... and no later than 8:30 PM
 const PUSH_PENDING_KEY = 'VR_PUSH_PENDING'; // { reference: notificationId }
 const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
@@ -1099,22 +1100,26 @@ function osCall_(method, path, body) {
   return { ok: ok, code: code, text: text, json: json };
 }
 
-// If a time falls inside quiet hours, moves it to when they end.
-function afterQuiet_(ms) {
+// When a New-verse push may go out: between 7:30 AM and 8:30 PM (local time).
+//   - Snooze ends earlier than 7:30 AM  -> 7:30 AM.
+//   - Snooze ends after 8:30 PM         -> 8:30 PM if you snoozed before then, otherwise next morning at 7:30 AM.
+function newVerseWindow_(endMs, nowMs) {
   const tz = Session.getScriptTimeZone();
-  const hour = Number(Utilities.formatDate(new Date(ms), tz, 'H'));
-  const inQuiet = QUIET_START > QUIET_END ? (hour >= QUIET_START || hour < QUIET_END) : (hour >= QUIET_START && hour < QUIET_END);
-  if (!inQuiet) return ms;
-  let t = ms;
-  for (let i = 0; i < 30; i++) { // step forward until the local hour reaches QUIET_END
-    t += 30 * 60 * 1000;
-    if (Number(Utilities.formatDate(new Date(t), tz, 'H')) === QUIET_END) {
-      // back up to the top of that hour
-      const mins = Number(Utilities.formatDate(new Date(t), tz, 'm'));
-      return t - mins * 60 * 1000;
-    }
-  }
-  return ms;
+  const mins = function(ms) {
+    return Number(Utilities.formatDate(new Date(ms), tz, 'H')) * 60 + Number(Utilities.formatDate(new Date(ms), tz, 'm'));
+  };
+  const day = function(ms) { return Utilities.formatDate(new Date(ms), tz, 'yyyy-MM-dd'); };
+  const m = mins(endMs), first = NEW_PUSH_FROM, last = NEW_PUSH_TO;
+  const MIN = 60000;
+  if (m >= first && m <= last) return endMs;
+  if (m < first) return endMs + (first - m) * MIN;
+  // after the last allowed time
+  if (day(nowMs) === day(endMs) && mins(nowMs) <= last) return endMs - (m - last) * MIN;
+  return endMs + (1440 - m + first) * MIN;
+}
+
+function badgeCount_() {
+  try { return getDueCards(true).length; } catch (e) { return 0; }
 }
 
 function osSend_(heading, message, whenMs, topic) {
@@ -1125,7 +1130,8 @@ function osSend_(heading, message, whenMs, topic) {
     headings: { en: heading },
     contents: { en: message },
     url: PUSH_URL,
-    web_push_topic: topic || 'verse-review'
+    web_push_topic: topic || 'verse-review',
+    data: { vrbadge: badgeCount_() }
   };
   if (whenMs && whenMs > Date.now() + 30000) {
     body.send_after = Utilities.formatDate(new Date(whenMs), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -1159,7 +1165,7 @@ function pushSnooze(reference, endMs) {
     const end = Number(endMs);
     if (!ref || !end || end < Date.now() || end > Date.now() + 6 * 60 * 60 * 1000) return { ok: false };
     cancelSnoozePush_(ref);
-    const when = afterQuiet_(end);
+    const when = newVerseWindow_(end, Date.now());
     const r = osSend_('New verse ready', ref + ' is ready to review again.', when, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''));
     if (r.ok && r.json && r.json.id) {
       const map = pendingPush_();
@@ -1177,8 +1183,6 @@ function dailyPush() {
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;
   if (due < 1) return;
-  const send = afterQuiet_(Date.now()) === Date.now();
-  if (!send) return; // inside quiet hours: the next trigger run (or tomorrow) handles it
   const r = osSend_('Reviews ready', due === 1 ? '1 review is ready today.' : due + ' reviews are ready today.', 0, 'vr-daily');
   if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
 }

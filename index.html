@@ -273,6 +273,14 @@
 
       if (!isAppOrigin(e.origin)) return;
 
+      if (d.type === 'VR_BADGE') {
+        try {
+          var n = Number(d.n) || 0;
+          if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n);
+          else if (navigator.clearAppBadge) navigator.clearAppBadge();
+        } catch (err) {}
+        return;
+      }
       if (d.type === 'VR_PUSH_ENABLE') {
         pushSource = e.source;
         enablePush();
