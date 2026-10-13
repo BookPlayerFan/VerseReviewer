@@ -544,7 +544,7 @@
       font-size: 16px; 
     }
     .btn-fail.review { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
-    .btn-fail.seen { opacity: 0.6; }
+    .btn-fail.seen, .btn-fail.locked { opacity: 0.6; }
 
     .btn-pass { 
       flex: 1; 
@@ -1586,7 +1586,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-65';
+    const CLIENT_BUILD = 'sync-66';
 
     let queue = [];
     let currentIndex = 0;
@@ -2036,6 +2036,7 @@
     function render() {
       if (mode === 'learning') renderLearning();
       else renderCard();
+      updateFailLock();
       updateTabs();
       placeNotice();
       placeUndo();
@@ -2203,7 +2204,7 @@
         metaTag.classList.add("is-lapse-badge");
         btnFailText.textContent = "Repeat";
         btnPassText.textContent = "Clear";
-        btnFail.style.display = "none";
+        btnFail.style.display = "flex";
         if (passBadge) passBadge.textContent = "CLEAR";
         if (failBadge) failBadge.textContent = "REPEAT";
       } else if (fastTrackTarget) {
@@ -2212,7 +2213,7 @@
         metaTag.classList.add("is-fasttrack-badge");
         btnFailText.textContent = "Fail";
         btnPassText.textContent = "Pass";
-        btnFail.style.display = "none";
+        btnFail.style.display = "flex";
         if (passBadge) passBadge.textContent = "RESTORE";
         if (failBadge) failBadge.textContent = "FAIL";
 
@@ -2221,7 +2222,7 @@
         setRankBadge(metaTag, card.group);
         btnFailText.textContent = "Fail";
         btnPassText.textContent = "Pass";
-        btnFail.style.display = "none";
+        btnFail.style.display = "flex";
         if (passBadge) passBadge.textContent = "PASS";
         if (failBadge) failBadge.textContent = "FAIL";
 
@@ -2325,9 +2326,13 @@
       if (mode === 'learning') return;
 
       const card = queue[currentIndex];
-      if (card && (card.group > 0 || card.isLapse)) {
-        document.getElementById("btnFail").style.display = isFlipped ? "flex" : "none";
-      }
+      updateFailLock();
+    }
+
+    // Fail is always on screen in Review, but dimmed and inert until some of the verse text is showing.
+    function updateFailLock() {
+      const b = document.getElementById("btnFail");
+      b.classList.toggle("locked", mode !== 'learning' && hasActiveCard() && !canFail());
     }
 
     // ───────────── Scoring ─────────────
