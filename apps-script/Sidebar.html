@@ -261,7 +261,8 @@
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
-    .vl-verse { -webkit-user-select: none; user-select: none; }
+    #verseListView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down { background: var(--btn-restart-bg); }
     .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
       background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
@@ -766,10 +767,6 @@
     .undo-menu button { display: block; border: 0; background: none; color: var(--text-primary); font: inherit; padding: 11px 16px; border-radius: 10px; margin: 0; min-height: 0; box-shadow: none; }
     .undo-menu button:active { background: var(--btn-restart-bg); }
     .undo-menu button.off { color: var(--text-muted); font-weight: 500; }
-    .corner-add { position: absolute; top: 10px; left: 12px; z-index: 6; margin: 0; width: 30px; min-height: 0; height: 30px;
-      padding: 0; border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); color: var(--text-muted);
-      display: flex; align-items: center; justify-content: center; flex-direction: row; opacity: 0.9; }
-    .corner-add svg { width: 16px; height: 16px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
     .sync-warning { position: fixed; top: max(env(safe-area-inset-top, 0px), 8px); left: 50%; transform: translateX(-50%);
       z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
     /* Status readout (tap "Verse List" to show it) */
@@ -833,7 +830,6 @@
   <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
 
   <div id="deckContainer">
-    <button type="button" class="corner-add" id="cornerAdd" onclick="addNewVerse()" aria-label="Add a new verse" style="display: none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
     <div class="notice" id="toastNotice"></div>
     <div class="card" id="activeCard">
 
@@ -1229,13 +1225,6 @@
       updateTabs();
     }
 
-    function updateCornerAdd() {
-      const b = document.getElementById("cornerAdd");
-      if (!b) return;
-      const cardUp = document.getElementById("activeCard").style.display !== "none";
-      b.style.display = (mode === "learning" && cardUp) ? "flex" : "none"; // flex keeps the plus centered
-    }
-
     function updateProgressBar() {
       const tr = document.querySelector(".progress-track");
       if (!tr) return;
@@ -1247,7 +1236,6 @@
       if (mode === "learning" && learningCards[learningIndex]) {
         document.getElementById("btnFail").classList.toggle("seen", isSeen(learningCards[learningIndex].reference));
       }
-      updateCornerAdd();
       updateProgressBar();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       const which = listOpen ? "verses" : (mode === "learning" ? "new" : "review");
@@ -1422,7 +1410,7 @@
       tip.className = "vl-tip";
       tip.textContent = words ? words : "(no text)";
       item.appendChild(tip);
-      vlTipTimer = setTimeout(hideVerseTip, 2500);
+      vlTipTimer = setTimeout(hideVerseTip, 2000);
     }
 
     // ── Verse List search ──
@@ -1590,7 +1578,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-75';
+    const CLIENT_BUILD = 'sync-76';
 
     let queue = [];
     let currentIndex = 0;
@@ -1642,6 +1630,9 @@
     window.onload = function() {
       attachRevealHold();
       attachUndoHold();
+      const tn = document.getElementById("tabNew");
+      const heldTab = attachLongPress(tn, function() { addNewVerse(); });
+      tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       if (initialSession && Array.isArray(initialSession.cards)) {
         adoptSession(initialSession);
       } else {
