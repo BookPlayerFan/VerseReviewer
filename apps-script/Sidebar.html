@@ -1626,7 +1626,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-50';
+    const CLIENT_BUILD = 'sync-51';
 
     let queue = [];
     let currentIndex = 0;
@@ -2423,9 +2423,7 @@
         ms = 1200;
       } else {
         learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
-        if (learningIndex < learningCards.length - 1) {
-          learningIndex++;
-        }
+        learningIndex = (learningIndex + 1) % learningCards.length; // loops back to the first verse
         enqueueSubmit(null, snapshot(currentIndex));
       }
 
