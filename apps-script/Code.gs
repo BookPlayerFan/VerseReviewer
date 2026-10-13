@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-26'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-27'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -248,7 +248,8 @@ function getDueCards(includeNew) {
 //
 //   { date, version, baseCount, currentIndex, processed,
 //     stats: { reviewed, passed, failed, graduated },
-//     queue: [ { r: row, f: reference, g: level, p: rep, l: 1 if same-day retry } ] }
+//     queue: [ { r: row, f: reference, g: level, p: rep, l: 1 if same-day retry, h: 1 if a held repeat } ] }
+//     (held repeats are failed verses waiting at the end of the queue until the Practice button starts them)
 
 const SESSION_KEY = 'VR_SESSION';
 const SESSION_VER_KEY = 'VR_SESSION_V'; // tiny "date|version" marker so polling needs only one read
@@ -322,7 +323,10 @@ function releaseLater_(s, now) {
   if (!s || !Array.isArray(s.later) || s.later.length === 0) return false;
   const due = s.later.filter(function(e) { return e.at <= now; });
   if (due.length === 0) return false;
-  due.forEach(function(e) { s.queue.push({ r: e.r, f: e.f, g: 1, p: 2, l: 1 }); });
+  // Evening cards go in front of any held repeats, which stay at the very end until practice is started.
+  let at = s.queue.findIndex(function(q) { return q.h; });
+  if (at < 0) at = s.queue.length;
+  due.forEach(function(e, i) { s.queue.splice(at + i, 0, { r: e.r, f: e.f, g: 1, p: 2, l: 1 }); });
   s.later = s.later.filter(function(e) { return e.at > now; });
   delete s.undo; // the deck changed, so the old undo no longer lines up
   s.version++;
@@ -331,6 +335,12 @@ function releaseLater_(s, now) {
 
 function compactCard_(c) {
   return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isLapse ? 1 : 0 };
+}
+
+// Where the active deck ends: held repeats (h) sit after it and are not part of the deck until practice starts.
+function activeEnd_(s) {
+  const i = s.queue.findIndex(function(q) { return q.h; });
+  return i < 0 ? s.queue.length : i;
 }
 
 function emptyStats_() {
@@ -426,7 +436,8 @@ function hydrate_(s, preRead) {
       groupName: info.name,
       rep: e.p,
       repsNeeded: info.repsNeeded,
-      isLapse: !!e.l
+      isLapse: !!e.l,
+      isHeld: !!e.h
     });
   });
 
@@ -488,9 +499,10 @@ function refreshSession() {
     } else if (releaseLater_(s, nowMs_())) {
       writeState_(s); // an evening practice card is now due
     }
-    if (!fresh && s.currentIndex >= s.queue.length) {
+    if (!fresh && s.currentIndex >= activeEnd_(s)) {
       const cards = getDueCards();
-      s.queue = cards.map(compactCard_);
+      const held = s.queue.filter(function(q) { return q.h; }); // unpracticed repeats carry over to the new batch
+      s.queue = cards.map(compactCard_).concat(held);
       s.baseCount = cards.length;
       s.currentIndex = 0;
       delete s.undo; // the old queue is gone, so there is nothing to undo
@@ -593,7 +605,9 @@ function sanitizeQueue_(q) {
     const r = Number(e.r), g = Number(e.g), p = Number(e.p);
     if (!Number.isInteger(r) || r < 2 || !Number.isInteger(g) || g < 0 || g > MAX_GROUP ||
         !Number.isInteger(p) || p < 1 || typeof e.f !== 'string' || !e.f) return null;
-    out.push({ r: r, f: e.f, g: g, p: p, l: e.l ? 1 : 0 });
+    const o = { r: r, f: e.f, g: g, p: p, l: e.l ? 1 : 0 };
+    if (e.h) o.h = 1;
+    out.push(o);
   }
   return out;
 }

@@ -602,11 +602,15 @@
       .card.ranked .pip.filled { box-shadow: 0 0 5px color-mix(in srgb, var(--rc) 55%, transparent); }
       .dia-mark { text-shadow: 0 0 7px color-mix(in srgb, var(--rc) 70%, transparent); }
     }
-    .fail-list { text-align: left; margin: -6px 0 14px; padding: 10px 12px 6px; background: var(--bg-body); border: 1px solid var(--border-body);
-      border-radius: 12px; color: var(--text-primary); }
-    .fail-list .fail-title { display: block; text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--text-muted); font-weight: 600; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border-body); }
-    .fail-list .fail-inner { max-height: 180px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .fail-list { text-align: left; margin: -6px 0 14px; padding: 0 12px 6px; background: var(--bg-body); border: 1px solid var(--border-body);
+      border-radius: 12px; color: var(--text-primary); overflow: hidden; }
+    /* Header stays put while the verses scroll beneath it; both lists are always five rows tall. */
+    .fail-list .fail-head { display: flex; align-items: center; justify-content: center; height: 44px; box-sizing: border-box;
+      border-bottom: 1px solid var(--border-body); background: var(--bg-body); position: relative; z-index: 1; }
+    .fail-list .fail-head .fail-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
+    .fail-list .fail-head button { width: 100%; height: 32px; min-height: 0; border: 0; border-radius: 9px; padding: 0; font-family: inherit;
+      background: var(--btn-restart-bg); color: var(--btn-restart-text); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .fail-list .fail-inner { height: 180px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .fail-list .fail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 0 4px 0 6px; font-size: 14px; }
     .fail-list .fail-row + .fail-row { border-top: 1px solid var(--border-body); }
     .fail-list .fail-note { padding: 8px 6px; font-size: 12px; color: var(--text-muted); text-align: center; }
@@ -1270,7 +1274,7 @@
       document.getElementById("tabReview").classList.toggle("on", which === "review");
       document.getElementById("tabNew").classList.toggle("on", which === "new");
       document.getElementById("tabVerses").classList.toggle("on", which === "verses");
-      const left = Math.max(0, queue.length - currentIndex);
+      const left = Math.max(0, activeEnd() - currentIndex);
       const rc = document.getElementById("tabReviewCount");
       rc.textContent = left; rc.style.display = left > 0 ? "" : "none";
       const nc = document.getElementById("tabNewCount");
@@ -1577,7 +1581,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-67';
+    const CLIENT_BUILD = 'sync-68';
 
     let queue = [];
     let currentIndex = 0;
@@ -1798,7 +1802,7 @@
     function snapshot(nextIndex) {
       return {
         queue: queue.map(function(c) {
-          return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isLapse ? 1 : 0 };
+          return { r: c.rowIndex, f: c.reference, g: c.group, p: c.rep, l: c.isLapse ? 1 : 0, h: c.isHeld ? 1 : 0 };
         }),
         currentIndex: nextIndex,
         baseCount: baseCount,
@@ -2012,8 +2016,17 @@
     }
 
     // Failing needs the verse revealed first, except for brand-new (Level 0) cards, where Fail means Skip.
+    // Failed verses wait at the end of the queue (held) until Practice is started; they are not part of the deck.
+    function activeEnd() {
+      for (let i = 0; i < queue.length; i++) if (queue[i].isHeld) return i;
+      return queue.length;
+    }
+    function heldCount() {
+      return queue.filter(function(c) { return c.isHeld; }).length;
+    }
+
     function hasActiveCard() {
-      return mode === 'learning' ? !!learningCards[learningIndex] : currentIndex < queue.length;
+      return mode === 'learning' ? !!learningCards[learningIndex] : currentIndex < activeEnd();
     }
 
     function canFail() {
@@ -2144,7 +2157,7 @@
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
 
-      if (currentIndex >= queue.length) {
+      if (currentIndex >= activeEnd()) {
         renderEndOfDayScreen();
         return;
       }
@@ -2317,6 +2330,7 @@
       cardEl.style.opacity = "0";
     }
 
+    let practicing = false; // a practice round started from the Review Complete screen is running
     const LEVELUP_MS = 1100; // how long the card shows its new rank before moving on
 
     function advanceAfter(ms) {
@@ -2325,7 +2339,10 @@
         if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
         document.getElementById("toastNotice").textContent = "";
         currentIndex++;
-        if (currentIndex >= queue.length && totalCardsProcessed > 0) countUpPending = true; // just finished: play the count-up once
+        if (currentIndex >= activeEnd()) {
+          if (practicing) practicing = false;
+          else if (totalCardsProcessed > 0) countUpPending = true; // just finished: play the count-up once
+        }
         render();
       }, ms);
     }
@@ -2367,7 +2384,7 @@
 
     function scoreCard(action) {
       if (mode === 'learning') { scoreLearning(action); return; }
-      if (isScoring || currentIndex >= queue.length) return;
+      if (isScoring || currentIndex >= activeEnd()) return;
       if (action === "Fail" && !canFail()) return;
 
       isScoring = true;
@@ -2471,7 +2488,8 @@
           queue.push(Object.assign({}, card, {
             group: newGroup,
             rep: newRep,
-            isLapse: true
+            isLapse: true,
+            isHeld: true // waits for the Practice button on the Review Complete screen
           }));
         }
       }
@@ -2496,7 +2514,6 @@
         advanceAfter(ms);
       } else if (action === "Fail" && card.group > 0) {
         animateOut();
-        notice.textContent = "Added to end of queue";
         advanceAfter(320);
       } else {
         animateOut();
@@ -2627,6 +2644,15 @@
       list.innerHTML = "";
     }
 
+    // Starts a practice round: the held repeats join the deck as Repeat / Clear cards. Nothing is written to the sheet.
+    function startPractice() {
+      if (isScoring || heldCount() === 0) return;
+      queue.forEach(function(c) { if (c.isHeld) c.isHeld = false; });
+      practicing = true;
+      enqueueSubmit(null, snapshot(currentIndex));
+      render();
+    }
+
     function toggleStatList(kind) {
       const cfg = STAT_LISTS[kind];
       const items = statItems(kind);
@@ -2642,9 +2668,21 @@
       openStatList = kind;
       document.getElementById(cfg.box).classList.add("open");
       list.innerHTML = "";
-      const title = document.createElement("span");
-      title.className = "fail-title";
-      title.textContent = cfg.title;
+      const head = document.createElement("div");
+      head.className = "fail-head";
+      const held = kind === "fail" ? heldCount() : 0;
+      if (held > 0) {
+        const pb = document.createElement("button");
+        pb.type = "button";
+        pb.textContent = (held === 1 ? "Practice this verse" : held <= 4 ? "Practice these " + held : "Practice all " + held) + " \u203A";
+        pb.onclick = startPractice;
+        head.appendChild(pb);
+      } else {
+        const title = document.createElement("span");
+        title.className = "fail-title";
+        title.textContent = cfg.title;
+        head.appendChild(title);
+      }
       const inner = document.createElement("div");
       inner.className = "fail-inner";
       items.forEach(function(it) {
@@ -2665,7 +2703,7 @@
           : "Names weren't saved for today's earlier reviews. New ones will be listed.";
         inner.appendChild(note);
       }
-      list.appendChild(title);
+      list.appendChild(head);
       list.appendChild(inner);
       list.style.display = "block";
     }
