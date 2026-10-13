@@ -650,23 +650,6 @@
       color: var(--btn-restart-text); 
       font-size: 14px; 
     }
-    /* Quiet "Undo": invisible until a card was just scored, then fades out on its own. */
-    .undo-link {
-      background: none;
-      border: 0;
-      box-shadow: none;
-      padding: 5px 4px;
-      margin: -5px 0;
-      min-height: 0;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.4s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .undo-link.show { opacity: 0.75; pointer-events: auto; }
 
     /* Tiny muted line pinned to the bottom of the Review Complete card. */
     .summary-card { position: relative; }
@@ -769,10 +752,16 @@
     .pv-btns button { flex: 1; min-height: 0; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; flex-direction: row; justify-content: center; }
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
-    /* Undo: small pill just above the Reveal button, only while it can be used */
-    .undo-link { position: absolute; top: -38px; right: 6px; z-index: 6; margin: 0; padding: 5px 11px;
-      border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); opacity: 0; }
-    .undo-link.show { opacity: 0.95; }
+    /* Hold the reference: tiny undo menu */
+    .ref-header { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+    .ref-header.lp-down, .ref-header.um-open { background: var(--btn-restart-bg); border-radius: 14px; }
+    .card-header-group { position: relative; }
+    .undo-menu { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); z-index: 30; white-space: nowrap;
+      background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.22);
+      padding: 4px; font-size: 15px; font-weight: 600; }
+    .undo-menu button { display: block; border: 0; background: none; color: var(--text-primary); font: inherit; padding: 11px 16px; border-radius: 10px; margin: 0; min-height: 0; box-shadow: none; }
+    .undo-menu button:active { background: var(--btn-restart-bg); }
+    .undo-menu button.off { color: var(--text-muted); font-weight: 500; }
     .corner-add { position: absolute; top: 10px; left: 12px; z-index: 6; margin: 0; width: 30px; min-height: 0; height: 30px;
       padding: 0; border: 1px solid var(--border-card); border-radius: 99px; background: var(--bg-body); color: var(--text-muted);
       display: flex; align-items: center; justify-content: center; flex-direction: row; opacity: 0.9; }
@@ -854,7 +843,6 @@
       </div>
 
       <div class="verse-wrap">
-        <button type="button" class="undo-link" id="undoBtn" onclick="undoLast()">↶ Undo</button>
         <div class="verse-body" id="cardBody" onclick="handleContainerClick(event)">
         </div>
       </div>
@@ -1045,21 +1033,6 @@
       n.style.bottom = Math.max(0, deck.clientHeight - bottomEdge + 10) + "px";
       n.style.left = (card.offsetLeft + wrap.offsetLeft + wrap.offsetWidth / 2) + "px";
     }
-    // Undo is centered over the Reveal button (its width changes with the label, so measure it).
-    function placeUndo() {
-      const u = document.getElementById("undoBtn");
-      const wrap = document.querySelector(".verse-wrap");
-      const rv = document.querySelector("#cardBody .btn-reveal-all");
-      if (!u || !wrap || !rv) return;
-      const wr = wrap.getBoundingClientRect(), rr = rv.getBoundingClientRect();
-      if (!rr.width) return;
-      u.style.right = "auto";
-      u.style.left = Math.round(rr.left + rr.width / 2 - wr.left - u.offsetWidth / 2) + "px";
-    }
-    window.addEventListener("resize", placeUndo);
-    try {
-      new MutationObserver(placeUndo).observe(document.getElementById("cardBody"), { childList: true, subtree: true, characterData: true });
-    } catch (e) {}
     try {
       new MutationObserver(placeNotice).observe(document.getElementById("toastNotice"), { childList: true, characterData: true, subtree: true });
     } catch (e) {}
@@ -1613,7 +1586,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-74';
+    const CLIENT_BUILD = 'sync-75';
 
     let queue = [];
     let currentIndex = 0;
@@ -1629,8 +1602,10 @@
     let countUpPending = false;
     let countUpToken = 0;
     let undoId = null;
-    let undoTimer = null;
-    const UNDO_SHOW_MS = 5000;
+    let undoLabel = "";
+    let undoExp = 0;
+    let pendingUndoLabel = "";
+    const UNDO_WINDOW_MS = 2 * 60 * 1000; // matches the server
     let epoch = 0; // bumps whenever the server's session replaces ours, cancelling in-flight card animations
 
     let parsedSegments = [];
@@ -1662,6 +1637,7 @@
 
     window.onload = function() {
       attachRevealHold();
+      attachUndoHold();
       if (initialSession && Array.isArray(initialSession.cards)) {
         adoptSession(initialSession);
       } else {
@@ -1851,8 +1827,9 @@
       return outbox.length + (inFlight ? 1 : 0);
     }
 
-    function enqueueSubmit(review, state) {
+    function enqueueSubmit(review, state, label) {
       hideUndo();
+      if (review) pendingUndoLabel = label || "";
       outbox.push({ review: review, state: state });
       pumpOutbox();
     }
@@ -1940,22 +1917,52 @@
 
     function showUndo(id) {
       undoId = id;
-      const b = document.getElementById("undoBtn");
-      if (b) b.classList.add("show");
-      placeUndo();
-      clearTimeout(undoTimer);
-      undoTimer = setTimeout(hideUndo, UNDO_SHOW_MS);
+      undoLabel = pendingUndoLabel;
+      undoExp = Date.now() + UNDO_WINDOW_MS;
     }
 
     function hideUndo() {
-      clearTimeout(undoTimer);
       undoId = null;
-      const b = document.getElementById("undoBtn");
-      if (b) b.classList.remove("show");
+      closeUndoMenu();
+    }
+
+    function undoAvailable() {
+      return !!undoId && Date.now() < undoExp && !isScoring && pendingCount() === 0;
+    }
+
+    function closeUndoMenu() {
+      document.querySelectorAll(".undo-menu").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+      const r = document.getElementById("cardRef"); if (r) r.classList.remove("um-open");
+      document.removeEventListener("pointerdown", onUndoOutside, true);
+    }
+    function onUndoOutside(e) { if (!e.target.closest(".undo-menu")) closeUndoMenu(); }
+    function openUndoMenu() {
+      closeUndoMenu();
+      const ref = document.getElementById("cardRef");
+      if (!ref) return;
+      const m = document.createElement("div");
+      m.className = "undo-menu";
+      const ok = undoAvailable();
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = ok ? "" : "off";
+      b.textContent = "\u21B6 " + (ok ? "Undo " + undoLabel : "Nothing to undo");
+      b.onclick = function(e) { e.stopPropagation(); closeUndoMenu(); if (ok) undoLast(); };
+      m.appendChild(b);
+      const grp = ref.closest(".card-header-group") || ref.parentNode;
+      grp.appendChild(m);
+      ref.classList.add("um-open");
+      setTimeout(function() { document.addEventListener("pointerdown", onUndoOutside, true); }, 0);
+    }
+    let heldRef = null;
+    function attachUndoHold() {
+      const ref = document.getElementById("cardRef");
+      heldRef = attachLongPress(ref, function() { if (hasActiveCard()) openUndoMenu(); }, function(e) { return !e.target.closest(".undo-menu"); });
+      ref.addEventListener("click", function(e) { if (heldRef()) { e.stopPropagation(); e.preventDefault(); } }, true);
     }
 
     function undoLast() {
-      if (!undoId || isScoring || pendingCount() > 0) return;
+      if (!undoAvailable()) { if (!undoId) return; flashNotice("Nothing to undo"); return; }
       const id = undoId;
       hideUndo();
       isScoring = true;
@@ -2076,7 +2083,6 @@
       updateFailLock();
       updateTabs();
       placeNotice();
-      placeUndo();
       postCache();
     }
 
@@ -2276,19 +2282,13 @@
       if (parsedSegments.length > 1) {
         html += `
           <div class="passage-toolbar">
-            <span class="passage-status">${revealedCount} of ${parsedSegments.length} revealed</span>
-            <button type="button" class="btn-reveal-all" onclick="toggleRevealAll(event)">
-              ${allRevealed ? 'Hide All' : 'Reveal All'}
-            </button>
+            <span class="passage-status">${revealedCount} of ${parsedSegments.length} revealed${allRevealed ? '' : ' \u00B7 hold to reveal all'}</span>
           </div>
         `;
       } else {
         html += `
           <div class="passage-toolbar">
             <span class="passage-status">${allRevealed ? 'Revealed' : 'Tap to reveal'}</span>
-            <button type="button" class="btn-reveal-all" onclick="toggleRevealAll(event)">
-              ${allRevealed ? 'Hide' : 'Reveal'}
-            </button>
           </div>
         `;
       }
@@ -2411,7 +2411,7 @@
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
         enqueueSubmit(
           { rowIndex: card.rowIndex, reference: card.reference, rep: 1, group: 1 },
-          snapshot(currentIndex)
+          snapshot(currentIndex), "Level Up \u00B7 " + card.reference
         );
         ms = LEVELUP_MS;
         setTimeout(fadeOutLevelUp, ms - 140);
@@ -2559,7 +2559,7 @@
         { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup,
           // first Bronze review passed: ask the server for the evening practice card
           later: (action === "Pass" && card.group === 1 && card.rep === 1) ? true : undefined },
-        snapshot(currentIndex + 1)
+        snapshot(currentIndex + 1), action + " \u00B7 " + card.reference
       );
 
       if (isFastTrackRestored || graduated) {
