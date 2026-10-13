@@ -1585,7 +1585,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-78';
+    const CLIENT_BUILD = 'sync-79';
 
     let queue = [];
     let currentIndex = 0;
@@ -2847,23 +2847,31 @@
     // "Add New Verse": opens a short list of unassigned verses; tapping one starts learning it.
     let pickerItems = [];
 
+    let pickerLoading = false;
+    let pickerToken = 0;
     function addNewVerse() {
       const btn = document.getElementById("btnAddVerse");
-      if (!btn || btn.disabled) return;
-      btn.disabled = true;
+      if (!btn || btn.disabled || pickerLoading) return;
       showSummaryNotice("");
+      // open right away; the list fills in when the sheet answers
+      const token = ++pickerToken;
+      pickerLoading = true;
+      pickerItems = [];
+      document.getElementById("pickerNote").textContent = "";
+      document.getElementById("pickerSearch").value = "";
+      document.getElementById("picker").classList.add("open");
+      renderPicker();
       google.script.run
         .withSuccessHandler(function(list) {
-          btn.disabled = false;
-          if (!Array.isArray(list)) list = [];
-          pickerItems = list;
-          document.getElementById("pickerNote").textContent = "";
-          document.getElementById("pickerSearch").value = "";
-          document.getElementById("picker").classList.add("open");
+          pickerLoading = false;
+          if (token !== pickerToken) return;
+          pickerItems = Array.isArray(list) ? list : [];
           renderPicker();
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false;
+          pickerLoading = false;
+          if (token !== pickerToken) return;
+          closePicker();
           showSummaryNotice("Couldn't load verses: " + ((err && err.message) || err), true);
         })
         .listUnassigned();
@@ -2938,6 +2946,7 @@
     }
 
     function closePicker() {
+      pickerToken++; pickerLoading = false;
       document.getElementById("picker").classList.remove("open");
     }
 
@@ -2945,6 +2954,13 @@
       const q = document.getElementById("pickerSearch").value.trim().toLowerCase();
       const box = document.getElementById("pickerList");
       box.textContent = "";
+      if (pickerLoading) {
+        const e = document.createElement("div");
+        e.className = "picker-empty";
+        e.textContent = "Loading verses\u2026";
+        box.appendChild(e);
+        return;
+      }
       const shown = pickerItems.filter(function(it) { return !q || it.f.toLowerCase().indexOf(q) >= 0; });
       if (shown.length === 0) {
         const e = document.createElement("div");
