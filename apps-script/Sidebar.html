@@ -563,7 +563,7 @@
       color: var(--btn-fail-text); 
       font-size: 16px; 
     }
-    .btn-fail.seen { opacity: 0.4; }
+    .btn-fail.seen { opacity: 0.7; }
 
     .btn-pass { 
       flex: 1; 
@@ -1328,9 +1328,9 @@
       scheduleBadgeReturn();
     }
 
-    // "Reviewed" on a New verse marks it as looked at for 3 hours; the New tab's count only shows verses
+    // "Reviewed" on a New verse marks it as looked at for 2 hours; the New tab's count only shows verses
     // that are still waiting. The marks are saved with the session, so every device agrees.
-    const NEW_SNOOZE_MS = 3 * 60 * 60 * 1000;
+    const NEW_SNOOZE_MS = 2 * 60 * 60 * 1000;
     let learningSeen = {};
     let badgeTimer = null;
     function isSeen(ref) { return (learningSeen[ref] || 0) > Date.now(); }
@@ -1626,7 +1626,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-49';
+    const CLIENT_BUILD = 'sync-50';
 
     let queue = [];
     let currentIndex = 0;
