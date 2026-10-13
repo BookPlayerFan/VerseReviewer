@@ -1379,7 +1379,7 @@
 
     // Press and hold (about half a second) on an element. A press that moves or lifts early does nothing.
     // Returns held(): true once if the hold fired, so the click that follows it can be ignored.
-    const LONG_PRESS_MS = 400;
+    const LONG_PRESS_MS = 350;
     function attachLongPress(el, onHold, canStart) {
       let timer = null, sx = 0, sy = 0, fired = false;
       function cancel() { if (timer) { clearTimeout(timer); timer = null; } el.classList.remove("lp-down"); }
@@ -1584,7 +1584,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-81';
+    const CLIENT_BUILD = 'sync-82';
 
     let queue = [];
     let currentIndex = 0;
