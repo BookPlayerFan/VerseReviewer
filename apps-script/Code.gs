@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-27'; // shown in the app's status readout (tap the "Card x of y" label)
+const BUILD = 'sync-28'; // shown in the app's status readout (tap the "Card x of y" label)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -344,7 +344,7 @@ function activeEnd_(s) {
 }
 
 function emptyStats_() {
-  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [] };
+  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
 }
 
 function createState_(dateKey) {
@@ -642,7 +642,7 @@ function sanitizeStats_(st) {
     });
     return out;
   };
-  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs) };
+  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
 }
 
 /**
@@ -738,7 +738,8 @@ function submitReview(expectedVersion, review, next) {
     }
 
     const prev = { idx: s.currentIndex, qlen: s.queue.length, stats: s.stats, processed: s.processed };
-    const isScore = !!review || idx !== prev.idx || queue.length !== prev.qlen;
+    // Starting a practice round (next.practice) changes the queue but is not a score: no log row, no undo.
+    const isScore = !next.practice && (!!review || idx !== prev.idx || queue.length !== prev.qlen);
     const prevCard = s.queue[s.currentIndex] || null;
 
     s.queue = queue;
