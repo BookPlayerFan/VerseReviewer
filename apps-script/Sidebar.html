@@ -518,6 +518,7 @@
     }
     .btn-fail.review { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .btn-fail.seen, .btn-fail.locked { opacity: 0.6; }
+    #btnFail.seen.only { pointer-events: none; }
 
     .btn-pass { 
       flex: 1; 
@@ -1239,7 +1240,7 @@
 
     function updateTabs() {
       if (mode === "learning" && learningCards[learningIndex]) {
-        document.getElementById("btnFail").classList.toggle("seen", isSeen(learningCards[learningIndex].reference));
+        { const b = document.getElementById("btnFail"); const sn = isSeen(learningCards[learningIndex].reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn && learningCards.length === 1); }
       }
       updateProgressBar();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
@@ -1587,7 +1588,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-90';
+    const CLIENT_BUILD = 'sync-91';
 
     let queue = [];
     let currentIndex = 0;
@@ -1642,6 +1643,7 @@
     }
     window.addEventListener("message", function(e) {
       const d = e.data;
+      if (d && d.type === "VR_GOTO" && (d.tab === "new" || d.tab === "review")) { goTab(d.tab); return; }
       if (!d || d.type !== "VR_PUSH_STATE") return;
       const b = document.getElementById("vlBellBtn");
       if (b) b.style.display = (d.supported && !d.on && !d.denied) ? "" : "none";
@@ -2210,7 +2212,7 @@
       document.getElementById("btnFailText").textContent = doneLabel;
       document.getElementById("btnFail").style.display = "flex";
       document.getElementById("btnFail").classList.add("review");
-      document.getElementById("btnFail").classList.toggle("seen", isSeen(card.reference));
+      { const b = document.getElementById("btnFail"); const sn = isSeen(card.reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn && learningCards.length === 1); }
 
       document.getElementById("cardRef").textContent = card.reference;
       renderCardBody();
@@ -2233,7 +2235,7 @@
       const metaTag = document.getElementById("cardMeta");
       const versionBadge = document.getElementById("cardVersion");
       const btnFail = document.getElementById("btnFail");
-      btnFail.classList.remove("seen", "review");
+      btnFail.classList.remove("seen", "only", "review");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
 
@@ -2440,6 +2442,8 @@
       if (isScoring) return;
       const card = learningCards[learningIndex];
       if (!card) return;
+      // Already reviewed (dimmed): pressing again must not restart its snooze or push. With a single New verse it does nothing.
+      if (action === "Fail" && isSeen(card.reference) && learningCards.length === 1) return;
       isScoring = true;
 
       const notice = document.getElementById("toastNotice");
@@ -2456,9 +2460,10 @@
         ms = LEVELUP_MS;
         setTimeout(fadeOutLevelUp, ms - 140);
       } else {
-        learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
+        const alreadySeen = isSeen(card.reference); // moving past a dimmed verse keeps its original snooze
+        if (!alreadySeen) learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
         // ask the server for a push when this snooze ends (it is cancelled if the verse is finished first)
-        try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).pushSnooze(card.reference, learningSeen[card.reference]); } catch (e) {}
+        if (!alreadySeen) { try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).pushSnooze(card.reference, learningSeen[card.reference]); } catch (e) {} }
         learningIndex = (learningIndex + 1) % learningCards.length; // loops back to the first verse
         enqueueSubmit(null, snapshot(currentIndex));
         if (learningCards.length === 1) {
