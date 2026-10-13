@@ -1567,7 +1567,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-62';
+    const CLIENT_BUILD = 'sync-63';
 
     let queue = [];
     let currentIndex = 0;
@@ -2066,6 +2066,7 @@
 
       cardEl.style.display = "flex";
       setCardRank(cardEl, 0);
+      document.querySelectorAll(".shortcut-hint").forEach(function(h) { h.style.display = "none"; });
       summaryEl.style.display = "none";
 
       isFlipped = false;
@@ -2144,6 +2145,7 @@
 
       cardEl.style.display = "flex";
       setCardRank(cardEl, queue[currentIndex].group);
+      document.querySelectorAll(".shortcut-hint").forEach(function(h) { h.style.display = ""; });
       summaryEl.style.display = "none";
 
       const card = queue[currentIndex];
@@ -2991,17 +2993,13 @@
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
-      // Tabs: 1 Review, 2 New, 3 Verses (not while a popup is open)
+      // Not while a popup is open
       const popupOpen = ["picker", "pickerPreview", "pasteModal"].some(function(id) {
         return document.getElementById(id).classList.contains("open");
       });
       if (popupOpen) return;
-      if (key === "1" || key === "2" || key === "3") {
-        e.preventDefault();
-        goTab(key === "1" ? "review" : key === "2" ? "new" : "verses");
-        return;
-      }
-      // Card shortcuts only apply when a card is on screen, not over the Verse List
+      // Shortcuts are for the Review cards only: not the New screen, not over the Verse List
+      if (mode === "learning") return;
       if (document.getElementById("verseListView").classList.contains("open")) return;
       if (e.code === "Space") {
         e.preventDefault();
