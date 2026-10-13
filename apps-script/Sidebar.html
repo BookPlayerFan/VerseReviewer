@@ -697,7 +697,6 @@
       font-size: 10.5px; font-weight: 600; color: var(--text-muted); position: relative; border-radius: 0;
       -webkit-tap-highlight-color: transparent; }
     .tab:active { transform: none; filter: none; }
-    #tabNew.lp-down svg, #tabNew.lp-down { color: var(--text-accent); transform: scale(1.12); transition: transform .12s ease; }
     body.lp-active, body.lp-active * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
     .pv-card, .pv-card * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8;
@@ -1381,6 +1380,24 @@
     // Press and hold (about half a second) on an element. A press that moves or lifts early does nothing.
     // Returns held(): true once if the hold fired, so the click that follows it can be ignored.
     const LONG_PRESS_MS = 300;
+    // A small tap-tap felt when a hold registers. Android vibrates; iPhone has no vibrate API, so we flip a hidden
+    // iOS "switch" checkbox, which makes Safari play its haptic. If neither works, nothing happens.
+    let hapticLabel = null;
+    function hapticTick() {
+      try { if (navigator.vibrate) { navigator.vibrate(12); return; } } catch (e) {}
+      try {
+        if (!hapticLabel) {
+          hapticLabel = document.createElement("label");
+          hapticLabel.setAttribute("aria-hidden", "true");
+          hapticLabel.style.cssText = "position:fixed;left:-100px;top:-100px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden";
+          const cb = document.createElement("input");
+          cb.type = "checkbox"; cb.setAttribute("switch", ""); cb.tabIndex = -1;
+          hapticLabel.appendChild(cb);
+          document.body.appendChild(hapticLabel);
+        }
+        hapticLabel.click();
+      } catch (e) {}
+    }
     function attachLongPress(el, onHold, canStart) {
       let timer = null, sx = 0, sy = 0, fired = false;
       function cancel() { if (timer) { clearTimeout(timer); timer = null; } el.classList.remove("lp-down"); }
@@ -1390,7 +1407,7 @@
         fired = false; sx = e.clientX; sy = e.clientY; cancel();
         el.classList.add("lp-down");
         document.body.classList.add("lp-active");
-        timer = setTimeout(function() { timer = null; fired = true; el.classList.remove("lp-down"); try { window.getSelection().removeAllRanges(); } catch (x) {} onHold(e); }, LONG_PRESS_MS);
+        timer = setTimeout(function() { timer = null; fired = true; el.classList.remove("lp-down"); try { window.getSelection().removeAllRanges(); } catch (x) {} hapticTick(); onHold(e); }, LONG_PRESS_MS);
       });
       el.addEventListener("pointermove", function(e) {
         if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
@@ -1585,7 +1602,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-79';
+    const CLIENT_BUILD = 'sync-80';
 
     let queue = [];
     let currentIndex = 0;
