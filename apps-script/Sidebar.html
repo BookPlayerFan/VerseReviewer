@@ -103,19 +103,6 @@
       transition: background-color 0.25s ease, color 0.25s ease;
     }
 
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      padding: 0 4px;
-      font-weight: 500;
-      flex-shrink: 0;
-      height: 20px;
-    }
-
     .progress-track {
       width: 100%;
       height: 3px;
@@ -312,9 +299,6 @@
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); } }
     :root[data-theme="dark"] .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
     .vl-verse + .vl-verse { border-top: 1px solid var(--border-card); }
-
-    .link-quiet { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
-      padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text-muted); align-self: center; }
 
     .rank-1 { --rl: #a8643a; --rd: #d9945f; }
     .rank-2 { --rl: #7b8794; --rd: #b8c2cc; }
@@ -657,40 +641,6 @@
       color: var(--btn-restart-text); 
       font-size: 14px; 
     }
-    /* Three columns so the mode label sits in the true center of the bar. */
-    .status-bar {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .sb-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-    }
-
-    .sb-left > span {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .sb-right {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
-      min-width: 0;
-    }
-
-    #sessionStatus {
-      text-align: right;
-      white-space: nowrap;
-    }
-
     /* Quiet "Undo": invisible until a card was just scored, then fades out on its own. */
     .undo-link {
       background: none;
@@ -734,31 +684,6 @@
       pointer-events: none;
     }
 
-    /* Names the screen you're on; tap it to switch. Plain in Review, blue in Learning. */
-    .learning-chip {
-      flex-direction: row;
-      justify-content: center;
-      min-width: 76px;
-      min-height: 0;
-      /* extra padding enlarges the tap area; negative margin keeps the bar the same height */
-      padding: 5px 12px;
-      margin: -5px 0;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      text-align: center;
-      white-space: nowrap;
-      letter-spacing: 0.2px;
-      background: transparent;
-      color: var(--text-muted);
-      transition: background-color 0.15s ease, color 0.15s ease;
-    }
-
-    .learning-chip.active {
-      background: var(--btn-restart-bg);
-      color: var(--btn-restart-text);
-    }
-
     .diag-line {
       font-size: 10px;
       line-height: 1.35;
@@ -773,7 +698,6 @@
     /* ── Bottom tab bar navigation ── */
     :root { --tab-h: calc(53px + max(env(safe-area-inset-bottom, 0px) - 14px, 0px)); }
     body { padding-bottom: calc(var(--tab-h) + 4px); }
-    .status-bar { display: none !important; }
     /* Blue progress line along the top of the tab bar: only while reviewing cards (hidden on New, Verses and Review Complete) */
     .progress-track { display: none; position: absolute; top: -1px; left: 0; right: 0; height: 3px; margin: 0;
       background: transparent; border-radius: 0; z-index: 2; }
@@ -852,7 +776,6 @@
       z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
     .diag-line { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tab-h) + 4px); z-index: 60;
       background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 8px; padding: 6px 8px; margin: 0; }
-    #btnRanks { display: none !important; }
     /* Notices (level up, "Added to end of queue", errors) float over the bottom of the verse box,
        so they take no room between the verse and the buttons. */
     .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
@@ -905,16 +828,6 @@
   </style>
 </head>
 <body>
-
-  <div class="status-bar">
-    <div class="sb-left">
-      <span id="queueProgress" onclick="toggleDiag()"></span>
-    </div>
-    <button type="button" class="learning-chip" id="learningChip" onclick="toggleLearning()" style="display: none;"></button>
-    <div class="sb-right">
-      <span id="sessionStatus"></span>
-    </div>
-  </div>
 
   <div class="diag-line" id="diagLine" style="display: none;"></div>
 
@@ -994,7 +907,6 @@
         <button type="button" class="btn-restart" id="btnRestart" onclick="restartSession()" style="display: none;">
           Try again
         </button>
-        <button type="button" class="link-quiet" id="btnRanks" onclick="openVerseList()" style="display: none;">Verse List</button>
       </div>
     </div>
   </div>
@@ -1629,7 +1541,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-52';
+    const CLIENT_BUILD = 'sync-53';
 
     let queue = [];
     let currentIndex = 0;
@@ -1739,7 +1651,6 @@
     function fetchSession() {
       if (isFetching) return;
       isFetching = true;
-      document.getElementById("queueProgress").textContent = "Loading cards...";
       google.script.run
         .withSuccessHandler(function(session) {
           isFetching = false;
@@ -1806,8 +1717,6 @@
       loadedAt = 0; // lets the next time the app is opened retry automatically
       document.getElementById("activeCard").style.display = "none";
       document.getElementById("summaryView").style.display = "flex";
-      document.getElementById("queueProgress").textContent = "Couldn't load";
-      document.getElementById("sessionStatus").textContent = "";
       document.getElementById("sessionProgressFill").style.width = "0%";
       document.getElementById("summaryIcon").textContent = "⚠️";
       document.getElementById("summaryTitle").textContent = "Couldn't Load Cards";
@@ -1817,7 +1726,6 @@
       setSummaryButtons(false, true);
       renderTomorrowNote();
       setSummaryBusy(false);
-      updateLearningChip();
       notifyReady();
     }
 
@@ -2001,8 +1909,6 @@
         document.getElementById("btnAddVerse").style.display === "none" &&
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
-      const rb = document.getElementById("btnRanks");
-      if (rb) rb.style.display = onComplete ? "flex" : "none";
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       el.textContent = tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow";
       el.style.display = "block";
@@ -2083,21 +1989,10 @@
     function render() {
       if (mode === 'learning') renderLearning();
       else renderCard();
-      updateLearningChip();
       updateTabs();
       placeNotice();
       placeUndo();
       postCache();
-    }
-
-    function updateLearningChip() {
-      const chip = document.getElementById("learningChip");
-      if (!chip) return;
-      // Always shown: it names the screen you're on, and tapping it switches to the other one.
-      const learning = (mode === 'learning');
-      chip.textContent = "New Verse";
-      chip.classList.toggle("active", learning);
-      chip.style.display = "inline-flex";
     }
 
     function setMode(m) {
@@ -2121,8 +2016,6 @@
       isScoring = false;
       document.getElementById("activeCard").style.display = "none";
       document.getElementById("summaryView").style.display = "flex";
-      document.getElementById("queueProgress").textContent = "";
-      document.getElementById("sessionStatus").textContent = "";
       document.getElementById("sessionProgressFill").style.width = "0%";
 
       const icon = document.getElementById("summaryIcon");
@@ -2158,17 +2051,8 @@
       const failBadge = document.getElementById("badgeFail");
       if (passBadge) { passBadge.style.opacity = "0"; passBadge.textContent = "LEVEL UP"; }
 
-      const hasNext = learningIndex < learningCards.length - 1;
       const doneLabel = "Review";
-      if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }
-
-      // Learning verses don't count toward today's card numbers or reviewed total.
-      // The center label already says "New Verse", so the left side shows only the position (if more than one).
-      document.getElementById("queueProgress").textContent = learningCards.length > 1
-        ? `${learningIndex + 1} of ${learningCards.length}`
-        : "";
-      document.getElementById("sessionStatus").textContent = "";
-      document.getElementById("sessionProgressFill").style.width = "0%";
+      if (failBadge) { failBadge.style.opacity = "0"; failBadge.textContent = doneLabel.toUpperCase(); }      document.getElementById("sessionProgressFill").style.width = "0%";
 
       const metaTag = document.getElementById("cardMeta");
       metaTag.className = "meta-tag";
@@ -2206,8 +2090,6 @@
 
       const cardEl = document.getElementById("activeCard");
       const summaryEl = document.getElementById("summaryView");
-      const progressLabel = document.getElementById("queueProgress");
-      const statusLabel = document.getElementById("sessionStatus");
       const progressFill = document.getElementById("sessionProgressFill");
       const pipsContainer = document.getElementById("cardPips");
       const metaTag = document.getElementById("cardMeta");
@@ -2239,13 +2121,6 @@
 
       if (passBadge) passBadge.style.opacity = "0";
       if (failBadge) failBadge.style.opacity = "0";
-
-      const inRetry = currentIndex >= baseCount;
-      progressLabel.textContent = inRetry
-        ? `Retry ${currentIndex - baseCount + 1} of ${queue.length - baseCount}`
-        : `Card ${currentIndex + 1} of ${baseCount}`;
-      statusLabel.textContent = totalCardsProcessed > 0 ? `${totalCardsProcessed} reviewed` : '';
-
       // Progress through today's deck, worked out only from the synced position, so every device shows the
       // same bar. Repeat cards added after a Fail come after the deck and never move it backwards.
       const percent = baseCount > 0 ? (Math.min(currentIndex, baseCount) / baseCount) * 100 : 0;
@@ -2564,8 +2439,6 @@
         recordStatRef('gradRefs', card.reference, newGroup);
       }
 
-      const nextConfig = GROUP_CONFIG[newGroup] || GROUP_CONFIG[1];
-
       // The server computes the due date and stores the session; we send the new level and rep.
       enqueueSubmit(
         { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup,
@@ -2593,8 +2466,6 @@
     function renderEndOfDayScreen() {
       const cardEl = document.getElementById("activeCard");
       const summaryEl = document.getElementById("summaryView");
-      const progressLabel = document.getElementById("queueProgress");
-      const statusLabel = document.getElementById("sessionStatus");
       const progressFill = document.getElementById("sessionProgressFill");
 
       cardEl.style.display = "none";
@@ -2602,9 +2473,6 @@
       document.getElementById("summaryIcon").style.display = "";
       setSummaryButtons(false, false);
       renderTomorrowNote();
-
-      progressLabel.textContent = "";
-      statusLabel.textContent = "All Done 🎉";
       progressFill.style.width = "100%";
 
       // Both end-of-day screens start at the same height, so the trophy / sparkle and title line up.
