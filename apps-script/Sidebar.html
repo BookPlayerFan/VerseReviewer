@@ -264,6 +264,24 @@
     .notice .rank-badge { vertical-align: middle; }
     .notice .rank-badge.pop, .notice .rank-badge.pop-big { margin: 0 6px; } /* room for the glow */
     #toastNotice.levelup { padding: 8px 18px; }
+    /* Level-up toast: heading on top, old rank -> new rank below. Higher ranks add a ring and sparkles around the new pill. */
+    #toastNotice.levelup.lu-stack { flex-direction: column; flex-wrap: nowrap; gap: 8px; padding: 12px 22px; }
+    .lu-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; color: var(--badge-pass); }
+    .lu-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .lu-fx { position: relative; display: inline-block; --rc: var(--rl); }
+    @media (prefers-color-scheme: dark) { .lu-fx { --rc: var(--rd); } }
+    .lu-ring { position: absolute; inset: -1px; border-radius: 999px; border: 2px solid var(--rc); opacity: 0; pointer-events: none;
+      animation: luRing 0.8s ease-out forwards; animation-delay: var(--rd2, 0.22s); }
+    @keyframes luRing { 0% { transform: scale(0.95); opacity: 0.85; } 100% { transform: scale(1.22, 1.75); opacity: 0; } }
+    .lu-spark { position: absolute; left: 50%; top: 50%; font-size: 11px; line-height: 1; color: var(--rc); opacity: 0; pointer-events: none;
+      animation: luSpark 0.9s ease-out forwards; animation-delay: var(--sd, 0.2s); }
+    .lu-spark.dot { font-size: 6px; }
+    @keyframes luSpark {
+      0%   { transform: translate(calc(-50% + var(--ex)), calc(-50% + var(--ey))) scale(0.3); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) { .lu-ring, .lu-spark { display: none; } }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
     .vl-row:active, .vl-seg button:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
@@ -1128,16 +1146,53 @@
         if (el.querySelector(".rank-badge")) el.textContent = ""; // leave any newer message alone
       }, (toG >= 8 ? 1700 : 1200) + 1500);
       if (restored) {
+        el.classList.remove("lu-stack");
         el.appendChild(document.createTextNode("Restored to "));
-      } else if (fromG >= 0) {
-        el.appendChild(makePill(fromG));
+        el.appendChild(makePill(toG, "pop"));
+        return;
+      }
+      // Heading above, old rank -> new rank below. Higher ranks get a ring and a few sparkles around the new pill:
+      // Platinum/Sapphire: 1 ring + 5, Emerald/Ruby: 1 ring + 8, Diamond: 2 rings + 12.
+      el.classList.add("lu-stack");
+      const title = document.createElement("div");
+      title.className = "lu-title";
+      title.textContent = toG >= 8 ? "Verse mastered!" : "Level up!";
+      const row = document.createElement("div");
+      row.className = "lu-row";
+      if (fromG >= 0) {
+        row.appendChild(makePill(fromG));
         const a = document.createElement("span");
         a.className = "rank-arrow";
         a.textContent = "→";
-        el.appendChild(a);
+        row.appendChild(a);
       }
-      el.appendChild(makePill(toG, toG >= 8 ? "pop-big" : "pop"));
-      el.appendChild(document.createTextNode(toG >= 8 ? "  Top rank!" : restored ? "" : "  Level up!"));
+      const fx = document.createElement("span");
+      fx.className = "lu-fx rank-" + Math.min(8, toG);
+      const rings = toG >= 8 ? 2 : toG >= 4 ? 1 : 0;
+      const sparks = toG >= 8 ? 12 : toG >= 6 ? 8 : toG >= 4 ? 5 : 0;
+      for (let r = 0; r < rings; r++) {
+        const ring = document.createElement("span");
+        ring.className = "lu-ring";
+        ring.style.setProperty("--rd2", (0.22 + r * 0.18) + "s");
+        fx.appendChild(ring);
+      }
+      fx.appendChild(makePill(toG, toG >= 8 ? "pop-big" : "pop"));
+      for (let i = 0; i < sparks; i++) {
+        const sp = document.createElement("span");
+        const ang = (i / sparks) * Math.PI * 2 + 0.4;
+        const ex = Math.cos(ang) * 46, ey = Math.sin(ang) * 11, more = 10 + ((i * 7) % 9);
+        sp.className = "lu-spark" + (i % 3 === 0 ? " dot" : "");
+        sp.textContent = i % 3 === 0 ? "●" : "✦";
+        sp.style.setProperty("--ex", Math.round(ex) + "px");
+        sp.style.setProperty("--ey", Math.round(ey) + "px");
+        sp.style.setProperty("--dx", Math.round(ex + Math.cos(ang) * more) + "px");
+        sp.style.setProperty("--dy", Math.round(ey + Math.sin(ang) * more * 0.6) + "px");
+        sp.style.setProperty("--sd", (0.2 + (i % 3) * 0.06) + "s");
+        fx.appendChild(sp);
+      }
+      row.appendChild(fx);
+      el.appendChild(title);
+      el.appendChild(row);
     }
 
     // ── Verse List ──
@@ -1570,7 +1625,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-47';
+    const CLIENT_BUILD = 'sync-48';
 
     let queue = [];
     let currentIndex = 0;
