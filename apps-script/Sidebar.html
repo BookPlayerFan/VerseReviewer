@@ -772,6 +772,8 @@
     .sync-warning { position: fixed; top: max(env(safe-area-inset-top, 0px), 8px); left: 50%; transform: translateX(-50%);
       z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
     /* Status readout (tap "Verse List" to show it) */
+    .diag-test { display: block; margin: 8px 0 0; padding: 7px 12px; min-height: 0; width: auto; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); }
     .diag-line { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tab-h) + 4px); z-index: 60;
       font-size: 10px; line-height: 1.35; color: var(--text-muted); word-break: break-all; user-select: text; flex-shrink: 0;
       background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 8px; padding: 6px 8px; margin: 0; }
@@ -827,7 +829,7 @@
 </head>
 <body>
 
-  <div class="diag-line" id="diagLine" style="display: none;"></div>
+  <div class="diag-line" id="diagLine" style="display: none;"><span id="diagText"></span><button type="button" class="diag-test" id="diagTest" onclick="sendTestPush()">Send test notification</button></div>
 
   <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
 
@@ -1594,7 +1596,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-87';
+    const CLIENT_BUILD = 'sync-88';
 
     let queue = [];
     let currentIndex = 0;
@@ -3139,7 +3141,7 @@
     // when the window gains focus, on a tap after a pause, and every few seconds.
 
     function renderDiag() {
-      const el = document.getElementById("diagLine");
+      const el = document.getElementById("diagText");
       if (!el || !diagOn) return;
       el.textContent =
         "page " + CLIENT_BUILD + " · server " + (serverBuild || "?") +
@@ -3149,6 +3151,18 @@
         " · loaded " + (diag.adopted || "never") +
         (initialSession && initialSession.ms !== undefined ? " · server load " + initialSession.ms + " ms" : "") +
         " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "");
+    }
+
+    // Sends a test push through the server (tap the "Verse List" title, then the button).
+    function sendTestPush() {
+      const b = document.getElementById("diagTest");
+      if (!b || b.disabled) return;
+      b.disabled = true; b.textContent = "Sending\u2026";
+      function done(msg) { b.textContent = msg; setTimeout(function() { b.disabled = false; b.textContent = "Send test notification"; }, 4000); }
+      google.script.run
+        .withSuccessHandler(function(r) { done(r && r.ok ? "Sent \u2713" : "Failed: " + ((r && r.message) || "unknown")); })
+        .withFailureHandler(function(err) { done("Failed: " + ((err && err.message) || err)); })
+        .sendTestPush();
     }
 
     function toggleDiag() {
