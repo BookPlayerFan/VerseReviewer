@@ -666,6 +666,8 @@
 
     /* Tiny muted line pinned to the bottom of the Review Complete card. */
     .summary-card { position: relative; }
+    /* With the stats showing, content starts near the top so opening the Repeats / Leveled Up list doesn't move the boxes. */
+    .summary-card.top { justify-content: flex-start; padding-top: 36px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .tomorrow-note {
       position: absolute;
       left: 0;
@@ -1532,7 +1534,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-42';
+    const CLIENT_BUILD = 'sync-43';
 
     let queue = [];
     let currentIndex = 0;
@@ -2512,6 +2514,7 @@
       statusLabel.textContent = "All Done 🎉";
       progressFill.style.width = "100%";
 
+      document.getElementById("summaryView").classList.remove("top");
       if (totalCardsProcessed === 0) {
         document.getElementById("summaryIcon").textContent = "✨";
         document.getElementById("summaryTitle").textContent = "All Caught Up!";
@@ -2527,6 +2530,7 @@
         document.getElementById("summaryTitle").textContent = "Review Complete!";
         document.getElementById("summarySubtitle").textContent = "You have finished all verses scheduled for today.";
         document.getElementById("summaryStats").style.display = "grid";
+        document.getElementById("summaryView").classList.add("top");
 
         document.getElementById("statReviewed").textContent = sessionStats.reviewed;
         document.getElementById("statPassed").textContent = sessionStats.passed;
