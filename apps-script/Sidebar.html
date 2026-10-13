@@ -573,8 +573,10 @@
     .stat-box.tappable { cursor: pointer; }
     /* every repeat verse cleared at least once */
     .stat-box { position: relative; }
-    .stat-box.cleared::after { content: "\2713"; position: absolute; top: 6px; right: 7px; width: 20px; height: 20px; border-radius: 50%;
-      background: var(--btn-pass-bg); color: var(--btn-pass-text); font-size: 13px; font-weight: 800; line-height: 20px; text-align: center; }
+    .stat-box.cleared::after { content: "\2713"; position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--badge-pass); color: #fff; font-size: 17px; font-weight: 900; line-height: 26px; text-align: center;
+      box-shadow: 0 0 0 3px var(--btn-pass-bg), 0 1px 4px rgba(0, 0, 0, 0.25); }
+    @media (prefers-color-scheme: dark) { .stat-box.cleared::after { color: #0b2a17; } }
     .stat-box.open { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
     /* Leveled Up with 5 or more: soft gold fill and a bold gold number (the blue "open" border still wins when tapped). */
     :root { --gold-bg-a: rgba(255, 208, 70, 0.22); --gold-bg-b: rgba(214, 158, 20, 0.13); --gold-num: #a87400; }
@@ -1585,7 +1587,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-69';
+    const CLIENT_BUILD = 'sync-70';
 
     let queue = [];
     let currentIndex = 0;
