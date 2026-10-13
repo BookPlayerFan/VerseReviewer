@@ -1580,7 +1580,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-71';
+    const CLIENT_BUILD = 'sync-72';
 
     let queue = [];
     let currentIndex = 0;
@@ -2368,10 +2368,16 @@
         ms = LEVELUP_MS;
         setTimeout(fadeOutLevelUp, ms - 140);
       } else {
-        animateOut();
         learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
         learningIndex = (learningIndex + 1) % learningCards.length; // loops back to the first verse
         enqueueSubmit(null, snapshot(currentIndex));
+        if (learningCards.length === 1) {
+          // Only one new verse: nothing to move on to, so the card stays put. The button dims and the badge clears.
+          isScoring = false;
+          updateTabs();
+          return;
+        }
+        animateOut();
       }
 
       const startedIn = epoch;
