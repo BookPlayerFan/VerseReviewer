@@ -909,6 +909,7 @@
     <div class="picker-head">
       <span class="picker-title" onclick="toggleDiag()">Verse List</span>
       <span class="vl-total" id="vlTotal"></span>
+      <button type="button" class="vl-iconbtn" id="vlBellBtn" onclick="enableReminders()" aria-label="Turn on reminders" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg></button>
       <button type="button" class="vl-iconbtn" id="vlSearchBtn" onclick="toggleVlSearch()" aria-label="Search verses"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
@@ -1584,7 +1585,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-84';
+    const CLIENT_BUILD = 'sync-85';
 
     let queue = [];
     let currentIndex = 0;
@@ -1632,6 +1633,17 @@
     let settleWaiters = [];
 
     const initialSession = <?!= initialSessionJson ?>;
+
+    // Reminders: the GitHub shell owns push. It tells us the state; we only show the bell until it is on.
+    function enableReminders() {
+      try { window.top.postMessage({ type: 'VR_PUSH_ENABLE' }, '*'); } catch (e) {}
+    }
+    window.addEventListener("message", function(e) {
+      const d = e.data;
+      if (!d || d.type !== "VR_PUSH_STATE") return;
+      const b = document.getElementById("vlBellBtn");
+      if (b) b.style.display = (d.supported && !d.on && !d.denied) ? "" : "none";
+    });
 
     window.onload = function() {
       attachRevealHold();
