@@ -1567,7 +1567,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-60';
+    const CLIENT_BUILD = 'sync-61';
 
     let queue = [];
     let currentIndex = 0;
@@ -2310,8 +2310,14 @@
 
     // ───────────── Scoring ─────────────
 
-    function animateOut(action) {
+    // Swiping the verse slides it away; the buttons and keyboard just fade it out in place.
+    function animateOut(action, viaSwipe) {
       const cardEl = document.getElementById("activeCard");
+      if (!viaSwipe) {
+        cardEl.style.transition = "opacity 0.12s ease-out";
+        cardEl.style.opacity = "0";
+        return;
+      }
       cardEl.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
       cardEl.style.transform = action === "Pass"
         ? "translate(350px, 30px) rotate(20deg)"
@@ -2332,7 +2338,7 @@
     }
 
     // Learning screen: "Level Up" promotes the verse to Level 1; "Next" / "Done" just move on.
-    function scoreLearning(action) {
+    function scoreLearning(action, viaSwipe) {
       if (isScoring) return;
       const card = learningCards[learningIndex];
       if (!card) return;
@@ -2356,7 +2362,7 @@
         enqueueSubmit(null, snapshot(currentIndex));
       }
 
-      animateOut(action);
+      animateOut(action, viaSwipe);
       const startedIn = epoch;
       setTimeout(function() {
         if (startedIn !== epoch) return;
@@ -2366,8 +2372,8 @@
       }, ms);
     }
 
-    function scoreCard(action) {
-      if (mode === 'learning') { scoreLearning(action); return; }
+    function scoreCard(action, viaSwipe) {
+      if (mode === 'learning') { scoreLearning(action, viaSwipe); return; }
       if (isScoring || currentIndex >= queue.length) return;
       if (action === "Fail" && !canFail()) return;
 
@@ -2387,7 +2393,7 @@
           notice.textContent = "🔄 Re-queued for repeat";
         }
         enqueueSubmit(null, snapshot(currentIndex + 1));
-        animateOut(action);
+        animateOut(action, viaSwipe);
         advanceAfter(320);
         return;
       }
@@ -2490,7 +2496,7 @@
         snapshot(currentIndex + 1)
       );
 
-      animateOut(action);
+      animateOut(action, viaSwipe);
 
       if (isFastTrackRestored) {
         showRankUp(card.group, newGroup, true);
@@ -2964,9 +2970,9 @@
         if (axis !== 'x') return; // taps and vertical scrolls never score
 
         if (deltaX > SWIPE_THRESHOLD) {
-          scoreCard("Pass");
+          scoreCard("Pass", true);
         } else if (deltaX < -SWIPE_THRESHOLD && canFail()) {
-          scoreCard("Fail");
+          scoreCard("Fail", true);
         }
         if (!isScoring) springBack();
       });
