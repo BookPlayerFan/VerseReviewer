@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-44'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-45'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -956,7 +956,9 @@ function deleteUnassignedVerse(rowIndex, reference) {
 const CONTEXT_MODEL = 'claude-sonnet-5-5'; // a cheaper, faster choice is 'claude-haiku-5-5'
 const CONTEXT_COL = 9;                     // column I on the Verses tab
 const CONTEXT_OLD_SHEET = 'Context';       // an earlier build kept answers on this tab; they are reused if it exists
-const CONTEXT_MAX_TOKENS = 2500;
+// Claude thinks before it answers and that thinking counts toward this limit, so it needs plenty of room above the ~700 tokens the note itself takes.
+// If an answer is still cut off, it is asked once more with double the room (see askClaude_).
+const CONTEXT_MAX_TOKENS = 8000;
 const CONTEXT_LAST_KEY = 'VR_CTX_LAST'; // last API problem, for troubleshooting
 
 const CONTEXT_SYSTEM = 'You are a careful Bible study helper inside a personal Scripture-memorization app. ' +
@@ -1056,8 +1058,9 @@ function saveContext_(ref, text) {
   }
 }
 
-// One call to the Anthropic Messages API. Returns { ok, text } or { ok:false, code, message }.
-function askClaude_(system, user) {
+// One call to the Anthropic Messages API. Returns { ok, text, cut } or { ok:false, code, message }.
+// cut is true when Claude ran out of room (max_tokens) before it finished, so the text stops part way.
+function callClaude_(system, user, maxTokens) {
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
   if (!key) return { ok: false, code: 'nokey', message: 'Add your API key to turn this on.' };
   let res;
@@ -1069,7 +1072,7 @@ function askClaude_(system, user) {
       headers: { 'x-api-key': String(key).trim(), 'anthropic-version': '2023-06-01' },
       payload: JSON.stringify({
         model: CONTEXT_MODEL,
-        max_tokens: CONTEXT_MAX_TOKENS,
+        max_tokens: maxTokens,
         system: system,
         messages: [{ role: 'user', content: user }]
       })
@@ -1085,7 +1088,7 @@ function askClaude_(system, user) {
   if (code >= 200 && code < 300 && json && Array.isArray(json.content)) {
     const text = json.content.filter(function(b) { return b && b.type === 'text' && b.text; })
       .map(function(b) { return b.text; }).join('\n').trim();
-    if (text) return { ok: true, text: text };
+    if (text) return { ok: true, text: text, cut: json.stop_reason === 'max_tokens' };
     const why = json.stop_details && json.stop_details.type === 'refusal' ? 'Claude declined to answer for this verse.' : 'Claude sent back an empty answer. Try again.';
     return { ok: false, code: 'empty', message: why };
   }
@@ -1101,17 +1104,41 @@ function askClaude_(system, user) {
   return { ok: false, code: 'api', message: ('Claude could not answer (' + code + (apiType ? ' ' + apiType : '') + '). ' + apiMsg).slice(0, 260) };
 }
 
+// Asks for a note. A note that was cut off is never returned or kept: it is asked again with more room, and if that is still not enough it is an error.
+function askClaude_(system, user) {
+  let ans = callClaude_(system, user, CONTEXT_MAX_TOKENS);
+  if (ans.ok && ans.cut) ans = callClaude_(system, user, CONTEXT_MAX_TOKENS * 2);
+  if (ans.ok && ans.cut) {
+    try { PropertiesService.getScriptProperties().setProperty(CONTEXT_LAST_KEY, new Date().toISOString() + ' cut off at ' + (CONTEXT_MAX_TOKENS * 2) + ' tokens'); } catch (e) {}
+    return { ok: false, code: 'long', message: 'Claude ran out of room before it finished. Tap Try again.' };
+  }
+  if (ans.ok && /[A-Za-z0-9]$/.test(ans.text)) ans.text += '.'; // finished but no closing full stop: add one so it is never mistaken for a cut-off note later
+  return ans;
+}
+
+// True for a kept note in this app's format (it starts with SUMMARY:) that stops part way: no KEY POINT, or it ends mid-sentence.
+// Notes you type yourself in column I do not start with SUMMARY:, so they are never treated as cut off.
+function contextCutOff_(text) {
+  const t = String(text || '').trim();
+  if (!/^SUMMARY\s*:/i.test(t)) return false;
+  if (!/^KEY POINT\s*:/im.test(t)) return true;
+  return !/[.!?…"'”’)\]]$/.test(t);
+}
+
 // reference/version/text come from the card. force = true asks again even if an answer is already kept.
 function getVerseContext(reference, version, text, force) {
   const ref = cleanRef_(reference);
   if (!ref) return { ok: false, code: 'bad', message: 'No verse given.' };
+  let cutKept = '';
   if (!force) {
     let kept = readContext_(ref);
     if (!kept) {
       kept = oldContext_(ref);
       if (kept) saveContext_(ref, kept); // move it to column I
     }
-    if (kept) return { ok: true, text: kept, cached: true };
+    if (kept && !contextCutOff_(kept)) return { ok: true, text: kept, cached: true };
+    // a kept note that was cut off by an earlier build is asked for again below; if that fails it is still shown rather than lost
+    cutKept = kept;
   }
   let body = String(text || '').trim();
   if (!body) {
@@ -1123,7 +1150,7 @@ function getVerseContext(reference, version, text, force) {
   body = body.slice(0, 4000);
 
   const ans = askClaude_(CONTEXT_SYSTEM, contextPrompt_(ref, cleanRef_(version), body));
-  if (!ans.ok) return ans;
+  if (!ans.ok) return cutKept ? { ok: true, text: cutKept, cached: true, partial: true } : ans;
   const kept = saveContext_(ref, ans.text);
   return { ok: true, text: ans.text, cached: false, kept: kept, model: CONTEXT_MODEL };
 }

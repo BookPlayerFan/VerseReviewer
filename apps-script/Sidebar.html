@@ -1707,7 +1707,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-128';
+    const CLIENT_BUILD = 'sync-129';
 
     let queue = [];
     let currentIndex = 0;
@@ -2211,12 +2211,19 @@
       p.appendChild(head);
       p.appendChild(ctxEl("div", "ctx-scroll"));
       grp.appendChild(p);
-      // sits right under the reference with a little caret pointing up at it, and may reach down to the bottom of the verse box (the buttons stay visible)
+      // sits right under the reference with a little caret pointing up at it, and reaches down to just above the bottom edge of the card,
+      // leaving the same gap there as it has at the sides (the Review / Level Up buttons are covered while it is open)
       const top = ref.getBoundingClientRect().bottom - grp.getBoundingClientRect().top + 12;
       p.style.top = top + "px";
-      const wrap = document.querySelector("#activeCard .verse-wrap");
-      const room = wrap ? wrap.getBoundingClientRect().bottom - (grp.getBoundingClientRect().top + top) : 360;
-      p.style.maxHeight = Math.max(220, Math.min(room, 620)) + "px";
+      const cardEl = document.getElementById("activeCard");
+      const pr = p.getBoundingClientRect();
+      if (cardEl) {
+        const cr = cardEl.getBoundingClientRect();
+        const gap = Math.max(6, Math.min(16, pr.left - cr.left));
+        p.style.maxHeight = Math.max(240, cr.bottom - gap - pr.top) + "px";
+      } else {
+        p.style.maxHeight = "560px";
+      }
       grp.classList.add("ctx-open");
       setTimeout(function() { document.addEventListener("pointerdown", onCtxOutside, true); }, 0);
 
