@@ -1588,7 +1588,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-91';
+    const CLIENT_BUILD = 'sync-92';
 
     let queue = [];
     let currentIndex = 0;
@@ -1603,6 +1603,7 @@
     let tomorrowCount = null;
     let countUpPending = false;
     let countUpToken = 0;
+    let lastCountUpSig = "";
     let undoId = null;
     let undoLabel = "";
     let undoExp = 0;
@@ -2657,7 +2658,13 @@
         // A day with reviews and no repeats gets the gold badge.
         document.getElementById("flawlessBadge").style.display = (sessionStats.reviewed > 0 && sessionStats.failed === 0) ? "block" : "none";
         updateStatLists();
-        if (countUpPending) { countUpPending = false; runCountUp(); }
+        // Count up only when the numbers actually changed; clearing a same-day repeat or evening card leaves them as they were.
+        const sig = [sessionStats.reviewed, sessionStats.passed, sessionStats.graduated, sessionStats.failed].join("|");
+        if (countUpPending) {
+          countUpPending = false;
+          if (sig !== lastCountUpSig) runCountUp();
+        }
+        lastCountUpSig = sig;
       }
     }
 
