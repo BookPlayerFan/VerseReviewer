@@ -172,6 +172,7 @@
         serviceWorkerPath: "/VerseReviewer/OneSignalSDKWorker.js",
         serviceWorkerParam: { scope: "/VerseReviewer/" },
         notifyButton: { enable: false },
+        welcomeNotification: { disable: true },
         promptOptions: { slidedown: { prompts: [] } }
       });
       try { OneSignal.User.PushSubscription.addEventListener("change", sendPushState); } catch (e) {}
