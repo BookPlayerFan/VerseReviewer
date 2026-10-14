@@ -1644,7 +1644,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-101';
+    const CLIENT_BUILD = 'sync-102';
 
     let queue = [];
     let currentIndex = 0;
@@ -3238,8 +3238,8 @@
         box.appendChild(e);
         return;
       }
-      // Verses that have waited more than 30 days go below a divider (Bible order is kept within each group).
-      const LONG_WAIT = 30;
+      // Verses that have waited more than 14 days go below a divider (Bible order is kept within each group).
+      const LONG_WAIT = 14;
       const recent = shown.filter(function(it) { return !(it.d > LONG_WAIT); });
       const old = shown.filter(function(it) { return it.d > LONG_WAIT; });
       const ordered = recent.concat(old);
@@ -3247,12 +3247,12 @@
         if (old.length && recent.length && idx === recent.length) {
           const dv = document.createElement("div");
           dv.className = "picker-divider";
-          dv.textContent = "Waiting over 30 days";
+          dv.textContent = "Waiting over 14 days";
           box.appendChild(dv);
         } else if (old.length && !recent.length && idx === 0) {
           const dv = document.createElement("div");
           dv.className = "picker-divider";
-          dv.textContent = "Waiting over 30 days";
+          dv.textContent = "Waiting over 14 days";
           box.appendChild(dv);
         }
         const b = document.createElement("button");
