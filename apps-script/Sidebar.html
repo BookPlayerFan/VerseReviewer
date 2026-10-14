@@ -553,14 +553,18 @@
       min-height: 0;
     }
 
-    .summary-header .crown-icon { font-size: 44px; margin-bottom: 6px; }
-    .summary-header h2 { font-size: 24px; margin: 0 0 6px 0; color: var(--text-primary); font-weight: 700; }
+    /* Compact header: a small icon beside the title instead of a big trophy. */
+    .sum-title-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px; }
+    .sum-ico { font-size: 22px; line-height: 1; }
+    .sum-ico.ok { width: 28px; height: 28px; border-radius: 50%; background: var(--badge-pass); color: #fff; font-size: 17px; font-weight: 900; line-height: 28px; text-align: center; flex: none; }
+    @media (prefers-color-scheme: dark) { .sum-ico.ok { color: #0b2a17; } }
+    .summary-header h2 { font-size: 22px; margin: 0; color: var(--text-primary); font-weight: 700; }
     .summary-header p { margin: 0; color: var(--text-muted); font-size: 14px; }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
       margin: 16px 0;
     }
 
@@ -877,8 +881,10 @@
     <div class="summary-card" id="summaryView" style="display: none;">
       <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Flawless day</div>
       <div class="summary-header">
-        <div class="crown-icon" id="summaryIcon">🏆</div>
-        <h2 id="summaryTitle">Review Complete!</h2>
+        <div class="sum-title-row">
+          <span class="sum-ico ok" id="summaryIcon">\u2713</span>
+          <h2 id="summaryTitle">Review Complete!</h2>
+        </div>
         <p id="summarySubtitle">You have finished all verses scheduled for today.</p>
       </div>
 
@@ -886,10 +892,6 @@
         <div class="stat-box">
           <div class="stat-val" id="statReviewed">0</div>
           <div class="stat-lbl">Reviewed</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val val-pass" id="statPassed">0</div>
-          <div class="stat-lbl">Flawless</div>
         </div>
         <div class="stat-box" id="statGradBox" onclick="toggleStatList('grad')">
           <div class="stat-val val-grad" id="statGraduated">0</div>
@@ -1596,7 +1598,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-97';
+    const CLIENT_BUILD = 'sync-98';
 
     let queue = [];
     let currentIndex = 0;
@@ -1795,6 +1797,7 @@
       document.getElementById("summaryView").style.display = "flex";
       document.getElementById("sessionProgressFill").style.width = "0%";
       document.getElementById("summaryIcon").textContent = "⚠️";
+      document.getElementById("summaryIcon").className = "sum-ico";
       document.getElementById("summaryTitle").textContent = "Couldn't Load Cards";
       document.getElementById("summarySubtitle").textContent = msg;
       document.getElementById("summaryStats").style.display = "none";
@@ -2650,18 +2653,19 @@
       document.getElementById("flawlessBadge").style.display = "none";
       if (totalCardsProcessed === 0) {
         document.getElementById("summaryIcon").textContent = "✨";
+        document.getElementById("summaryIcon").className = "sum-ico";
         document.getElementById("summaryTitle").textContent = "All Caught Up!";
         document.getElementById("summarySubtitle").textContent = "No verses are due for review right now.";
         document.getElementById("summaryStats").style.display = "none";
         updateStatLists();
       } else {
-        document.getElementById("summaryIcon").textContent = "🏆";
+        document.getElementById("summaryIcon").textContent = "\u2713";
+        document.getElementById("summaryIcon").className = "sum-ico ok";
         document.getElementById("summaryTitle").textContent = "Review Complete!";
         document.getElementById("summarySubtitle").textContent = "You have finished all verses scheduled for today.";
         document.getElementById("summaryStats").style.display = "grid";
 
         document.getElementById("statReviewed").textContent = sessionStats.reviewed;
-        document.getElementById("statPassed").textContent = sessionStats.passed;
         document.getElementById("statGraduated").textContent = sessionStats.graduated;
         document.getElementById("statGradBox").classList.toggle("gold", sessionStats.graduated >= 7);
         document.getElementById("statFailed").textContent = sessionStats.failed;
@@ -2692,7 +2696,7 @@
 
     function runCountUp() {
       const items = [
-        ["statReviewed", sessionStats.reviewed], ["statPassed", sessionStats.passed],
+        ["statReviewed", sessionStats.reviewed],
         ["statGraduated", sessionStats.graduated], ["statFailed", sessionStats.failed]
       ];
       const gold = document.getElementById("statGradBox");
