@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-40'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-41'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -916,6 +916,33 @@ function addChosenVerse(rowIndex, reference) {
     }
     sheet.getRange(row, 2, 1, 4).setValues([["", today_(), 1, 0]]);
     return { success: true, reference: want, rowIndex: row };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Removes a verse that has no level yet (still in the Choose a verse list) from the Verses tab.
+// Started verses (Level 0 and up) are never deleted here. Rows are matched by reference, like everywhere else.
+function deleteUnassignedVerse(rowIndex, reference) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+    if (!sheet) return { success: false, message: 'Sheet "Verses" not found.' };
+    const want = cleanRef_(reference);
+    if (!want) return { success: false, message: 'No verse given.' };
+    let row = Number(rowIndex);
+    const lastRow = sheet.getLastRow();
+    if (!(row >= 2 && row <= lastRow) || cleanRef_(sheet.getRange(row, 6).getValue()) !== want) {
+      row = findRowByRef_(sheet, want);
+    }
+    if (!row) return { success: false, message: 'That verse is no longer in the sheet.' };
+    const g = sheet.getRange(row, 5).getValue();
+    if (!(g === '' || g === null || g === undefined)) {
+      return { success: false, message: 'That verse has already been started, so it was not deleted.' };
+    }
+    sheet.deleteRow(row);
+    return { success: true, reference: want };
   } finally {
     lock.releaseLock();
   }

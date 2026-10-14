@@ -267,7 +267,7 @@
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
     #verseListView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
-    .vl-verse.lp-down { background: var(--btn-restart-bg); }
+    .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
@@ -786,6 +786,7 @@
     .pv-btns button { flex: 1; min-height: 0; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; flex-direction: row; justify-content: center; }
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
+    .pv-del { background: var(--btn-fail-bg); color: var(--btn-fail-text); }
     /* Hold the reference: tiny undo menu */
     .ref-header { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
     .ref-header { position: relative; isolation: isolate; }
@@ -981,8 +982,10 @@
     <div class="pv-card">
       <div class="pv-head"><span id="pvRef"></span><span class="version-badge" id="pvVer" style="display:none"></span></div>
       <div class="pv-text" id="pvText"></div>
+      <div class="pp-note" id="pvNote"></div>
       <div class="pv-btns">
         <button type="button" class="pv-close" onclick="closePreview()">Close</button>
+        <button type="button" class="pv-del" id="pvDel" style="display:none"></button>
         <button type="button" class="pv-add" id="pvAdd">Add</button>
       </div>
     </div>
@@ -1663,7 +1666,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-119';
+    const CLIENT_BUILD = 'sync-120';
 
     let queue = [];
     let currentIndex = 0;
@@ -3179,7 +3182,8 @@
     // "Paste verse": the paste box opens right away (so the keyboard and iPhone's Paste bubble work, as they did
     // originally), and in the background we try to read the clipboard for you. If that works, the box is skipped
     // and the popup shows the verse it understood.
-    let AUTO_CLIP_READ = true;
+    // Automatic clipboard reading is off for now: iPhone blocks it inside the app frame.
+    let AUTO_CLIP_READ = false;
     function startPaste() {
       openPaste();
       if (!AUTO_CLIP_READ || pasteReading) return;
@@ -3348,7 +3352,8 @@
         b.type = "button";
         b.className = "picker-item";
         b.textContent = it.f;
-        b.onclick = function() { showPreview(it); };
+        const heldItem = attachLongPress(b, function() { showPreview(it, true, true); });
+        b.onclick = function() { if (heldItem()) return; showPreview(it); };
         box.appendChild(b);
       });
     }
@@ -3378,12 +3383,53 @@
       }
     }
 
-    function showPreview(it, noAdd) {
+    // mode "delete" (press and hold in the Choose a verse list): the popup offers Delete instead of Add.
+    function showPreview(it, noAdd, canDelete) {
       fillVersePopup("pvRef", "pvVer", "pvText", it, false);
       const addBtn = document.getElementById("pvAdd");
-      addBtn.style.display = noAdd ? "none" : "";
+      addBtn.style.display = (noAdd || canDelete) ? "none" : "";
       addBtn.onclick = function() { closePreview(); chooseVerse(it); };
+      const del = document.getElementById("pvDel"), note = document.getElementById("pvNote");
+      note.textContent = ""; note.className = "pp-note";
+      del.disabled = false;
+      if (canDelete) {
+        let armed = false;
+        del.style.display = "";
+        del.textContent = "Delete";
+        del.onclick = function() {
+          if (!armed) { // first tap asks, second tap deletes
+            armed = true; del.textContent = "Tap again to delete";
+            note.textContent = "This removes " + it.f + " from your Google Sheet.";
+            return;
+          }
+          deletePickerVerse(it, del, note);
+        };
+      } else {
+        del.style.display = "none"; del.onclick = null;
+      }
       document.getElementById("pickerPreview").classList.add("open");
+    }
+
+    function deletePickerVerse(it, del, note) {
+      del.disabled = true; del.textContent = "Deleting…";
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            closePreview();
+            pickerItems = pickerItems.filter(function(x) { return x.f !== it.f; });
+            renderPicker();
+          } else {
+            del.disabled = false; del.textContent = "Delete";
+            note.textContent = (res && res.message) ? res.message : "Couldn't delete that verse.";
+            note.className = "pp-note bad";
+          }
+        })
+        .withFailureHandler(function(err) {
+          del.disabled = false; del.textContent = "Delete";
+          note.textContent = "Couldn't delete: " + ((err && err.message) || err);
+          note.className = "pp-note bad";
+        })
+        .deleteUnassignedVerse(it.r, it.f);
     }
 
     function closePreview() {
