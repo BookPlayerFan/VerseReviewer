@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-37'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-38'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -1205,13 +1205,13 @@ function installDailyPush() {
 
 // Run from the editor to check the connection. View -> Logs shows the answer.
 function testPush() {
-  const r = osSend_('Verse Review', 'Test reminder: push is working.', 0, 'vr-test');
+  const r = osSend_('Test notification', 'Push is working.', 0, 'vr-test');
   console.log('ok=' + r.ok + ' code=' + r.code + ' ' + r.text);
 }
 
 // Called by the app (Verse List title -> "Send test notification").
 function sendTestPush() {
-  const r = osSend_('Verse Review', 'Test reminder: push is working.', 0, 'vr-test');
+  const r = osSend_('Test notification', 'Push is working.', 0, 'vr-test');
   let msg = '';
   if (!r.ok) {
     msg = (r.text || '').slice(0, 120);
