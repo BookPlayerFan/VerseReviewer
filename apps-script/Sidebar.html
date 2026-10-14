@@ -689,7 +689,7 @@
       60%  { opacity: 1; transform: translateX(-50%) scale(1.14); }
       100% { opacity: 1; transform: translateX(-50%) scale(1); }
     }
-    .summary-card.top { justify-content: flex-start; padding-top: clamp(36px, 11vh, 110px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .summary-card.top { justify-content: flex-start; padding-top: clamp(84px, 21vh, 170px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .tomorrow-note {
       position: absolute;
       left: 0;
@@ -895,7 +895,7 @@
 
     <div class="summary-card" id="summaryView" style="display: none;">
       <div class="summary-header">
-        <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Flawless day</div>
+        <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Perfect Day</div>
         <div class="sum-title-row">
           <span class="sum-ico ok" id="summaryIcon">\u2713</span>
           <h2 id="summaryTitle">Review Complete!</h2>
@@ -1651,7 +1651,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-109';
+    const CLIENT_BUILD = 'sync-110';
 
     let queue = [];
     let currentIndex = 0;
@@ -2766,7 +2766,7 @@
     }
 
     // When you finish the deck, the four numbers count up one after another (once; reopening the app shows them straight away).
-    // Gold "Flawless day" badge: reviewed something and no repeats. animate = pop in like a badge earned.
+    // Gold "Perfect Day" badge: reviewed something and no repeats. animate = pop in like a badge earned.
     function showFlawlessBadge(animate) {
       const el = document.getElementById("flawlessBadge");
       el.classList.remove("pop");
