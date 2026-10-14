@@ -1654,7 +1654,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-111';
+    const CLIENT_BUILD = 'sync-112';
 
     let queue = [];
     let currentIndex = 0;
@@ -1770,9 +1770,25 @@
 
     window.addEventListener("message", function(e) {
       const d = e.data;
-      if (!d || d.type !== "VR_EARLY" || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
-      applyEarly(d);
+      if (!d || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
+      if (d.type === "VR_EARLY") applyEarly(d);
+      else if (d.type === "VR_CLIP_TEXT" && clipWait && d.id === clipWait.id) {
+        const w = clipWait; clipWait = null; clearTimeout(w.timer);
+        if (d.ok) w.resolve(String(d.text || "")); else w.reject(new Error(d.error || "blocked"));
+      }
     });
+
+    // The Apps Script frame usually isn't allowed to read the clipboard, but the GitHub shell page around it is,
+    // and your tap counts for it too. So we ask the shell to read it and send the text back.
+    let clipWait = null, clipSeq = 0;
+    function readClipViaShell() {
+      return new Promise(function(resolve, reject) {
+        if (window.top === window) { reject(new Error("no shell")); return; }
+        const id = ++clipSeq;
+        clipWait = { id: id, resolve: resolve, reject: reject, timer: setTimeout(function() { if (clipWait && clipWait.id === id) { clipWait = null; reject(new Error("timeout")); } }, 15000) };
+        try { window.top.postMessage({ type: "VR_CLIP_READ", id: id }, "*"); } catch (e) { clipWait = null; reject(e); }
+      });
+    }
 
     function notifyReady() {
       // Apps Script nests this page in its own wrapper iframe, so the PWA shell is window.top.
@@ -3147,9 +3163,10 @@
     // "Paste verse": take what is on the clipboard, or fall back to the paste box.
     function startPaste() {
       if (pasteReading) return;
-      let cb = null;
-      try { cb = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { cb = null; }
-      if (!cb) { openPaste(); return; }
+      let direct = null;
+      try { direct = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { direct = null; }
+      // direct read first; if this frame isn't allowed, ask the shell page to read it instead
+      const cb = direct ? direct.catch(function() { return readClipViaShell(); }) : readClipViaShell();
       pasteReading = true;
       // iPhone can leave the clipboard request waiting on a tiny "Paste" bubble (or never answer inside the app frame).
       // If nothing comes back quickly, open the paste box so the button never feels dead.
