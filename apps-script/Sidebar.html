@@ -672,9 +672,10 @@
 
     /* Tiny muted line pinned to the bottom of the Review Complete card. */
     .summary-card { position: relative; }
+    .summary-header { position: relative; }
     /* Content starts near the top so opening the Repeats / Leveled Up list doesn't move the boxes. */
     /* Gold badge floating at the top of the card on a day with no repeats; it doesn't move anything. */
-    .flawless-badge { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+    .flawless-badge { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
       padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.9px; text-transform: uppercase;
       color: #b88a00; border: 1px solid rgba(184, 138, 0, 0.45);
       background: linear-gradient(110deg, rgba(184, 138, 0, 0.12) 30%, rgba(255, 215, 90, 0.45) 50%, rgba(184, 138, 0, 0.12) 70%); }
@@ -893,8 +894,8 @@
     </div>
 
     <div class="summary-card" id="summaryView" style="display: none;">
-      <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Flawless day</div>
       <div class="summary-header">
+        <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Flawless day</div>
         <div class="sum-title-row">
           <span class="sum-ico ok" id="summaryIcon">\u2713</span>
           <h2 id="summaryTitle">Review Complete!</h2>
@@ -1650,7 +1651,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-105';
+    const CLIENT_BUILD = 'sync-106';
 
     let queue = [];
     let currentIndex = 0;
