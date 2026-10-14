@@ -461,6 +461,18 @@
       display: inline-block;
     }
 
+    /* phrase letter (a, b, c...) in front of a revealed phrase of a split verse */
+    .p-let {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      color: var(--text-meta);
+      vertical-align: super;
+      margin: 0 1px 0 0;
+      user-select: none;
+    }
+
     .v-text {
       border-radius: 4px;
       padding: 2px 4px;
@@ -1666,7 +1678,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-123';
+    const CLIENT_BUILD = 'sync-124';
 
     let queue = [];
     let currentIndex = 0;
@@ -1752,7 +1764,7 @@
         const cards = learningCards.slice(0, 40).map(function(c) {
           return {
             f: c.reference, v: c.version || "", day: c.day || 0,
-            segs: parseVerseSegments(c.text, c.reference).map(function(s) { return { n: s.num, t: s.text }; })
+            segs: buildUnits(parseVerseSegments(c.text, c.reference), true).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
           };
         });
         const sig = JSON.stringify(cards);
@@ -1770,7 +1782,7 @@
           learningIndex = at >= 0 ? at : 0;
           render();
           const shown = Array.isArray(d.revealed) ? d.revealed : [];
-          if (at >= 0 && shown.length && parsedSegments.length) {
+          if (at >= 0 && shown.length && parsedSegments.length && (typeof d.n !== 'number' || d.n === parsedSegments.length)) {
             segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; });
             syncFlipState();
             renderCardBody();
@@ -2183,6 +2195,95 @@
       return segments;
     }
 
+    // ── Phrase splitting (New tab) ──
+    // A numbered verse longer than PHRASE_CAP words is cut into phrases so you can learn it a piece at a time.
+    // Aim is about PHRASE_TARGET words per phrase; up to PHRASE_CAP (20% more) is allowed when it gives a cleaner break.
+    // Breaks go where the sentence naturally pauses: sentence ends first, then ; : dashes, then a comma before
+    // and / but / that / who ..., and plain commas last. Lists ("faith, hope, and love") are kept together.
+    const PHRASE_TARGET = 20, PHRASE_CAP = 24, PHRASE_MIN = 5;
+    const PHRASE_CONJ = /^(and|but|for|so|yet|or|nor|that|because|who|whom|whose|which|when|while|if|though|although|since|until|unless|whether|as|then|therefore|thus|lest|where|whoever|whatever|whenever|wherever)$/;
+
+    function splitPhrases(text) {
+      const whole = String(text || "").trim();
+      // words; an em dash with no spaces ("authorities\u2014all") is a possible break, so it is cut there and glued back after
+      const words = [], glue = [];
+      whole.split(/\s+/).filter(Boolean).forEach(function(tok) {
+        const parts = tok.match(/[^\u2014]+\u2014?|\u2014/g) || [tok];
+        parts.forEach(function(p, k) { words.push(p); glue.push(k > 0); });
+      });
+      const n = words.length;
+      if (n <= PHRASE_CAP) return [whole];
+
+      const core = function(w) { return w.replace(/[”"’')\]]+$/, ""); };           // word without closing quotes
+      const bare = function(w) { return w.replace(/^[“"‘'(\[]+/, "").replace(/[^A-Za-z']+$/, "").toLowerCase(); };
+      const punct = words.map(function(w) { return /[,;:.!?—–]$/.test(core(w)); });
+      const itemLen = new Array(n).fill(0);   // words since the previous punctuation (for spotting lists)
+      let last = -1;
+      for (let i = 0; i < n; i++) { if (punct[i]) { itemLen[i] = i - last; last = i; } }
+
+      function isListComma(i) {
+        if (itemLen[i] > 3) return false;
+        const p = i - itemLen[i];
+        if (p >= 0 && /,$/.test(core(words[p])) && itemLen[p] <= 3) return true;   // second short item in a row
+        let j = i + 1; while (j < n && !punct[j]) j++;
+        return j < n && (j - i) <= 3 && /,$/.test(core(words[j]));                  // next item is short and a comma item too
+      }
+      function firmAfter(i) { return i < 0 || i >= n - 1 || /[.!?;]$/.test(core(words[i])); }
+      // cost of ending a phrase after word i
+      function breakCost(i) {
+        const w = core(words[i]), next = bare(words[i + 1]);
+        if (/[.!?;]$/.test(w)) return 0;
+        if (/[:—–]$/.test(w)) return 0.5;
+        if (/,$/.test(w)) return isListComma(i) ? 4 : (PHRASE_CONJ.test(next) ? 0.3 : 1);
+        return PHRASE_CONJ.test(next) ? 3 : 5;                                          // no pause here: last resort
+      }
+      const sentEnd = words.map(function(w) { return /[.!?]$/.test(core(w)) ? 1 : 0; });
+      const sentSum = [0]; for (let i = 0; i < n; i++) sentSum.push(sentSum[i] + sentEnd[i]);
+      function pieceCost(from, to) {   // words from..to-1
+        const L = to - from;
+        let c = 1;                                                                       // each extra phrase costs a little
+        c += sentSum[to - 1] - sentSum[from];                                            // a phrase running across a sentence end
+        if (L > PHRASE_TARGET) c += (L - PHRASE_TARGET) * 0.2;
+        if (L < 8) c += (8 - L) * 0.5;
+        if (L < PHRASE_MIN && !(firmAfter(from - 1) && firmAfter(to - 1))) c += 3;       // very short bit that isn't a whole sentence
+        c += Math.pow((L - 16) / 16, 2) * 0.6;                                           // gentle pull toward even sizes
+        return c;
+      }
+
+      const best = new Array(n + 1).fill(Infinity), from = new Array(n + 1).fill(0);
+      best[0] = 0;
+      for (let j = 1; j <= n; j++) {
+        for (let i = Math.max(0, j - PHRASE_CAP); i < j; i++) {
+          if (best[i] === Infinity) continue;
+          const c = best[i] + pieceCost(i, j) + (j < n ? breakCost(j - 1) : 0);
+          if (c < best[j]) { best[j] = c; from[j] = i; }
+        }
+      }
+      const cuts = [];
+      for (let j = n; j > 0; j = from[j]) cuts.unshift([from[j], j]);
+      return cuts.map(function(c) {
+        let t = "";
+        for (let i = c[0]; i < c[1]; i++) t += (i > c[0] && !glue[i] ? " " : "") + words[i];
+        return t;
+      });
+    }
+
+    // Flatten verses into the pieces that are shown and revealed. New tab: long verses split into phrases (a, b, c...).
+    // Review tab: one piece per verse. Only the first piece of a verse carries the verse number.
+    function buildUnits(segs, split) {
+      const units = [];
+      segs.forEach(function(s, vi) {
+        const parts = split ? splitPhrases(s.text) : [s.text];
+        parts.forEach(function(t, k) {
+          units.push({
+            num: k === 0 ? s.num : "", text: t, vi: vi,
+            letter: parts.length > 1 ? String.fromCharCode(97 + k) : ""
+          });
+        });
+      });
+      return units;
+    }
+
     function escapeHtml(str) {
       if (!str) return "";
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2275,7 +2376,7 @@
       summaryEl.style.display = "none";
 
       isFlipped = false;
-      parsedSegments = parseVerseSegments(card.text, card.reference);
+      parsedSegments = buildUnits(parseVerseSegments(card.text, card.reference), true);   // New tab: long verses split into phrases
       segmentStates = parsedSegments.map(() => 'hidden');
 
       cardEl.style.transition = "";
@@ -2353,7 +2454,7 @@
       const card = queue[currentIndex];
       isFlipped = false;
 
-      parsedSegments = parseVerseSegments(card.text, card.reference);
+      parsedSegments = buildUnits(parseVerseSegments(card.text, card.reference), false);   // Review tab: whole verses
       segmentStates = parsedSegments.map(() => 'hidden');
 
       cardEl.style.transition = "";
@@ -2441,9 +2542,10 @@
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
+        // phrases of a split verse show a small grey letter (a, b, c...) once they are revealed
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
-            ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}
+            ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter && isRev ? `<span class="p-let">${seg.letter}</span>` : ''}
             <span class="v-text ${isRev ? 'revealed' : 'blurred'}">${escapeHtml(seg.text)}</span>
           </span>
         `;
@@ -2474,7 +2576,14 @@
       // (The New tab keeps tap-a-verse-to-toggle.)
       if (mode !== 'learning') { handleContainerClick(event); return; }
 
-      segmentStates[index] = segmentStates[index] === 'revealed' ? 'hidden' : 'revealed';
+      // New tab: tapping a verse shows its next hidden phrase (the whole verse if it has no phrases);
+      // tapping a verse that is fully showing hides all of it again.
+      const vi = parsedSegments[index].vi;
+      const mine = [];
+      parsedSegments.forEach(function(u, i) { if (u.vi === vi) mine.push(i); });
+      const nextHidden = mine.find(function(i) { return segmentStates[i] === 'hidden'; });
+      if (nextHidden !== undefined) segmentStates[nextHidden] = 'revealed';
+      else mine.forEach(function(i) { segmentStates[i] = 'hidden'; });
       syncFlipState();
       renderCardBody();
     }
