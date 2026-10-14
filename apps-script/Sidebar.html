@@ -759,7 +759,7 @@
     .pv-card .paste-area { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
     /* the paste box must accept typing and the iPhone Paste bubble, whatever the page-wide no-select rules say */
     textarea, input { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
-    .pv-card #pasteText, body.lp-active #pasteText { -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; -webkit-user-modify: read-write-plaintext-only; touch-action: manipulation; pointer-events: auto; }
+    .pv-card #pasteText, body.lp-active #pasteText { -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; }
     .paste-area:focus { border-color: var(--text-accent); }
     .pp-note { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
     .pp-note.bad { color: var(--badge-fail); }
@@ -1007,6 +1007,7 @@
       <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
         placeholder="Paste a verse here (reference + text), or type it:&#10;Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="updatePasteHint()" onpaste="pasteLanded()"></textarea>
       <div class="paste-hint" id="pasteHint"></div>
+      <div class="paste-hint" id="pasteDiag" style="display:none"></div>
       <div class="pv-btns">
         <button type="button" class="pv-close" onclick="closePaste()">Cancel</button>
         <button type="button" class="pv-add" id="pasteAdd" onclick="submitPaste()">Add</button>
@@ -1654,7 +1655,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-114';
+    const CLIENT_BUILD = 'sync-115';
 
     let queue = [];
     let currentIndex = 0;
@@ -3152,6 +3153,7 @@
       hint.className = note ? "paste-hint bad" : "paste-hint";
       document.getElementById("pasteAdd").disabled = false;
       document.getElementById("pasteModal").classList.add("open");
+      try { window.refreshPasteDiag(); } catch (e) {}
       if (prefill) updatePasteHint();
       setTimeout(function() { try { document.getElementById("pasteText").focus(); } catch (e) {} }, 50);
     }
@@ -3241,6 +3243,29 @@
         }
       });
     }
+
+    // Tiny readout (only while the Verse List title status line is open) to see what the phone does with the box.
+    (function() {
+      const c = { focus: 0, touch: 0, input: 0, paste: 0, sel: 0, ro: 0 };
+      function show() {
+        const el = document.getElementById("pasteDiag"), t = document.getElementById("pasteText");
+        if (!el || !t) return;
+        el.style.display = (typeof diagOn !== "undefined" && diagOn) ? "block" : "none";
+        el.textContent = "focus " + c.focus + " · touch " + c.touch + " · typed " + c.input + " · paste " + c.paste + " · sel " + c.sel +
+          " · " + (t.readOnly ? "read-only" : "editable") + " · select=" + (getComputedStyle(t).webkitUserSelect || getComputedStyle(t).userSelect);
+      }
+      function wire() {
+        const t = document.getElementById("pasteText");
+        if (!t) return;
+        t.addEventListener("focus", function() { c.focus++; show(); });
+        t.addEventListener("touchstart", function() { c.touch++; show(); }, { passive: true });
+        t.addEventListener("input", function() { c.input++; show(); });
+        t.addEventListener("paste", function() { c.paste++; show(); });
+        document.addEventListener("selectionchange", function() { if (document.activeElement === t) { c.sel++; show(); } });
+      }
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
+      window.refreshPasteDiag = show;
+    })();
 
     function updatePasteHint() {
       const el = document.getElementById("pasteHint");
