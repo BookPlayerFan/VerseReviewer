@@ -492,6 +492,18 @@
       background-color: transparent;
     }
 
+    /* Hold a hidden phrase (New tab): its first letters show in blue, in the exact spot they will have once it is revealed.
+       The rest of each word keeps its width but is invisible, so the verse does not change size or shift when it is revealed. */
+    .v-text.hinted {
+      filter: none;
+      opacity: 1;
+      background-color: transparent;
+      color: var(--text-accent);
+      user-select: none;
+    }
+    .v-text.hinted .hz { color: transparent; }
+    .v-text.hinted .hl { -webkit-text-stroke: 0.35px currentColor; } /* a touch heavier without changing the letter's width */
+
     .notice {
       font-size: 13px;
       text-align: center;
@@ -1708,7 +1720,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-130';
+    const CLIENT_BUILD = 'sync-131';
 
     let queue = [];
     let currentIndex = 0;
@@ -1733,6 +1745,7 @@
 
     let parsedSegments = [];
     let segmentStates = [];
+    let hintSet = {};   // New tab: index of a hidden phrase -> true while its first letters are showing (not a reveal, never saved)
 
     // Today's session. The server is the source of truth so every device shows the same session.
     let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
@@ -2535,6 +2548,7 @@
       isFlipped = false;
       parsedSegments = buildUnits(parseVerseSegments(card.text, card.reference), true);   // New tab: long verses split into phrases
       segmentStates = parsedSegments.map(() => 'hidden');
+      hintSet = {};
 
       cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
@@ -2605,6 +2619,7 @@
 
       parsedSegments = buildUnits(parseVerseSegments(card.text, card.reference), false);   // Review tab: whole verses
       segmentStates = parsedSegments.map(() => 'hidden');
+      hintSet = {};
 
       cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
@@ -2671,19 +2686,22 @@
       const body = document.getElementById("cardBody");
       const revealedCount = segmentStates.filter(s => s === 'revealed').length;
       const allRevealed = revealedCount === parsedSegments.length;
+      const isNew = mode === 'learning';
 
       let html = '';
 
       if (parsedSegments.length > 1) {
+        // New tab: holding a verse gives a hint; there is no reveal-all there. Review tab: hold reveals everything.
+        const more = allRevealed ? '' : (isNew ? ' \u00B7 hold a verse for a hint' : ' \u00B7 hold to reveal all');
         html += `
           <div class="passage-toolbar">
-            <span class="passage-status">${revealedCount} of ${parsedSegments.length} revealed${allRevealed ? '' : ' \u00B7 hold to reveal all'}</span>
+            <span class="passage-status">${revealedCount} of ${parsedSegments.length} revealed${more}</span>
           </div>
         `;
       } else {
         html += `
           <div class="passage-toolbar">
-            <span class="passage-status">${allRevealed ? 'Revealed' : 'Tap to reveal'}</span>
+            <span class="passage-status">${allRevealed ? 'Revealed' : (isNew ? 'Tap to reveal \u00B7 hold for a hint' : 'Tap to reveal')}</span>
           </div>
         `;
       }
@@ -2691,11 +2709,13 @@
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
+        if (isRev) delete hintSet[idx];
+        const isHint = isNew && !isRev && hintSet[idx];
         // phrases of a split verse show a small grey letter (a, b, c...) once they are revealed
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
             ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter && isRev ? `<span class="p-let">${seg.letter}</span>` : ''}
-            <span class="v-text ${isRev ? 'revealed' : 'blurred'}">${escapeHtml(seg.text)}</span>
+            <span class="v-text ${isRev ? 'revealed' : (isHint ? 'hinted' : 'blurred')}">${isHint ? hintMarkup(seg.text) : escapeHtml(seg.text)}</span>
           </span>
         `;
       });
@@ -2704,12 +2724,39 @@
       body.innerHTML = html;
     }
 
-    // Press and hold anywhere in the verse box to reveal everything (hold again to hide it all).
+    // First letter of every word in blue, in place; the rest of the word is there but invisible, so nothing changes size or moves.
+    function hintMarkup(text) {
+      return String(text || "").split(/(\s+)/).map(function(w) {
+        if (!w || /^\s+$/.test(w)) return w;
+        const m = w.match(/^([^A-Za-z0-9]*)([A-Za-z0-9])([\s\S]*)$/);
+        if (!m) return '<span class="hz">' + escapeHtml(w) + '</span>';
+        return escapeHtml(m[1]) + '<span class="hl">' + escapeHtml(m[2]) + '</span><span class="hz">' + escapeHtml(m[3]) + '</span>';
+      }).join("");
+    }
+
+    // New tab: hold a verse to show (or hide) the first letters of the phrase a tap there would reveal next. A hint is not a reveal.
+    function toggleHint(e) {
+      if (isScoring || mode !== 'learning') return;
+      const u = e && e.target && e.target.closest ? e.target.closest(".verse-unit") : null;
+      let target = -1;
+      if (u) {
+        const vi = parsedSegments[+u.getAttribute("data-idx")].vi;
+        target = parsedSegments.findIndex(function(x, i) { return x.vi === vi && segmentStates[i] === 'hidden'; });
+      } else {
+        target = segmentStates.findIndex(function(s) { return s === 'hidden'; });
+      }
+      if (target < 0) return;
+      if (hintSet[target]) delete hintSet[target]; else hintSet[target] = true;
+      renderCardBody();
+    }
+
+    // Press and hold in the verse box. New tab: a hint for that verse. Review tab: reveal everything (hold again to hide it all).
     let heldBody = null;
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
-      heldBody = attachLongPress(body, function() {
+      heldBody = attachLongPress(body, function(e) {
         if (isScoring || !hasActiveCard()) return;
+        if (mode === 'learning') { toggleHint(e); return; }
         toggleRevealAll();
       }, function(e) { return !e.target.closest("button"); });
       // the click that ends a hold must not also reveal or hide a piece
