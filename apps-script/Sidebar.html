@@ -1590,7 +1590,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-95';
+    const CLIENT_BUILD = 'sync-96';
 
     let queue = [];
     let currentIndex = 0;
@@ -2160,6 +2160,7 @@
       document.getElementById("summaryTitle").textContent = "No New Verse";
       document.getElementById("summarySubtitle").textContent = "Would you like to add a new verse?";
       document.getElementById("summaryStats").style.display = "none";
+      updateStatLists(); // an open Repeats / Leveled Up list from the Review screen must not follow you here
       setSummaryButtons(true, false);
       renderTomorrowNote();
     }
@@ -2646,6 +2647,7 @@
         document.getElementById("summaryTitle").textContent = "All Caught Up!";
         document.getElementById("summarySubtitle").textContent = "No verses are due for review right now.";
         document.getElementById("summaryStats").style.display = "none";
+        updateStatLists();
       } else {
         document.getElementById("summaryIcon").textContent = "🏆";
         document.getElementById("summaryTitle").textContent = "Review Complete!";
