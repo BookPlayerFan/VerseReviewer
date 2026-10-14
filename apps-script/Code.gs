@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-35'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-36'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -300,10 +300,11 @@ function writeState_(s) {
 
 // ── Evening practice card ──
 // After the first review of a Bronze verse (Level 1, rep 1) is passed, one extra practice card is held
-// back and added to the deck later that day: at 5 pm, or an hour after the pass if that is already past 5 pm.
+// back and added to the deck later that day: at 6 pm, or an hour after the pass if that is already past 6 pm.
+// A push goes out when the card appears (scheduleEveningPush_), unless that would be 10 pm or later.
 // It behaves like a same-day repeat: never written to the sheet, no rep, no demotion.
 const LATER_KEY = 'VR_LATER_AT'; // earliest release time (ms), so polling only needs one tiny read
-const LATER_HOUR = 17;
+const LATER_HOUR = 18;
 const LATER_DELAY_MS = 60 * 60 * 1000;
 
 function nowMs_() { return Date.now(); }
@@ -786,6 +787,7 @@ function submitReview(expectedVersion, review, next) {
         s.later = (Array.isArray(s.later) ? s.later : []).filter(function(e) { return e.f !== written.f; });
         s.later.push({ r: written.r, f: written.f, at: at });
         laterRef = written.f;
+        scheduleEveningPush_(written.f, at);
       }
     }
 
@@ -850,6 +852,7 @@ function undoLast(undoId) {
     unlogEvent_(u.log);
     if (u.tryRef && s.tries && s.tries[u.tryRef]) s.tries[u.tryRef]--;
     if (u.later && Array.isArray(s.later)) s.later = s.later.filter(function(e) { return e.f !== u.later; });
+    if (u.later) cancelSnoozePush_('evening:' + u.later);
 
     for (let i = 0; i < u.pushed; i++) s.queue.pop();
     s.currentIndex = u.idx;
@@ -1208,4 +1211,20 @@ function sendTestPush() {
     if (/subscribed|recipients/i.test(msg)) msg = 'no subscribed device';
   }
   return { ok: !!r.ok, message: msg };
+}
+
+// Push for the evening practice card, scheduled for the moment it joins the deck.
+function scheduleEveningPush_(ref, atMs) {
+  try {
+    const hour = Number(Utilities.formatDate(new Date(atMs), Session.getScriptTimeZone(), 'H'));
+    if (hour >= 22 || hour < 5) return; // too late at night; the card is still waiting in the app
+    const key = 'evening:' + ref;
+    cancelSnoozePush_(key);
+    const r = osSend_('Evening review', ref + ' is ready for its evening review.', atMs, 'vr-eve-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'review');
+    if (r.ok && r.json && r.json.id) {
+      const map = pendingPush_();
+      map[key] = r.json.id;
+      setPendingPush_(map);
+    }
+  } catch (e) { console.error('scheduleEveningPush_ failed: ' + e); }
 }

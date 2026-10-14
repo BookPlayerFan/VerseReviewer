@@ -17,7 +17,7 @@ self.addEventListener("notificationclick", function(event) {
     var n = event.notification, tab = findKey(n && n.data, "vrgo", 0);
     if (!tab && n && n.tag) {
       if (/^vr-new-/.test(n.tag)) tab = "new";
-      else if (n.tag === "vr-daily") tab = "review";
+      else if (n.tag === "vr-daily" || /^vr-eve-/.test(n.tag)) tab = "review";
     }
     if (tab !== "new" && tab !== "review") return;
     event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(list) {
