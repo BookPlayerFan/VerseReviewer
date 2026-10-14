@@ -1651,7 +1651,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-106';
+    const CLIENT_BUILD = 'sync-107';
 
     let queue = [];
     let currentIndex = 0;
@@ -1854,6 +1854,7 @@
       document.getElementById("summaryTitle").textContent = "Couldn't Load Cards";
       document.getElementById("summarySubtitle").textContent = msg;
       document.getElementById("summaryStats").style.display = "none";
+      document.getElementById("flawlessBadge").style.display = "none";
       document.getElementById("summaryIcon").style.display = "";
       setSummaryButtons(false, true);
       renderTomorrowNote();
@@ -2222,6 +2223,8 @@
       document.getElementById("summaryTitle").textContent = "No New Verse";
       document.getElementById("summarySubtitle").textContent = "Would you like to add a new verse?";
       document.getElementById("summaryStats").style.display = "none";
+      document.getElementById("flawlessBadge").style.display = "none";
+      countUpToken++;
       updateStatLists(); // an open Repeats / Leveled Up list from the Review screen must not follow you here
       setSummaryButtons(true, false);
       renderTomorrowNote();
