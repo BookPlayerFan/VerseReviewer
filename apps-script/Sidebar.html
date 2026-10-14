@@ -1651,7 +1651,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-108';
+    const CLIENT_BUILD = 'sync-109';
 
     let queue = [];
     let currentIndex = 0;
@@ -2358,7 +2358,7 @@
         metaTag.textContent = `⚡ Fast-Track · back to ${rankName(fastTrackTarget)}`;
         metaTag.classList.add("is-fasttrack-badge");
         btnFailText.textContent = "Repeat";
-        btnPassText.textContent = "Level Up";
+        btnPassText.textContent = "Recover";
         btnFail.style.display = "flex";
 
         pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
