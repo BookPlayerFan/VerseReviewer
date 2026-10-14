@@ -1445,6 +1445,15 @@
 
     // Press and hold (about half a second) on an element. A press that moves or lifts early does nothing.
     // Returns held(): true once if the hold fired, so the click that follows it can be ignored.
+    // Clears any text selection left by a press-and-hold, but never inside a text box: wiping the selection there
+    // is what made the paste box lose its cursor and ignore typing on iPhone.
+    function clearPageSelection() {
+      try {
+        const a = document.activeElement;
+        if (a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT" || a.isContentEditable)) return;
+        window.getSelection().removeAllRanges();
+      } catch (x) {}
+    }
     const LONG_PRESS_MS = 350;
     function attachLongPress(el, onHold, canStart) {
       let timer = null, sx = 0, sy = 0, fired = false;
@@ -1455,14 +1464,14 @@
         fired = false; sx = e.clientX; sy = e.clientY; cancel();
         el.classList.add("lp-down");
         document.body.classList.add("lp-active");
-        timer = setTimeout(function() { timer = null; fired = true; el.classList.remove("lp-down"); try { window.getSelection().removeAllRanges(); } catch (x) {} onHold(e); }, LONG_PRESS_MS);
+        timer = setTimeout(function() { timer = null; fired = true; el.classList.remove("lp-down"); clearPageSelection(); onHold(e); }, LONG_PRESS_MS);
       });
       el.addEventListener("pointermove", function(e) {
         if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
       });
       ["pointerup", "pointercancel", "pointerleave"].forEach(function(n) { el.addEventListener(n, cancel); });
       // keep selection blocked until the finger is fully up (the popup opens under it)
-      ["pointerup", "pointercancel"].forEach(function(n) { window.addEventListener(n, function() { setTimeout(function() { document.body.classList.remove("lp-active"); try { window.getSelection().removeAllRanges(); } catch (x) {} }, 400); }); });
+      ["pointerup", "pointercancel"].forEach(function(n) { window.addEventListener(n, function() { setTimeout(function() { document.body.classList.remove("lp-active"); clearPageSelection(); }, 400); }); });
       el.addEventListener("selectstart", function(e) { if (timer || fired) e.preventDefault(); });
       el.addEventListener("contextmenu", function(e) { if (timer || fired) e.preventDefault(); });
       return function held() { const f = fired; fired = false; return f; };
@@ -1655,7 +1664,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-117';
+    const CLIENT_BUILD = 'sync-118';
 
     let queue = [];
     let currentIndex = 0;
