@@ -264,6 +264,9 @@
     #verseListView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down { background: var(--btn-restart-bg); }
+    .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
+    .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
     .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
       background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
       padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
@@ -1587,7 +1590,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-94';
+    const CLIENT_BUILD = 'sync-95';
 
     let queue = [];
     let currentIndex = 0;
@@ -2740,6 +2743,22 @@
     let openStatList = null;
 
     // Verses for a list, highest level first, then Bible order.
+    // Verse text for a reference, from today's deck (or the Verses list if it has been opened).
+    function verseInfoFor(ref) {
+      let v = "", txt = "";
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].reference === ref && queue[i].text) { v = queue[i].version || ""; txt = queue[i].text; break; }
+      }
+      if (!txt && Array.isArray(vlVerses)) {
+        const m = vlVerses.find(function(x) { return x.f === ref; });
+        if (m) { v = m.v || ""; txt = m.t || m.x || ""; }
+      }
+      if (/^\(No verse text found/.test(txt)) txt = "";
+      const words = txt.replace(/\[\d+\]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+      const w = words.slice(0, 3).join(" ") + (words.length > 3 ? "\u2026" : "");
+      return { v: v, t: txt, w: w };
+    }
+
     function statItems(kind) {
       const raw = Array.isArray(sessionStats[STAT_LISTS[kind].key]) ? sessionStats[STAT_LISTS[kind].key] : [];
       const items = raw.map(function(r) {
@@ -2851,6 +2870,17 @@
         name.textContent = it.f;
         row.appendChild(name);
         if (it.g !== null) row.appendChild(makePill(it.g));
+        // tap: quick three-word peek; hold: the full verse (same as the Verses list)
+        const heldStat = attachLongPress(row, function() {
+          hideVerseTip();
+          const info = verseInfoFor(it.f);
+          showPreview({ f: it.f, v: info.v, t: info.t }, true);
+        });
+        row.onclick = function(ev) {
+          ev.stopPropagation();
+          if (heldStat()) return;
+          showVerseTip(row, verseInfoFor(it.f).w);
+        };
         inner.appendChild(row);
       });
       if (missing) {
