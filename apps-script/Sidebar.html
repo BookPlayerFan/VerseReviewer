@@ -798,6 +798,7 @@
     .pv-btns button { flex: 1; min-height: 0; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; flex-direction: row; justify-content: center; }
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
+    .pv-add:disabled { opacity: .4; pointer-events: none; }
     .pv-undo { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .uc-body { text-align: center; font-size: 16px; line-height: 1.45; margin: 2px 0 8px; color: var(--text-primary); }
     .uc-body .uc-sub { margin-top: 4px; font-size: 14px; color: var(--text-muted); }
@@ -1331,7 +1332,7 @@
 
     function updateTabs() {
       if (mode === "learning" && learningCards[learningIndex]) {
-        { const b = document.getElementById("btnFail"); const sn = isSeen(learningCards[learningIndex].reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn && learningCards.length === 1); }
+        { const b = document.getElementById("btnFail"); const sn = isSeen(learningCards[learningIndex].reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn); }
       }
       updateProgressBar();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
@@ -1355,7 +1356,7 @@
     let badgeTimer = null;
     function isSeen(ref) { return (learningSeen[ref] || 0) > Date.now(); }
     function unseenCount() {
-      return learningCards.filter(function(c) { return !isSeen(c.reference); }).length;
+      return learningCards.length && !isSeen(learningCards[0].reference) ? 1 : 0; // one new verse at a time
     }
     function scheduleBadgeReturn() {
       if (badgeTimer) { clearTimeout(badgeTimer); badgeTimer = null; }
@@ -1707,7 +1708,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-129';
+    const CLIENT_BUILD = 'sync-130';
 
     let queue = [];
     let currentIndex = 0;
@@ -1794,7 +1795,7 @@
     let cacheSig = "";
     function postCache() {
       try {
-        const cards = learningCards.slice(0, 40).map(function(c) {
+        const cards = learningCards.slice(0, 1).map(function(c) { // one new verse at a time
           return {
             f: c.reference, v: c.version || "", day: c.day || 0,
             segs: buildUnits(parseVerseSegments(c.text, c.reference), true).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
@@ -1810,9 +1811,9 @@
     function applyEarly(d) {
       try {
         if (learningCards.length) {
-          const at = learningCards.findIndex(function(c) { return c.reference === d.f; });
+          const at = learningCards[0].reference === d.f ? 0 : -1; // only restore the revealed parts if it is still the same verse
           if (mode !== 'learning') setMode('learning'); // saved like tapping the New tab
-          learningIndex = at >= 0 ? at : 0;
+          learningIndex = 0;
           render();
           const shown = Array.isArray(d.revealed) ? d.revealed : [];
           if (at >= 0 && shown.length && parsedSegments.length && (typeof d.n !== 'number' || d.n === parsedSegments.length)) {
@@ -1913,7 +1914,7 @@
         enterLearningAfterLoad = null;
         const at = learningCards.findIndex(function(c) { return c.reference === ref; });
         if (at >= 0) {
-          learningIndex = at;
+          learningIndex = 0;
           if (mode !== 'learning') setMode('learning');
           else render();
         }
@@ -2546,15 +2547,7 @@
       const metaTag = document.getElementById("cardMeta");
       metaTag.className = "meta-tag";
       metaTag.textContent = card.day > 0 ? "New Verse · Day " + card.day : "New Verse";
-      const lp = document.getElementById("cardPips");
-      lp.innerHTML = "";
-      if (learningCards.length > 1 && learningCards.length <= 10) {
-        learningCards.forEach(function(_, i) {
-          const pip = document.createElement("div");
-          pip.className = "pip" + (i === learningIndex ? " filled" : "");
-          lp.appendChild(pip);
-        });
-      }
+      document.getElementById("cardPips").innerHTML = ""; // one new verse at a time: nothing to count here
 
       const versionBadge = document.getElementById("cardVersion");
       const ver = (card.version || "").trim();
@@ -2569,7 +2562,7 @@
       document.getElementById("btnFailText").textContent = doneLabel;
       document.getElementById("btnFail").style.display = "flex";
       document.getElementById("btnFail").classList.add("review");
-      { const b = document.getElementById("btnFail"); const sn = isSeen(card.reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn && learningCards.length === 1); }
+      { const b = document.getElementById("btnFail"); const sn = isSeen(card.reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn); }
 
       document.getElementById("cardRef").textContent = card.reference;
       renderCardBody();
@@ -2830,13 +2823,13 @@
       }, ms);
     }
 
-    // Learning screen: "Level Up" promotes the verse to Level 1; "Next" / "Done" just move on.
+    // Learning screen: "Level Up" promotes the verse to Level 1; "Review" marks it as looked at for a while.
     function scoreLearning(action) {
       if (isScoring) return;
       const card = learningCards[learningIndex];
       if (!card) return;
-      // Already reviewed (dimmed): pressing again must not restart its snooze or push. With a single New verse it does nothing.
-      if (action === "Fail" && isSeen(card.reference) && learningCards.length === 1) return;
+      // Already reviewed (dimmed): pressing again must not restart its snooze or push, so it does nothing.
+      if (action === "Fail" && isSeen(card.reference)) return;
       isScoring = true;
 
       const notice = document.getElementById("toastNotice");
@@ -2857,15 +2850,11 @@
         if (!alreadySeen) learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
         // ask the server for a push when this snooze ends (it is cancelled if the verse is finished first)
         if (!alreadySeen) { try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).pushSnooze(card.reference, learningSeen[card.reference]); } catch (e) {} }
-        learningIndex = (learningIndex + 1) % learningCards.length; // loops back to the first verse
         enqueueSubmit(null, snapshot(currentIndex));
-        if (learningCards.length === 1) {
-          // Only one new verse: nothing to move on to, so the card stays put. The button dims and the badge clears.
-          isScoring = false;
-          updateTabs();
-          return;
-        }
-        animateOut();
+        // One new verse at a time, so there is nothing to move on to: the card stays put, the button dims and the badge clears.
+        isScoring = false;
+        updateTabs();
+        return;
       }
 
       const startedIn = epoch;
@@ -3656,9 +3645,13 @@
       fillVersePopup("pvRef", "pvVer", "pvText", it, false);
       const addBtn = document.getElementById("pvAdd");
       addBtn.style.display = (noAdd || canDelete) ? "none" : "";
-      addBtn.onclick = function() { closePreview(); chooseVerse(it); };
+      // one new verse at a time: while one is on the New tab, the final Add button is off (the list itself still opens)
+      const haveNew = learningCards.length > 0;
+      addBtn.disabled = haveNew;
+      addBtn.onclick = function() { if (haveNew) return; closePreview(); chooseVerse(it); };
       const del = document.getElementById("pvDel"), note = document.getElementById("pvNote");
-      note.textContent = ""; note.className = "pp-note";
+      note.textContent = (haveNew && !noAdd && !canDelete) ? "You already have a new verse. Level it up first, then add the next one." : "";
+      note.className = "pp-note";
       del.disabled = false;
       if (canDelete) {
         let armed = false;

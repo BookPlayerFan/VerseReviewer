@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-47'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-48'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -913,6 +913,14 @@ function addChosenVerse(rowIndex, reference) {
     const g = sheet.getRange(row, 5).getValue();
     if (!(g === "" || g === null || g === undefined)) {
       return { success: false, message: 'That verse was already added.' };
+    }
+    // one new verse at a time: refuse if another is already at Level 0 (a phone with an out-of-date screen could otherwise add a second)
+    if (lastRow >= 2) {
+      const levels = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
+      for (let i = 0; i < levels.length; i++) {
+        const lv = String(levels[i][0] === null || levels[i][0] === undefined ? '' : levels[i][0]).trim();
+        if (lv !== '' && Number(lv) === 0) return { success: false, message: 'You already have a new verse. Level it up first, then add the next one.' };
+      }
     }
     sheet.getRange(row, 2, 1, 4).setValues([["", today_(), 1, 0]]);
     return { success: true, reference: want, rowIndex: row };
