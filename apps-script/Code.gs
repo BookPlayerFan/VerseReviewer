@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-42'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-43'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -960,21 +960,42 @@ const CONTEXT_MAX_TOKENS = 2500;
 const CONTEXT_LAST_KEY = 'VR_CTX_LAST'; // last API problem, for troubleshooting
 
 const CONTEXT_SYSTEM = 'You are a careful Bible study helper inside a personal Scripture-memorization app. ' +
-  'Give the reader brief, accurate background for one passage so it is easier to understand and remember. ' +
-  'Stick to widely agreed information about the author, audience, date, occasion, genre, and where the passage sits in its book. ' +
-  'Where scholars or Bible translations disagree, say so plainly and do not pick a side; do not argue denominational or doctrinal positions. ' +
-  'Never invent historical details; if something is uncertain, say that it is uncertain. ' +
-  'Write in plain, warm, simple language for a general reader. No markdown and no bullet points. Keep the whole answer under about 250 words.';
+  'Give the reader background that makes one passage come alive and easier to remember, the way a knowledgeable friend would explain it. ' +
+  'Be concrete and specific: name the people and the situation, say what the key Hebrew or Greek word meant, and say what the passage\'s own words picture. Prefer particular detail over general statements. ' +
+  'Be accurate: use widely agreed information about the author, audience, date, occasion, genre, and where the passage sits in its book. Never invent details. ' +
+  'When something is genuinely uncertain, say so briefly where it matters. Do not open with disclaimers about authorship or date, and do not hedge everything. ' +
+  'Do not argue denominational or doctrinal positions; where translations or scholars differ in a way that changes how the passage reads, mention only the one or two most important differences, briefly, without taking a side. ' +
+  'Write in plain, warm language. No markdown and no bullet points. Keep the whole answer to about 250 words.';
+
+// Two worked examples (other passages than the ones most likely to be studied) set the depth, detail and tone.
+const CONTEXT_EXAMPLES = [
+  ['Romans 5:8 (ESV)',
+   'SUMMARY: Paul says God\'s love is not just a feeling or a promise; it was shown in a specific act. Christ died for people while they were still sinners, not after they had cleaned up their lives.\n' +
+   'SETTING: Paul wrote this letter to the Christians in Rome, a church he had not yet visited, most likely from Corinth around AD 57. By chapter 5 he has spent four chapters arguing that everyone, Jew and non-Jew, needs God\'s mercy and is put right with God by faith rather than by earning it. Now he turns to what that gift produces: peace with God and a steady hope.\n' +
+   'WHERE IT FITS: Verse 7 sets the scene: hardly anyone would die for a righteous person, and perhaps someone might dare to die for a good one. Then verse 8 breaks the pattern. The word "shows" means to demonstrate or put on display, so the cross is presented as the proof of God\'s love. Right after, in verses 9-10, Paul reasons that if God did this for his enemies, he will surely save those who are now his friends.\n' +
+   'KEY POINT: God\'s love does not wait for us to deserve it; it came to us at our worst.'],
+  ['Psalm 121:1-2 (ESV)',
+   'SUMMARY: The psalm opens with a question: looking up at the hills, where will help come from? The answer comes at once. It will not come from the hills but from the LORD, who made heaven and earth.\n' +
+   'SETTING: This is one of the "Songs of Ascents" (Psalms 120-134), which pilgrims sang as they climbed toward Jerusalem for the festivals. The road ran through rugged hill country where travelers faced real dangers: heat, rough ground and robbers. The psalm names no author.\n' +
+   'WHERE IT FITS: The rest of the psalm (verses 3-8) unfolds the answer. The LORD does not sleep, he is a shade at your right hand, and he guards your going out and your coming in. The Hebrew word for "keep" or "guard" appears six times in these eight verses, so protection is the psalm\'s main theme.\n' +
+   'WORTH KNOWING: "The hills" can be read as the dangers of the road, or as the hilltop shrines where people worshiped other gods. Either way, the point is the same: help comes from the Creator, not from the landscape.\n' +
+   'KEY POINT: When the road ahead looks dangerous, the psalm turns your eyes past the obstacle to the one who made it.']
+];
 
 function contextPrompt_(ref, version, text) {
-  return 'Passage: ' + ref + (version ? ' (' + version + ')' : '') + '\n' +
+  let out = 'Two examples of the depth, detail and tone wanted, for other passages. Match their style and length, but never reuse their wording for a different passage. ' +
+    'Note that the WORTH KNOWING label is left out when there is nothing real to flag.\n\n';
+  CONTEXT_EXAMPLES.forEach(function(ex) { out += '--- Example: ' + ex[0] + ' ---\n' + ex[1] + '\n\n'; });
+  out += '--- Your turn ---\n' +
+    'Passage: ' + ref + (version ? ' (' + version + ')' : '') + '\n' +
     'Text (any bracketed numbers are verse numbers): ' + text + '\n\n' +
     'Answer using exactly these labels, each at the start of its own line, in this order:\n' +
-    'SUMMARY: two or three sentences on what the passage says.\n' +
-    'SETTING: who wrote it, to whom, when and why, and what is happening around it.\n' +
-    'WHERE IT FITS: how it connects to what comes before and after it in the book, and any key word or image worth knowing.\n' +
-    'WORTH KNOWING: only if there is a real difference between translations or scholars, or a common misunderstanding. If there is not, leave this label out completely.\n' +
-    'KEY POINT: one sentence.';
+    'SUMMARY: two or three sentences in plain words on what the passage says and how its thought or feeling moves. Name its main figure or idea directly.\n' +
+    'SETTING: who is speaking or writing, to whom, and what is happening at that point in the story, poem or letter. Lead with the situation.\n' +
+    'WHERE IT FITS: how it connects to what comes just before and after it, and what one key word or image means and why it matters.\n' +
+    'WORTH KNOWING: only if translations or scholars differ in a way that changes how the passage reads, or there is a common misunderstanding. Give at most the one or two most important points, in three sentences or fewer. If there is nothing like that, leave this label out completely.\n' +
+    'KEY POINT: one sentence giving the takeaway, what to hold on to. Do not just repeat the summary.';
+  return out;
 }
 
 function versesSheet_() {
