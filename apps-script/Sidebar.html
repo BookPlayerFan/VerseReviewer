@@ -603,6 +603,12 @@
 
     /* Review cards take their verse's rank color: a thin outline, a faint tint at the top, colored progress dots.
        (Rank colors come from the .rank-N classes above; the tint needs color-mix, older browsers just skip it.) */
+    /* Registered so the card's rank colors can glide from one verse's rank to the next instead of snapping. */
+    @property --rc { syntax: '<color>'; inherits: true; initial-value: transparent; }
+    @property --rb { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+    @property --rt { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+    @property --rg { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+    .card { transition: --rc 0.3s ease, --rb 0.3s ease, --rt 0.3s ease, --rg 0.3s ease; }
     .card.ranked { --rc: var(--rl); }
     @media (prefers-color-scheme: dark) { .card.ranked { --rc: var(--rd); } }
     .card.ranked .pip.filled { background: var(--rc); border-color: var(--rc); }
@@ -1162,7 +1168,7 @@
     }
     function fadeOutLevelUp() {
       const card = document.getElementById("activeCard");
-      if (card) { card.style.transition = "opacity 0.12s ease-out"; card.style.opacity = "0"; }
+      if (card) fadeCardContent();
       if (luOverlay) { luOverlay.style.transition = "opacity 0.12s ease-out"; luOverlay.style.opacity = "0"; }
     }
 
@@ -1644,7 +1650,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-102';
+    const CLIENT_BUILD = 'sync-103';
 
     let queue = [];
     let currentIndex = 0;
@@ -2237,7 +2243,7 @@
       parsedSegments = parseVerseSegments(card.text, card.reference);
       segmentStates = parsedSegments.map(() => 'hidden');
 
-      cardEl.style.transition = "none";
+      cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
       cardEl.style.opacity = "1";
 
@@ -2275,6 +2281,7 @@
 
       document.getElementById("cardRef").textContent = card.reference;
       renderCardBody();
+      showCardContent();
     }
 
     // Gives the verse card its rank's color theme (no theme for New verses).
@@ -2314,7 +2321,7 @@
       parsedSegments = parseVerseSegments(card.text, card.reference);
       segmentStates = parsedSegments.map(() => 'hidden');
 
-      cardEl.style.transition = "none";
+      cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
       cardEl.style.opacity = "1";
 
@@ -2371,6 +2378,7 @@
 
       document.getElementById("cardRef").textContent = card.reference;
       renderCardBody();
+      showCardContent();
     }
 
     function renderCardBody() {
@@ -2473,11 +2481,30 @@
     // ───────────── Scoring ─────────────
 
     // Buttons and keys fade the card out in place.
-    function animateOut() {
-      const cardEl = document.getElementById("activeCard");
-      cardEl.style.transition = "opacity 0.12s ease-out";
-      cardEl.style.opacity = "0";
+    // The card frame stays put; only what changes (reference, rank tag, dots, verse text) fades, so there is no blink.
+    let cardContentFaded = false;
+    function cardContentEls() {
+      const c = document.getElementById("activeCard");
+      return [c.querySelector(".card-header-group"), c.querySelector(".verse-wrap")].filter(Boolean);
     }
+    function fadeCardContent() {
+      cardContentEls().forEach(function(e) { e.style.transition = "opacity 0.12s ease-out"; e.style.opacity = "0"; });
+      cardContentFaded = true;
+    }
+    function showCardContent() {
+      const animate = cardContentFaded;
+      cardContentFaded = false;
+      cardContentEls().forEach(function(e) {
+        e.style.transition = "none";
+        if (animate) {
+          e.style.opacity = "0";
+          void e.offsetWidth;
+          e.style.transition = "opacity 0.2s ease-out";
+        }
+        e.style.opacity = "1";
+      });
+    }
+    function animateOut() { fadeCardContent(); }
 
     let practicing = false; // a practice round started from the Review Complete screen is running
     const LEVELUP_MS = 1100; // how long the card shows its new rank before moving on
