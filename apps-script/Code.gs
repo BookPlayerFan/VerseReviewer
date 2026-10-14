@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-36'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-37'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -300,8 +300,8 @@ function writeState_(s) {
 
 // ── Evening practice card ──
 // After the first review of a Bronze verse (Level 1, rep 1) is passed, one extra practice card is held
-// back and added to the deck later that day: at 6 pm, or an hour after the pass if that is already past 6 pm.
-// A push goes out when the card appears (scheduleEveningPush_), unless that would be 10 pm or later.
+// back and added to the deck later that day: at 6 pm, or an hour after the pass if that is already past 6 pm, but never
+// later than 8:30 pm (passed after 7:30 pm -> 8:30 pm; passed after 8:30 pm -> no evening card). A push goes out when the card appears.
 // It behaves like a same-day repeat: never written to the sheet, no rep, no demotion.
 const LATER_KEY = 'VR_LATER_AT'; // earliest release time (ms), so polling only needs one tiny read
 const LATER_HOUR = 18;
@@ -309,14 +309,21 @@ const LATER_DELAY_MS = 60 * 60 * 1000;
 
 function nowMs_() { return Date.now(); }
 
-// When the evening card should appear, or 0 if that would be after today ends.
+// When the evening card should appear, or 0 if it should be skipped today.
+//   - Passed before 6:00 PM          -> 6:00 PM
+//   - Passed from 6:00 to 7:30 PM    -> an hour after the pass
+//   - Passed from 7:30 to 8:30 PM    -> 8:30 PM (the last time it can appear)
+//   - Passed after 8:30 PM           -> skipped
+const LATER_LAST_SECS = 20 * 3600 + 30 * 60;
 function laterAt_() {
   const tz = Session.getScriptTimeZone();
   const now = nowMs_();
   const nowD = new Date(now);
   const secs = Number(Utilities.formatDate(nowD, tz, 'H')) * 3600 + Number(Utilities.formatDate(nowD, tz, 'm')) * 60 + Number(Utilities.formatDate(nowD, tz, 's'));
-  const at = secs < LATER_HOUR * 3600 ? now + (LATER_HOUR * 3600 - secs) * 1000 : now + LATER_DELAY_MS;
-  return Utilities.formatDate(new Date(at), tz, 'yyyy-MM-dd') === Utilities.formatDate(nowD, tz, 'yyyy-MM-dd') ? at : 0;
+  if (secs > LATER_LAST_SECS) return 0;
+  const wantSecs = secs < LATER_HOUR * 3600 ? LATER_HOUR * 3600 : secs + LATER_DELAY_MS / 1000;
+  const useSecs = Math.min(wantSecs, LATER_LAST_SECS);
+  return now + (useSecs - secs) * 1000;
 }
 
 // Moves any evening cards whose time has come onto the end of the deck. Returns true if it changed anything.
@@ -1216,8 +1223,6 @@ function sendTestPush() {
 // Push for the evening practice card, scheduled for the moment it joins the deck.
 function scheduleEveningPush_(ref, atMs) {
   try {
-    const hour = Number(Utilities.formatDate(new Date(atMs), Session.getScriptTimeZone(), 'H'));
-    if (hour >= 22 || hour < 5) return; // too late at night; the card is still waiting in the app
     const key = 'evening:' + ref;
     cancelSnoozePush_(key);
     const r = osSend_('Evening review', ref + ' is ready for its evening review.', atMs, 'vr-eve-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'review');
