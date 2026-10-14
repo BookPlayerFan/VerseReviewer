@@ -745,7 +745,11 @@
     .picker-note:empty { display: none; }
     .paste-area { width: 100%; min-height: 200px; resize: none; outline: none; border: 1px solid var(--border-card); border-radius: 10px;
       background: transparent; color: var(--text-primary); font-size: 16px; line-height: 1.4; padding: 10px 12px; user-select: text; }
+    .pv-card .paste-area { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
     .paste-area:focus { border-color: var(--text-accent); }
+    .pp-note { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
+    .pp-note.bad { color: var(--badge-fail); }
+    .pv-edit { background: transparent; color: var(--text-accent); border: 0; font-size: 15px; font-weight: 600; padding: 10px 14px; cursor: pointer; }
     .paste-hint { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
     .paste-hint.bad { color: var(--badge-fail); }
     .paste-hint.ok { color: var(--text-muted); }
@@ -982,7 +986,7 @@
     <div class="pv-card">
       <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Paste new verse</div>
       <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
-        placeholder="Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="updatePasteHint()"></textarea>
+        placeholder="Paste a verse here (reference + text), or type it:&#10;Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="updatePasteHint()" onpaste="pasteLanded()"></textarea>
       <div class="paste-hint" id="pasteHint"></div>
       <div class="pv-btns">
         <button type="button" class="pv-close" onclick="closePaste()">Cancel</button>
@@ -991,11 +995,24 @@
     </div>
   </div>
 
+  <div class="pv" id="pastePreview" onclick="if (event.target === this) cancelPastePreview()">
+    <div class="pv-card">
+      <div class="pv-head"><span id="ppRef"></span><span class="version-badge" id="ppVer"></span></div>
+      <div class="pv-text" id="ppText"></div>
+      <div class="pp-note" id="ppNote"></div>
+      <div class="pv-btns">
+        <button type="button" class="pv-close" onclick="cancelPastePreview()">Cancel</button>
+        <button type="button" class="pv-edit" onclick="editPastePreview()">Edit</button>
+        <button type="button" class="pv-add" id="ppAdd" onclick="addFromPreview()">Add</button>
+      </div>
+    </div>
+  </div>
+
   <div class="picker" id="picker">
     <div class="picker-head">
       <span class="picker-title">Choose a verse</span>
       <span class="picker-actions">
-        <button type="button" class="picker-close" onclick="openPaste()">Paste verse</button>
+        <button type="button" class="picker-close" onclick="startPaste()">Paste verse</button>
         <button type="button" class="picker-close" onclick="closePicker()">Cancel</button>
       </span>
     </div>
@@ -1598,7 +1615,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-98';
+    const CLIENT_BUILD = 'sync-99';
 
     let queue = [];
     let currentIndex = 0;
@@ -2987,33 +3004,150 @@
 
 
     // ── Paste a new verse ──
-    // First line: reference and (optionally) version, e.g. "Romans 8:35-37 ESV". The rest is the verse text.
-    function parsePasted(raw) {
-      const lines = String(raw || "").replace(/\r/g, "").split("\n");
-      let i = 0;
-      while (i < lines.length && !lines[i].trim()) i++;
-      if (i >= lines.length) return { empty: true };
-      let head = lines[i].trim().replace(/\s+/g, " ");
-      const body = lines.slice(i + 1).join(" ").replace(/\s+/g, " ").trim();
+    // Tapping "Paste verse" reads the clipboard and shows what it understood in a popup (reference, version, text) with
+    // Add / Edit / Cancel. If the phone won't let the page read the clipboard, a paste box opens instead; pasting into it
+    // shows the same popup. The reference can be the first line ("Romans 8:35-37 ESV"), the last line ("— John 3:16 ESV"),
+    // or at the start of a single line.
+    const REF_RX = "((?:[1-3]\\s?)?[A-Za-z]+(?:\\s+(?:of\\s+)?[A-Za-z]+){0,2}\\s+\\d+(?::\\d+(?:\\s?[-–—]\\s?\\d+)?)?)";
+    function splitRefVersion(head) {
+      head = String(head || "").replace(/[–—]/g, "-").replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim()
+        .replace(/^[\s"'“”‘’\-]+|[\s"'“”‘’\-]+$/g, "");
       let ver = "";
       const m = head.match(/^(.*\S)[\s,]+\(?([A-Za-z][A-Za-z0-9]{1,7})\)?$/);
       if (m && /\d/.test(m[1])) { head = m[1].replace(/[,\s]+$/, ""); ver = m[2].toUpperCase(); }
-      if (!/\d/.test(head) || !/^[A-Za-z0-9]/.test(head)) return { error: "First line should be the reference, like Romans 8:35-37 ESV." };
-      if (!body) return { error: "Add the verse text on the lines below the reference." };
-      return { ref: head, ver: ver || "ESV", defaultVer: !ver, text: body };
+      return { head: head, ver: ver };
+    }
+    function looksLikeRef(h) { return /\d/.test(h) && /^[1-3]?\s?[A-Za-z]/.test(h) && h.length <= 60; }
+    function cleanBody(t) {
+      return String(t || "").replace(/\s+/g, " ").trim().replace(/^[“"]\s*/, "").replace(/\s*[”"]$/, "").trim();
+    }
+    function parsePasted(raw) {
+      const lines = String(raw || "").replace(/\r/g, "").split("\n").map(function(l) { return l.trim(); });
+      while (lines.length && !lines[0]) lines.shift();
+      while (lines.length && !lines[lines.length - 1]) lines.pop();
+      if (!lines.length) return { empty: true };
+      function done(rv, body, needsWords) {
+        const text = cleanBody(body);
+        if (!looksLikeRef(rv.head)) return null;
+        if (needsWords && text.split(" ").length < 4) return null; // one line: don't mistake "ESV" or a stray word for the verse text
+        if (!text) return { error: "I found the reference but no verse text." };
+        return { ref: rv.head, ver: rv.ver || "ESV", defaultVer: !rv.ver, text: text };
+      }
+      // 1. reference on the first line, text below
+      if (lines.length > 1) {
+        const a = done(splitRefVersion(lines[0]), lines.slice(1).join(" "));
+        if (a) return a;
+        // 2. reference on the last line (e.g. "— John 3:16 ESV"), text above
+        const b = done(splitRefVersion(lines[lines.length - 1]), lines.slice(0, -1).join(" "));
+        if (b) return b;
+      }
+      // 3. one block of text: reference first, then text on the same line ("John 3:16 ESV For God so loved…")
+      const all = lines.join(" ").replace(/\s+/g, " ");
+      let m = all.match(new RegExp("^" + REF_RX + "\\s*\\(?([A-Za-z]{2,6})?\\)?\\s*[:\\-–—]?\\s+(.+)$"));
+      if (m) {
+        const ver = (m[2] && /^[A-Z0-9]+$/.test(m[2].toUpperCase()) && m[2].length <= 5) ? m[2] : "";
+        const body = ver ? m[3] : ((m[2] ? m[2] + " " : "") + m[3]);
+        const c = done({ head: splitRefVersion(m[1]).head, ver: ver.toUpperCase() }, body, true);
+        if (c) return c;
+      }
+      // 4. text first, reference at the end on the same line
+      m = all.match(new RegExp("^(.+?)\\s*[–—\\-~]\\s*" + REF_RX + "\\s*\\(?([A-Za-z]{2,6})?\\)?\\s*$"));
+      if (m) {
+        const d = done({ head: splitRefVersion(m[2]).head, ver: (m[3] || "").toUpperCase() }, m[1], true);
+        if (d) return d;
+      }
+      return { error: "I couldn't find a reference. Put it on the first line, like Romans 8:35-37 ESV." };
     }
 
-    function openPaste() {
-      document.getElementById("pasteText").value = "";
-      document.getElementById("pasteHint").textContent = "";
-      document.getElementById("pasteHint").className = "paste-hint";
+    let pasteParsed = null;
+    let pasteReading = false;
+
+    function openPaste(prefill, note) {
+      document.getElementById("pasteText").value = prefill || "";
+      const hint = document.getElementById("pasteHint");
+      hint.textContent = note || "";
+      hint.className = note ? "paste-hint bad" : "paste-hint";
       document.getElementById("pasteAdd").disabled = false;
       document.getElementById("pasteModal").classList.add("open");
+      if (prefill) updatePasteHint();
       setTimeout(function() { try { document.getElementById("pasteText").focus(); } catch (e) {} }, 50);
     }
 
     function closePaste() {
       document.getElementById("pasteModal").classList.remove("open");
+    }
+
+    // "Paste verse": take what is on the clipboard, or fall back to the paste box.
+    function startPaste() {
+      if (pasteReading) return;
+      let cb = null;
+      try { cb = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { cb = null; }
+      if (!cb) { openPaste(); return; }
+      pasteReading = true;
+      const guard = setTimeout(function() { pasteReading = false; }, 10000);
+      cb.then(function(text) {
+        clearTimeout(guard); pasteReading = false;
+        text = String(text || "").trim();
+        if (!text) { openPaste("", "The clipboard is empty. Copy a verse first, then paste it here."); return; }
+        const p = parsePasted(text);
+        if (p.error || p.empty) { openPaste(text, p.error); return; }
+        showPastePreview(p);
+      }, function() {
+        clearTimeout(guard); pasteReading = false;
+        openPaste(); // this phone won't let the page read the clipboard: paste into the box instead
+      });
+    }
+
+    // Text just landed in the paste box: show the popup straight away when it makes sense.
+    function pasteLanded() {
+      setTimeout(function() {
+        const p = parsePasted(document.getElementById("pasteText").value);
+        if (!p.error && !p.empty) showPastePreview(p);
+        else updatePasteHint();
+      }, 30);
+    }
+
+    function showPastePreview(p) {
+      pasteParsed = p;
+      fillVersePopup("ppRef", "ppVer", "ppText", { f: p.ref, v: p.ver, t: p.text }, true);
+      const note = document.getElementById("ppNote");
+      note.textContent = p.defaultVer ? "No version found, so I used ESV. Tap Edit to change it." : "";
+      note.className = "pp-note";
+      document.getElementById("ppAdd").disabled = false;
+      try { document.getElementById("pasteText").blur(); } catch (e) {}
+      document.getElementById("pastePreview").classList.add("open");
+    }
+
+    function cancelPastePreview() {
+      document.getElementById("pastePreview").classList.remove("open");
+      closePaste();
+      pasteParsed = null;
+    }
+
+    function editPastePreview() {
+      const p = pasteParsed;
+      document.getElementById("pastePreview").classList.remove("open");
+      if (!p) { openPaste(); return; }
+      openPaste(p.ref + " " + p.ver + "\n" + p.text);
+    }
+
+    function addFromPreview() {
+      const p = pasteParsed;
+      if (!p) return;
+      const note = document.getElementById("ppNote");
+      const btn = document.getElementById("ppAdd");
+      btn.disabled = true;
+      addParsedVerse(p, function(res, msg) {
+        btn.disabled = false;
+        if (res) {
+          document.getElementById("pastePreview").classList.remove("open");
+          closePaste();
+          pasteParsed = null;
+        } else {
+          note.textContent = msg;
+          note.className = "pp-note bad";
+        }
+      });
     }
 
     function updatePasteHint() {
@@ -3025,31 +3159,29 @@
       el.className = "paste-hint ok";
     }
 
+    // Add button inside the paste box (typed text): same popup first, so you see what was understood.
     function submitPaste() {
       const el = document.getElementById("pasteHint");
       const p = parsePasted(document.getElementById("pasteText").value);
       if (p.empty || p.error) { el.textContent = p.error || "Paste a verse first."; el.className = "paste-hint bad"; return; }
-      const btn = document.getElementById("pasteAdd");
-      btn.disabled = true;
+      showPastePreview(p);
+    }
+
+    // Saves the verse to the sheet (it joins the waiting list in the picker).
+    function addParsedVerse(p, cb) {
       google.script.run
         .withSuccessHandler(function(res) {
-          btn.disabled = false;
           if (res && res.success) {
-            closePaste();
+            cb(true);
             document.getElementById("pickerNote").textContent = "Added " + res.reference + " (waiting in your list)";
             google.script.run
               .withSuccessHandler(function(list) { if (Array.isArray(list)) { pickerItems = list; renderPicker(); } })
               .listUnassigned();
           } else {
-            el.textContent = (res && res.message) || "Couldn't add that verse.";
-            el.className = "paste-hint bad";
+            cb(false, (res && res.message) || "Couldn't add that verse.");
           }
         })
-        .withFailureHandler(function(err) {
-          btn.disabled = false;
-          el.textContent = "Couldn't add: " + ((err && err.message) || err);
-          el.className = "paste-hint bad";
-        })
+        .withFailureHandler(function(err) { cb(false, "Couldn't add: " + ((err && err.message) || err)); })
         .addPastedVerse(p.ref, p.ver, p.text);
     }
 
@@ -3104,12 +3236,13 @@
     }
 
     // Tapping a verse in the list previews its text; adding is a separate button.
-    function showPreview(it, noAdd) {
-      document.getElementById("pvRef").textContent = it.f;
+    // Fills a verse popup (reference, version badge, text with verse numbers); alwaysVer shows the badge even for ESV.
+    function fillVersePopup(refId, verId, textId, it, alwaysVer) {
+      document.getElementById(refId).textContent = it.f;
       const ver = (it.v || "").trim();
-      const vb = document.getElementById("pvVer");
-      if (ver && ver.toUpperCase() !== "ESV") { vb.textContent = ver; vb.style.display = "inline-block"; } else { vb.style.display = "none"; }
-      const box = document.getElementById("pvText");
+      const vb = document.getElementById(verId);
+      if (ver && (alwaysVer || ver.toUpperCase() !== "ESV")) { vb.textContent = ver; vb.style.display = "inline-block"; } else { vb.style.display = "none"; }
+      const box = document.getElementById(textId);
       box.textContent = "";
       const segs = parseVerseSegments(it.t || "", it.f);
       if (!segs.length) {
@@ -3125,6 +3258,10 @@
           box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
         });
       }
+    }
+
+    function showPreview(it, noAdd) {
+      fillVersePopup("pvRef", "pvVer", "pvText", it, false);
       const addBtn = document.getElementById("pvAdd");
       addBtn.style.display = noAdd ? "none" : "";
       addBtn.onclick = function() { closePreview(); chooseVerse(it); };
@@ -3168,7 +3305,7 @@
         return;
       }
       // Not while a popup is open
-      const popupOpen = ["picker", "pickerPreview", "pasteModal"].some(function(id) {
+      const popupOpen = ["picker", "pickerPreview", "pasteModal", "pastePreview"].some(function(id) {
         return document.getElementById(id).classList.contains("open");
       });
       if (popupOpen) return;
