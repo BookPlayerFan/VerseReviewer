@@ -799,20 +799,37 @@
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
     .pv-del { background: var(--btn-fail-bg); color: var(--btn-fail-text); }
-    /* Hold the reference: tiny undo menu */
+    /* Hold the reference: background note (Context) under it */
     .ref-header { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
     .ref-header { position: relative; isolation: isolate; }
     .ref-header::before { content: ""; position: absolute; z-index: -1; left: var(--hl-l, -12px); right: var(--hl-r, -12px); top: var(--hl-t, -2px); bottom: var(--hl-b, -2px); border-radius: 14px; background: transparent; }
     .ref-header.lp-down::before, .ref-header.um-open::before { background: var(--btn-restart-bg); }
     .card-header-group { position: relative; }
-    .undo-menu { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 30; white-space: nowrap;
-      background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.22);
-      padding: 4px; font-size: 15px; font-weight: 600; }
-    .undo-menu::before { content: ""; position: absolute; left: 50%; top: -6px; width: 12px; height: 12px; background: var(--bg-card);
-      border-left: 1px solid var(--border-card); border-top: 1px solid var(--border-card); transform: translateX(-50%) rotate(45deg); }
-    .undo-menu button { display: block; border: 0; background: none; color: var(--text-primary); font: inherit; padding: 11px 16px; border-radius: 10px; margin: 0; min-height: 0; box-shadow: none; }
-    .undo-menu button:active { background: var(--btn-restart-bg); }
-    .undo-menu button.off { color: var(--text-muted); font-weight: 500; }
+    .ctx-panel { position: absolute; left: 50%; transform: translateX(-50%); width: 100%; max-width: 380px; z-index: 30; box-sizing: border-box;
+      display: flex; flex-direction: column; text-align: left; background: var(--bg-card); border: 1px solid var(--border-card);
+      border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.22); font-size: 15px; line-height: 1.5; color: var(--text-primary); }
+    .ctx-panel button { border: 0; background: none; color: var(--text-accent); font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
+    .ctx-panel button:active { opacity: .6; }
+    .ctx-undo { display: block; width: 100% !important; text-align: left; color: var(--text-primary) !important; font-weight: 600 !important; padding: 12px 14px !important;
+      border-bottom: 1px solid var(--border-body) !important; border-radius: 16px 16px 0 0 !important; }
+    .ctx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 6px 7px 14px; border-bottom: 1px solid var(--border-body); flex-shrink: 0; }
+    .ctx-title { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--text-muted); }
+    .ctx-x { font-size: 17px !important; line-height: 1 !important; padding: 6px 10px !important; color: var(--text-muted) !important; }
+    .ctx-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 10px 14px 12px; }
+    .ctx-sec + .ctx-sec { margin-top: 12px; }
+    .ctx-label { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--text-accent); margin: 0 0 2px; }
+    .ctx-text { margin: 0; }
+    .ctx-sec.key .ctx-text { font-weight: 600; }
+    .ctx-msg { margin: 0; color: var(--text-muted); }
+    .ctx-msg.err { color: var(--text-primary); }
+    .ctx-hint { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+    .ctx-retry { font-weight: 700 !important; padding: 8px 0 0 !important; }
+    .ctx-foot:empty { display: none; }
+    .ctx-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px 6px 14px; border-top: 1px solid var(--border-body); font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+    .ctx-foot button { font-size: 12px !important; font-weight: 700 !important; padding: 6px 6px !important; }
+    .ctx-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--border-card); border-top-color: var(--text-accent); border-radius: 50%;
+      animation: ctxspin .9s linear infinite; vertical-align: -3px; margin-right: 8px; }
+    @keyframes ctxspin { to { transform: rotate(360deg); } }
     .sync-warning { position: fixed; top: max(env(safe-area-inset-top, 0px), 8px); left: 50%; transform: translateX(-50%);
       z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
     /* Status readout (tap "Verse List" to show it) */
@@ -1678,7 +1695,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-124';
+    const CLIENT_BUILD = 'sync-125';
 
     let queue = [];
     let currentIndex = 0;
@@ -1742,7 +1759,7 @@
 
     window.onload = function() {
       attachRevealHold();
-      attachUndoHold();
+      attachRefHold();
       const tn = document.getElementById("tabNew");
       const heldTab = attachLongPress(tn, function() { addNewVerse(); });
       tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
@@ -2049,37 +2066,151 @@
 
     function hideUndo() {
       undoId = null;
-      closeUndoMenu();
     }
 
     function undoAvailable() {
       return !!undoId && Date.now() < undoExp && !isScoring && pendingCount() === 0;
     }
 
-    function closeUndoMenu() {
-      document.querySelectorAll(".undo-menu").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
-      const r = document.getElementById("cardRef"); if (r) r.classList.remove("um-open");
-      document.removeEventListener("pointerdown", onUndoOutside, true);
+    // ───────────── Context (hold the reference) ─────────────
+    // Holding a verse reference opens a scrollable note under it: summary, setting and where the verse fits.
+    // The server asks Claude once per verse and keeps the answer on the "Context" tab; later opens are instant.
+    const ctxCache = {};
+    let ctxToken = 0;
+    const CTX_LABELS = { "SUMMARY": "Summary", "SETTING": "Setting", "WHERE IT FITS": "Where it fits", "WORTH KNOWING": "Worth knowing", "KEY POINT": "Key point" };
+
+    function parseContext(text) {
+      const out = [];
+      let cur = null;
+      String(text || "").replace(/\r/g, "").split("\n").forEach(function(line) {
+        const clean = line.replace(/\*\*/g, "").trim();
+        const m = clean.match(/^(SUMMARY|SETTING|WHERE IT FITS|WORTH KNOWING|KEY POINT)\s*:\s*(.*)$/i);
+        if (m) { cur = { key: m[1].toUpperCase(), text: m[2] }; out.push(cur); }
+        else if (clean) {
+          if (cur) cur.text += (cur.text ? " " : "") + clean;
+          else { cur = { key: "", text: clean }; out.push(cur); }
+        }
+      });
+      return out;
     }
-    function onUndoOutside(e) { if (!e.target.closest(".undo-menu")) closeUndoMenu(); }
-    function openUndoMenu() {
-      closeUndoMenu();
+
+    function swallowNextClick() {
+      let t = null;
+      const h = function(e) { e.stopPropagation(); e.preventDefault(); clear(); };
+      function clear() { window.removeEventListener("click", h, true); clearTimeout(t); }
+      window.addEventListener("click", h, true);
+      t = setTimeout(clear, 450);
+    }
+
+    function closeContext(fromOutsideTap) {
+      ctxToken++; // any answer still on its way is ignored
+      document.querySelectorAll(".ctx-panel").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+      const r = document.getElementById("cardRef"); if (r) r.classList.remove("um-open");
+      document.removeEventListener("pointerdown", onCtxOutside, true);
+      if (fromOutsideTap) swallowNextClick(); // the tap that closes it must not also reveal a verse or press a button
+    }
+    function onCtxOutside(e) { if (!e.target.closest(".ctx-panel")) closeContext(true); }
+
+    function ctxEl(tag, cls, text) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined) n.textContent = text;
+      return n;
+    }
+
+    // st: { loading } | { text } | { error, code }   (force remembers whether "Try again" should ask Claude afresh)
+    function ctxRender(p, card, st, force) {
+      const sc = p.querySelector(".ctx-scroll"), ft = p.querySelector(".ctx-foot");
+      sc.textContent = ""; ft.textContent = "";
+      if (st.loading) {
+        const m = ctxEl("p", "ctx-msg");
+        m.appendChild(ctxEl("span", "ctx-spin"));
+        m.appendChild(document.createTextNode("Looking up the background…"));
+        sc.appendChild(m);
+        sc.appendChild(ctxEl("p", "ctx-hint", "The first look-up for a verse takes a few seconds. After that it opens instantly."));
+        return;
+      }
+      if (st.error) {
+        sc.appendChild(ctxEl("p", "ctx-msg err", st.error));
+        if (st.code === "nokey") sc.appendChild(ctxEl("p", "ctx-hint", "In Apps Script, open Project Settings → Script Properties and add ANTHROPIC_KEY."));
+        const r = ctxEl("button", "ctx-retry", "Try again");
+        r.type = "button";
+        r.onclick = function(e) { e.stopPropagation(); ctxLoad(p, card, force); };
+        sc.appendChild(r);
+        return;
+      }
+      parseContext(st.text).forEach(function(sec) {
+        const d = ctxEl("div", "ctx-sec" + (sec.key === "KEY POINT" ? " key" : ""));
+        if (sec.key) d.appendChild(ctxEl("div", "ctx-label", CTX_LABELS[sec.key] || sec.key));
+        d.appendChild(ctxEl("p", "ctx-text", sec.text));
+        sc.appendChild(d);
+      });
+      ft.appendChild(ctxEl("span", "", "AI-generated · can contain mistakes"));
+      const g = ctxEl("button", "", "Regenerate");
+      g.type = "button";
+      g.onclick = function(e) { e.stopPropagation(); ctxLoad(p, card, true); };
+      ft.appendChild(g);
+    }
+
+    function ctxLoad(p, card, force) {
+      const token = ++ctxToken;
+      ctxRender(p, card, { loading: true }, force);
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.ok && res.text) ctxCache[card.reference] = res.text;
+          if (token !== ctxToken) return;
+          if (res && res.ok && res.text) ctxRender(p, card, { text: res.text }, false);
+          else ctxRender(p, card, { error: (res && res.message) || "Couldn't get the background for this verse.", code: res && res.code }, force);
+        })
+        .withFailureHandler(function() {
+          if (token !== ctxToken) return;
+          ctxRender(p, card, { error: "Couldn't reach the app. Check your connection and try again." }, force);
+        })
+        .getVerseContext(card.reference, card.version || "", card.text || "", !!force);
+    }
+
+    function currentContextCard() {
+      if (!hasActiveCard()) return null;
+      return mode === 'learning' ? learningCards[learningIndex] : queue[currentIndex];
+    }
+
+    function openContext() {
+      closeContext();
+      const card = currentContextCard();
       const ref = document.getElementById("cardRef");
-      if (!ref) return;
-      const m = document.createElement("div");
-      m.className = "undo-menu";
-      const ok = undoAvailable();
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = ok ? "" : "off";
-      b.textContent = "\u21B6 " + (ok ? "Undo " + undoLabel : "Nothing to undo");
-      b.onclick = function(e) { e.stopPropagation(); closeUndoMenu(); if (ok) undoLast(); };
-      m.appendChild(b);
+      if (!card || !ref) return;
       const grp = ref.closest(".card-header-group") || ref.parentNode;
-      grp.appendChild(m);
-      m.style.top = (ref.getBoundingClientRect().bottom - grp.getBoundingClientRect().top + 8) + "px";
+      const p = ctxEl("div", "ctx-panel");
+      p.setAttribute("role", "dialog");
+      p.setAttribute("aria-label", "Background for " + card.reference);
+      // Undo used to live in this spot's old menu; until it has a new home it stays reachable here while an undo is available.
+      if (undoAvailable()) {
+        const u = ctxEl("button", "ctx-undo", "↶ Undo " + undoLabel);
+        u.type = "button";
+        u.onclick = function(e) { e.stopPropagation(); closeContext(); undoLast(); };
+        p.appendChild(u);
+      }
+      const head = ctxEl("div", "ctx-head");
+      head.appendChild(ctxEl("span", "ctx-title", "Background"));
+      const x = ctxEl("button", "ctx-x", "✕");
+      x.type = "button"; x.setAttribute("aria-label", "Close");
+      x.onclick = function(e) { e.stopPropagation(); closeContext(); };
+      head.appendChild(x);
+      p.appendChild(head);
+      p.appendChild(ctxEl("div", "ctx-scroll"));
+      p.appendChild(ctxEl("div", "ctx-foot"));
+      grp.appendChild(p);
+      // sits under the reference block (the reference stays visible, highlighted) and may reach down to the bottom of the verse box (the buttons stay visible)
+      const top = grp.getBoundingClientRect().height + 6;
+      p.style.top = top + "px";
+      const wrap = document.querySelector("#activeCard .verse-wrap");
+      const room = wrap ? wrap.getBoundingClientRect().bottom - (grp.getBoundingClientRect().top + top) : 360;
+      p.style.maxHeight = Math.max(200, Math.min(room, 480)) + "px";
       ref.classList.add("um-open");
-      setTimeout(function() { document.addEventListener("pointerdown", onUndoOutside, true); }, 0);
+      setTimeout(function() { document.addEventListener("pointerdown", onCtxOutside, true); }, 0);
+
+      if (ctxCache[card.reference]) ctxRender(p, card, { text: ctxCache[card.reference] }, false);
+      else ctxLoad(p, card, false);
     }
     // Size the blue highlight to the real ink of the reference (works with any font, so it looks centered on every device).
     function fitRefHighlight() {
@@ -2105,10 +2236,10 @@
       } catch (e) {}
     }
     let heldRef = null;
-    function attachUndoHold() {
+    function attachRefHold() {
       const ref = document.getElementById("cardRef");
-      // Review tab only: the New tab has nothing to undo from here
-      heldRef = attachLongPress(ref, function() { if (mode !== 'learning' && hasActiveCard()) openUndoMenu(); }, function(e) { if (mode === 'learning' || e.target.closest(".undo-menu")) return false; fitRefHighlight(); return true; });
+      // both tabs: hold the reference to open its background note
+      heldRef = attachLongPress(ref, function() { if (hasActiveCard()) openContext(); }, function(e) { if (e.target.closest(".ctx-panel")) return false; fitRefHighlight(); return true; });
       ref.addEventListener("click", function(e) { if (heldRef()) { e.stopPropagation(); e.preventDefault(); } }, true);
     }
 
@@ -2317,6 +2448,7 @@
     }
 
     function render() {
+      closeContext();
       clearLevelUp();
       if (mode === 'learning') renderLearning();
       else renderCard();

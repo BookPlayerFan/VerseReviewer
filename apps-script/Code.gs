@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-41'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-42'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -946,6 +946,150 @@ function deleteUnassignedVerse(rowIndex, reference) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// ───────────── Verse context (AI) ─────────────
+// Hold a verse reference in the app to see a short background note (summary, setting, where it fits).
+// It is written by Claude through the Anthropic API, using the key saved in Script Properties as ANTHROPIC_KEY.
+// Each verse is asked for once; the answer is kept on a "Context" tab (created automatically) and reused after that.
+// Delete a row on that tab, or use Regenerate in the app, to get a fresh one.
+const CONTEXT_MODEL = 'claude-sonnet-5-5'; // a cheaper, faster choice is 'claude-haiku-5-5'
+const CONTEXT_SHEET = 'Context';
+const CONTEXT_HEADERS = ['Reference', 'Context', 'Model', 'Created'];
+const CONTEXT_MAX_TOKENS = 2500;
+const CONTEXT_LAST_KEY = 'VR_CTX_LAST'; // last API problem, for troubleshooting
+
+const CONTEXT_SYSTEM = 'You are a careful Bible study helper inside a personal Scripture-memorization app. ' +
+  'Give the reader brief, accurate background for one passage so it is easier to understand and remember. ' +
+  'Stick to widely agreed information about the author, audience, date, occasion, genre, and where the passage sits in its book. ' +
+  'Where scholars or Bible translations disagree, say so plainly and do not pick a side; do not argue denominational or doctrinal positions. ' +
+  'Never invent historical details; if something is uncertain, say that it is uncertain. ' +
+  'Write in plain, warm, simple language for a general reader. No markdown and no bullet points. Keep the whole answer under about 250 words.';
+
+function contextPrompt_(ref, version, text) {
+  return 'Passage: ' + ref + (version ? ' (' + version + ')' : '') + '\n' +
+    'Text (any bracketed numbers are verse numbers): ' + text + '\n\n' +
+    'Answer using exactly these labels, each at the start of its own line, in this order:\n' +
+    'SUMMARY: two or three sentences on what the passage says.\n' +
+    'SETTING: who wrote it, to whom, when and why, and what is happening around it.\n' +
+    'WHERE IT FITS: how it connects to what comes before and after it in the book, and any key word or image worth knowing.\n' +
+    'WORTH KNOWING: only if there is a real difference between translations or scholars, or a common misunderstanding. If there is not, leave this label out completely.\n' +
+    'KEY POINT: one sentence.';
+}
+
+function getContextSheet_(create) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONTEXT_SHEET);
+  if (!sheet && create) {
+    sheet = ss.insertSheet(CONTEXT_SHEET);
+    sheet.appendRow(CONTEXT_HEADERS);
+    try { sheet.setFrozenRows(1); } catch (e) {}
+    try { sheet.setColumnWidth(2, 600); } catch (e) {}
+  }
+  return sheet;
+}
+
+function readContext_(ref) {
+  const sheet = getContextSheet_(false);
+  if (!sheet) return null;
+  const last = sheet.getLastRow();
+  if (last < 2) return null;
+  const want = cleanRef_(ref).toLowerCase();
+  const vals = sheet.getRange(2, 1, last - 1, 4).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (cleanRef_(vals[i][0]).toLowerCase() === want && String(vals[i][1] || '').trim()) {
+      return { row: i + 2, text: String(vals[i][1]), model: String(vals[i][2] || ''), at: String(vals[i][3] || '') };
+    }
+  }
+  return null;
+}
+
+function saveContext_(ref, text, model) {
+  const lock = LockService.getScriptLock();
+  let got = false;
+  try { got = lock.tryLock(10000); } catch (e) {}
+  if (!got) return false; // the answer is still shown; it just is not kept this time
+  try {
+    const sheet = getContextSheet_(true);
+    const old = readContext_(ref);
+    const row = [ref, text, model, new Date().toISOString()];
+    if (old) sheet.getRange(old.row, 1, 1, 4).setValues([row]);
+    else sheet.appendRow(row);
+    return true;
+  } catch (e) {
+    console.error('Context save failed: ' + e);
+    return false;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// One call to the Anthropic Messages API. Returns { ok, text } or { ok:false, code, message }.
+function askClaude_(system, user) {
+  const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
+  if (!key) return { ok: false, code: 'nokey', message: 'Add your API key to turn this on.' };
+  let res;
+  try {
+    res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      headers: { 'x-api-key': String(key).trim(), 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify({
+        model: CONTEXT_MODEL,
+        max_tokens: CONTEXT_MAX_TOKENS,
+        system: system,
+        messages: [{ role: 'user', content: user }]
+      })
+    });
+  } catch (err) {
+    return { ok: false, code: 'net', message: 'Could not reach Claude. Check your connection and try again.' };
+  }
+  const code = res.getResponseCode();
+  const body = res.getContentText();
+  let json = null;
+  try { json = JSON.parse(body); } catch (e) {}
+
+  if (code >= 200 && code < 300 && json && Array.isArray(json.content)) {
+    const text = json.content.filter(function(b) { return b && b.type === 'text' && b.text; })
+      .map(function(b) { return b.text; }).join('\n').trim();
+    if (text) return { ok: true, text: text };
+    const why = json.stop_details && json.stop_details.type === 'refusal' ? 'Claude declined to answer for this verse.' : 'Claude sent back an empty answer. Try again.';
+    return { ok: false, code: 'empty', message: why };
+  }
+
+  if (code >= 200 && code < 300) return { ok: false, code: 'empty', message: 'Claude sent back an answer the app could not read. Try again.' };
+  const apiMsg = json && json.error && json.error.message ? String(json.error.message) : '';
+  const apiType = json && json.error && json.error.type ? String(json.error.type) : '';
+  try { PropertiesService.getScriptProperties().setProperty(CONTEXT_LAST_KEY, new Date().toISOString() + ' ' + code + ' ' + body.slice(0, 300)); } catch (e) {}
+  if (code === 401) return { ok: false, code: 'badkey', message: 'The API key was not accepted. Check ANTHROPIC_KEY in Script Properties.' };
+  if (code === 402 || /credit balance|billing/i.test(apiMsg)) return { ok: false, code: 'nocredit', message: 'The API account is out of credit. Add credit in the Claude Console.' };
+  if (code === 403) return { ok: false, code: 'forbidden', message: 'The API key is not allowed to do this. ' + apiMsg.slice(0, 160) };
+  if (code === 429 || code === 529 || code >= 500) return { ok: false, code: 'busy', message: 'Claude is busy right now. Try again in a moment.' };
+  return { ok: false, code: 'api', message: ('Claude could not answer (' + code + (apiType ? ' ' + apiType : '') + '). ' + apiMsg).slice(0, 260) };
+}
+
+// reference/version/text come from the card. force = true asks again even if an answer is already kept.
+function getVerseContext(reference, version, text, force) {
+  const ref = cleanRef_(reference);
+  if (!ref) return { ok: false, code: 'bad', message: 'No verse given.' };
+  if (!force) {
+    const hit = readContext_(ref);
+    if (hit) return { ok: true, text: hit.text, cached: true, model: hit.model, at: hit.at };
+  }
+  let body = String(text || '').trim();
+  if (!body) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+    const row = sheet ? findRowByRef_(sheet, ref) : 0;
+    if (row) body = cleanRef_(sheet.getRange(row, 8).getValue());
+  }
+  if (!body) return { ok: false, code: 'bad', message: 'That verse has no text to look up.' };
+  body = body.slice(0, 4000);
+
+  const ans = askClaude_(CONTEXT_SYSTEM, contextPrompt_(ref, cleanRef_(version), body));
+  if (!ans.ok) return ans;
+  const kept = saveContext_(ref, ans.text, CONTEXT_MODEL);
+  return { ok: true, text: ans.text, cached: false, kept: kept, model: CONTEXT_MODEL, at: new Date().toISOString() };
 }
 
 // ── Keeping the Verses tab sorted ──
