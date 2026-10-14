@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-45'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-46'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -968,22 +968,23 @@ const CONTEXT_SYSTEM = 'You are a careful Bible study helper inside a personal S
   'Be accurate: use widely agreed information about the author, audience, date, occasion, genre, and the shape of the book. Never invent details. ' +
   'When something is genuinely uncertain, say so briefly where it matters. Do not open with disclaimers about authorship or date, and do not hedge everything. ' +
   'Do not argue denominational or doctrinal positions; where translations or scholars differ in a way that changes how the passage reads, mention only the one or two most important differences, briefly, without taking a side. ' +
-  'Write in plain, warm language. No markdown and no bullet points. Keep the whole answer to about 300 words.';
+  'Write in plain, warm language. No markdown and no bullet points. ' +
+  'Keep the whole answer between 250 and 300 words, and never over 300. Be selective: choose the few details that help most and leave the rest out, rather than covering everything.';
 
 // Worked examples set the depth, detail and tone.
 const CONTEXT_EXAMPLES = [
   ['Job 19:25-27 (ESV)',
-   'SUMMARY: In the middle of his worst suffering, Job declares that he knows his Redeemer lives and will stand up for him at last. He expects to see God for himself, as a friend rather than an enemy, and the thought leaves him almost overwhelmed with longing.\n' +
-   'LEAD-UP: Job is a righteous man who has lost his children, his wealth and his health. His three friends insist he must have sinned to deserve this, and chapter 19 is his answer to the second speech from Bildad, one of those friends. Job has just described how God seems to have turned against him, and how his family, his servants and even his closest friends have pulled away (verses 13-22). He begs for pity, and then, in a sudden turn, wishes his words could be carved in rock forever (verses 23-24). These verses are what he wants carved there.\n' +
-   'WHERE IT SITS: Job is a long poem about why a righteous person suffers. It is made of speeches between Job and his friends, and it ends with God\'s own answer. Chapter 19 falls in the middle of the second round of speeches, and these three verses are the high point of Job\'s argument so far, a flash of hope in a very dark stretch. Right after, in verses 28-29, Job warns his friends that they should fear judgment for how they are treating him.\n' +
-   'KEY WORD: In Hebrew, "Redeemer" is the go\'el, a family member who steps in to defend a relative, buy back lost property, or set a wrong right. Job pictures someone who will take his side in a courtroom and clear his name.\n' +
-   'WORTH KNOWING: Verse 26 is hard to translate, and Bible versions differ. "In my flesh I shall see God" could mean seeing God in a body after death, or from beyond death, or being vindicated while still alive. Many Christians read the passage as pointing to resurrection hope and to Christ. Many scholars think Job\'s immediate hope is that God himself will vindicate him, even if that comes after he dies.\n' +
+   'SUMMARY: Suffering terribly, Job declares that he knows his Redeemer lives and will stand up for him at last. He expects to see God for himself, as a friend rather than an enemy, and the thought almost overwhelms him with longing.\n' +
+   'LEAD-UP: Job is a righteous man who has lost his children, his wealth and his health. His three friends insist he must have sinned to deserve this, and chapter 19 answers Bildad, one of them. Job has just described how God seems to have turned against him and even his closest friends have pulled away (verses 13-22). He begs for pity, then wishes his words could be carved in rock forever (verses 23-24). These verses are what he wants carved there.\n' +
+   'WHERE IT SITS: Job is a long poem about why a righteous person suffers, made of speeches between Job and his friends and ending with God\'s own answer. Chapter 19 falls in the second round of speeches, and these verses are a flash of hope in a very dark stretch. Right after, in verses 28-29, Job warns his friends to fear judgment.\n' +
+   'KEY WORD: In Hebrew, "Redeemer" is the go\'el, a relative who steps in to defend family, buy back lost property, or set a wrong right. Job pictures someone who will clear his name.\n' +
+   'WORTH KNOWING: Verse 26 is hard to translate. "In my flesh I shall see God" could mean seeing God after death or being vindicated while still alive. Christians often hear resurrection hope here; many scholars stress Job\'s hope that God will clear his name.\n' +
    'KEY POINT: Job\'s hope does not depend on his circumstances getting better. It depends on who he believes God is.'],
   ['Romans 5:8 (ESV)',
    'SUMMARY: Paul says God\'s love is not just a feeling or a promise; it was shown in a specific act. Christ died for people while they were still sinners, not after they had cleaned up their lives.\n' +
-   'LEAD-UP: Paul wrote to the Christians in Rome, a church he had not yet visited, most likely from Corinth around AD 57. In the first four chapters he argued that everyone, Jew and non-Jew alike, stands guilty before God and is put right with him by faith rather than by earning it, using Abraham as his proof. Chapter 5 opens with what that gift produces: peace with God and a hope that holds even in suffering (verses 1-5). Verse 6 then begins to show why that hope is secure: Christ died for the ungodly "at the right time."\n' +
-   'WHERE IT SITS: Romans moves from the problem of everyone\'s sin (chapters 1-3), to the gift of being put right by faith (3-5), to life in the Spirit (6-8), and then on to God\'s plan for Israel and everyday Christian living. Verse 8 is the center of this chapter\'s argument. Right after it, in verses 9-10, Paul reasons that if God did this for his enemies, he will surely save those who are now his friends.\n' +
-   'KEY WORD: The word "shows" means to demonstrate or put on display, so the cross is presented as the proof of God\'s love. Verse 7 sets up the contrast: hardly anyone would die for a righteous person, though someone might dare to die for a good one.\n' +
+   'LEAD-UP: Paul wrote to the Christians in Rome, a church he had not yet visited, probably from Corinth around AD 57. In chapters 1-4 he argued that everyone stands guilty before God and is put right with him by faith, not by earning it. Chapter 5 opens with the results: peace with God and hope that holds in suffering (verses 1-5). Verse 6 begins to show why that hope is secure: Christ died for the ungodly "at the right time."\n' +
+   'WHERE IT SITS: Romans moves from everyone\'s sin (chapters 1-3), to the gift of being put right by faith (3-5), to life in the Spirit (6-8), and then to God\'s plan for Israel and Christian living. Verse 8 is the center of this chapter\'s argument. Right after, in verses 9-10, Paul reasons that if God did this for enemies, he will surely save friends.\n' +
+   'KEY WORD: The word "shows" means to demonstrate or put on display, so the cross is God\'s proof of his love. Verse 7 sets up the contrast: few would die for a righteous person, though someone might dare for a good one.\n' +
    'KEY POINT: God\'s love does not wait for us to deserve it; it came to us at our worst.'],
   ['Psalm 121:1-2 (ESV)',
    'SUMMARY: The psalm opens with a question: looking up at the hills, where will help come from? The answer comes at once. It will not come from the hills but from the LORD, who made heaven and earth.\n' +
@@ -1002,12 +1003,13 @@ function contextPrompt_(ref, version, text) {
     'Passage: ' + ref + (version ? ' (' + version + ')' : '') + '\n' +
     'Text (any bracketed numbers are verse numbers): ' + text + '\n\n' +
     'Answer using exactly these labels, each at the start of its own line, in this order:\n' +
-    'SUMMARY: two or three sentences in plain words on what the passage says and how its thought or feeling moves. Name its main figure or idea directly.\n' +
-    'LEAD-UP: the story or argument that leads into these verses: who is speaking or writing, to whom, and what has been happening just before, in this chapter and the book so far. Be specific and refer to chapters and verses. Four or five sentences.\n' +
-    'WHERE IT SITS: one sentence on what the whole book is and how it moves, then where this chapter and these verses fall in that movement, and what comes right after them.\n' +
-    'KEY WORD: what one important word or image means in the original language and why it matters. Leave this label out only if no word stands out.\n' +
-    'WORTH KNOWING: only if translations or scholars differ in a way that changes how the passage reads, or there is a common misunderstanding. Give at most the one or two most important points, in three sentences or fewer. If there is nothing like that, leave this label out completely.\n' +
-    'KEY POINT: one sentence giving the takeaway, what to hold on to. Do not just repeat the summary.';
+    'SUMMARY: two sentences, about 35 to 45 words, in plain words on what the passage says and how its thought or feeling moves. Name its main figure or idea directly.\n' +
+    'LEAD-UP: the story or argument that leads into these verses: who is speaking or writing, to whom, and what has been happening just before, in this chapter and the book so far. Be specific and refer to chapters and verses. Three or four sentences, no more than 80 words.\n' +
+    'WHERE IT SITS: one sentence on what the whole book is and how it moves, then where this chapter and these verses fall in that movement, and what comes right after them. No more than 60 words.\n' +
+    'KEY WORD: what one important word or image means in the original language and why it matters. One or two sentences, no more than 40 words. Leave this label out only if no word stands out.\n' +
+    'WORTH KNOWING: only if translations or scholars differ in a way that changes how the passage reads, or there is a common misunderstanding. Give only the one or two most important points, in no more than 45 words. If there is nothing like that, leave this label out completely.\n' +
+    'KEY POINT: one sentence of under 25 words giving the takeaway, what to hold on to. Do not just repeat the summary.\n' +
+    'The whole answer must stay between 250 and 300 words. Count as you write and cut the least useful detail rather than go over.';
   return out;
 }
 
