@@ -1005,7 +1005,7 @@
     <div class="pv-card paste-card">
       <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Paste new verse</div>
       <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
-        placeholder="Paste a verse here (reference + text), or type it:&#10;Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="updatePasteHint()" onpaste="pasteLanded()"></textarea>
+        placeholder="Paste a verse here (reference + text), or type it:&#10;Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="onPasteInput(event)" onpaste="pasteLanded()"></textarea>
       <div class="paste-hint" id="pasteHint"></div>
       <div class="paste-hint" id="pasteDiag" style="display:none"></div>
       <div class="pv-btns">
@@ -1655,7 +1655,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-115';
+    const CLIENT_BUILD = 'sync-116';
 
     let queue = [];
     let currentIndex = 0;
@@ -3148,6 +3148,7 @@
 
     function openPaste(prefill, note) {
       document.getElementById("pasteText").value = prefill || "";
+      pasteLastLen = (prefill || "").length;
       const hint = document.getElementById("pasteHint");
       hint.textContent = note || "";
       hint.className = note ? "paste-hint bad" : "paste-hint";
@@ -3266,6 +3267,17 @@
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
       window.refreshPasteDiag = show;
     })();
+
+    // iPhone's keyboard "Paste from ..." suggestion inserts text without sending a paste event, so a big jump in
+    // length in one go is treated as a paste too.
+    let pasteLastLen = 0;
+    function onPasteInput(e) {
+      const v = document.getElementById("pasteText").value;
+      const jump = v.length - pasteLastLen;
+      pasteLastLen = v.length;
+      if (jump >= 12) { pasteLanded(); return; }
+      updatePasteHint();
+    }
 
     function updatePasteHint() {
       const el = document.getElementById("pasteHint");
