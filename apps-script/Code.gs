@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-39'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-40'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -1173,7 +1173,7 @@ function pushSnooze(reference, endMs) {
     if (!ref || !end || end < Date.now() || end > Date.now() + 6 * 60 * 60 * 1000) return { ok: false };
     cancelSnoozePush_(ref);
     const when = newVerseWindow_(end, Date.now());
-    const r = osSend_('New Verse Ready', ref + ' is ready to review again.', when, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
+    const r = osSend_('New Verse', ref + ' is ready to review again.', when, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
     if (r.ok && r.json && r.json.id) {
       const map = pendingPush_();
       map[ref] = r.json.id;
@@ -1190,7 +1190,7 @@ function dailyPush() {
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;
   if (due < 1) return;
-  const r = osSend_('Reviews Ready', due === 1 ? '1 review is ready today.' : due + ' reviews are ready today.', 0, 'vr-daily', 'review');
+  const r = osSend_('Daily Review', due === 1 ? '1 review is ready today.' : due + ' reviews are ready today.', 0, 'vr-daily', 'review');
   if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
 }
 
