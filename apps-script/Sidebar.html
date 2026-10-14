@@ -416,7 +416,7 @@
     }
 
     /* 1. Mobile Default Typography (Touchscreens) */
-    .passage-stream {
+    .passage-stream, .pv-text {
       font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
       font-size: 17.5px;
       line-height: 1.7;
@@ -429,7 +429,7 @@
 
     /* 2. Desktop Override Typography (Mouse / Precision Trackpads) */
     @media (hover: hover) and (pointer: fine) {
-      .passage-stream {
+      .passage-stream, .pv-text {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         font-size: 16.5px;
         line-height: 1.7;
@@ -748,8 +748,7 @@
       max-height: 78%; display: flex; flex-direction: column; padding: 18px 18px 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
     .pv-head { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 18px; font-weight: 700;
       color: var(--text-accent); margin-bottom: 10px; }
-    .pv-text { overflow-y: auto; -webkit-overflow-scrolling: touch; font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
-      font-size: 17px; line-height: 1.55; user-select: text; padding: 2px 2px 8px; }
+    .pv-text { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 2px 8px; } /* typography comes from the shared .passage-stream rule */
     .pv-text sup, .pv-text .pv-n { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700;
       color: var(--text-accent); margin-right: 3px; }
     .pv-btns { display: flex; gap: 10px; margin-top: 10px; }
@@ -1588,7 +1587,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-93';
+    const CLIENT_BUILD = 'sync-94';
 
     let queue = [];
     let currentIndex = 0;
