@@ -871,7 +871,7 @@
       <div class="action-container">
         <div class="btn-row">
           <button type="button" class="btn-fail" id="btnFail" onclick="scoreCard('Fail')" style="display: none;">
-            <span id="btnFailText">Fail</span>
+            <span id="btnFailText">Repeat</span>
             <span class="shortcut-hint">[D]</span>
           </button>
           <button type="button" class="btn-pass" id="btnPass" onclick="scoreCard('Pass')">
@@ -976,7 +976,7 @@
       <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
       <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
       <div class="help-row"><span>Pass</span><kbd>F</kbd></div>
-      <div class="help-row"><span>Fail</span><kbd>D</kbd></div>
+      <div class="help-row"><span>Repeat</span><kbd>D</kbd></div>
       <div class="help-row"><span>Undo</span><kbd>Z</kbd></div>
       <div class="help-row"><span>Show / hide this menu</span><kbd>?</kbd></div>
     </div>
@@ -1615,7 +1615,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-99';
+    const CLIENT_BUILD = 'sync-100';
 
     let queue = [];
     let currentIndex = 0;
@@ -2317,14 +2317,14 @@
         // ⚡ Fast-Track Recovery Mode
         metaTag.textContent = `⚡ Fast-Track · back to ${rankName(fastTrackTarget)}`;
         metaTag.classList.add("is-fasttrack-badge");
-        btnFailText.textContent = "Fail";
+        btnFailText.textContent = "Repeat";
         btnPassText.textContent = "Pass";
         btnFail.style.display = "flex";
 
         pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
       } else {
         setRankBadge(metaTag, card.group);
-        btnFailText.textContent = "Fail";
+        btnFailText.textContent = "Repeat";
         btnPassText.textContent = "Pass";
         btnFail.style.display = "flex";
 
@@ -2636,7 +2636,7 @@
         { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup,
           // first Bronze review passed: ask the server for the evening practice card
           later: (action === "Pass" && card.group === 1 && card.rep === 1) ? true : undefined },
-        snapshot(currentIndex + 1), action + " \u00B7 " + card.reference
+        snapshot(currentIndex + 1), (action === "Fail" ? "Repeat" : action) + " \u00B7 " + card.reference
       );
 
       if (isFastTrackRestored || graduated) {
