@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-34'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-35'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -1126,6 +1126,7 @@ function osSend_(heading, message, whenMs, topic, go) {
     contents: { en: message },
     url: PUSH_URL + (go ? '?go=' + go : ''),
     web_push_topic: topic || 'verse-review',
+    data: go ? { vrgo: go } : {},
     priority: 10, // high priority: delivered right away, even when the phone is idle
     ttl: 4 * 60 * 60 // if the phone is unreachable, drop it after 4 hours instead of delivering a stale reminder
   };

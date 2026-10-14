@@ -143,7 +143,19 @@
       if (g === "new" || g === "review") pendingGo = g;
       if (qs.has("go") && history.replaceState) history.replaceState(null, "", location.pathname);
     } catch (e) {}
+    var appSource = null;
+    // The service worker tells us which tab a tapped push wants, for when the app was already open.
+    try {
+      navigator.serviceWorker.addEventListener("message", function(ev) {
+        var m = ev.data;
+        if (m && m.type === "VR_GOTO" && (m.tab === "new" || m.tab === "review")) {
+          pendingGo = m.tab;
+          if (appSource) sendGoto(appSource);
+        }
+      });
+    } catch (e) {}
     function sendGoto(src) {
+      appSource = src;
       if (!pendingGo) return;
       var tab = pendingGo; pendingGo = null;
       setTimeout(function() { try { src.postMessage({ type: "VR_GOTO", tab: tab }, "*"); } catch (e) {} }, 700);
