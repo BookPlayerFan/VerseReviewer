@@ -608,7 +608,7 @@
     @property --rb { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
     @property --rt { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
     @property --rg { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
-    .card { transition: --rc 0.3s ease, --rb 0.3s ease, --rt 0.3s ease, --rg 0.3s ease; }
+    .card { transition: --rc 0.45s ease, --rb 0.45s ease, --rt 0.45s ease, --rg 0.45s ease; }
     .card.ranked { --rc: var(--rl); }
     @media (prefers-color-scheme: dark) { .card.ranked { --rc: var(--rd); } }
     .card.ranked .pip.filled { background: var(--rc); border-color: var(--rc); }
@@ -1169,7 +1169,7 @@
     function fadeOutLevelUp() {
       const card = document.getElementById("activeCard");
       if (card) fadeCardContent();
-      if (luOverlay) { luOverlay.style.transition = "opacity 0.12s ease-out"; luOverlay.style.opacity = "0"; }
+      if (luOverlay) { luOverlay.style.transition = "opacity " + LU_FADE_MS + "ms ease-out"; luOverlay.style.opacity = "0"; }
     }
 
     // ── Verse List ──
@@ -1650,7 +1650,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-103';
+    const CLIENT_BUILD = 'sync-104';
 
     let queue = [];
     let currentIndex = 0;
@@ -2482,13 +2482,15 @@
 
     // Buttons and keys fade the card out in place.
     // The card frame stays put; only what changes (reference, rank tag, dots, verse text) fades, so there is no blink.
+    const CARD_FADE_OUT_MS = 220, CARD_FADE_IN_MS = 340; // old verse fades out, next verse fades in
+    const PASS_SWAP_MS = 320, REPEAT_SWAP_MS = 400;      // when the next card is put in place after Pass / Repeat
     let cardContentFaded = false;
     function cardContentEls() {
       const c = document.getElementById("activeCard");
       return [c.querySelector(".card-header-group"), c.querySelector(".verse-wrap")].filter(Boolean);
     }
     function fadeCardContent() {
-      cardContentEls().forEach(function(e) { e.style.transition = "opacity 0.12s ease-out"; e.style.opacity = "0"; });
+      cardContentEls().forEach(function(e) { e.style.transition = "opacity " + CARD_FADE_OUT_MS + "ms ease-out"; e.style.opacity = "0"; });
       cardContentFaded = true;
     }
     function showCardContent() {
@@ -2499,7 +2501,7 @@
         if (animate) {
           e.style.opacity = "0";
           void e.offsetWidth;
-          e.style.transition = "opacity 0.2s ease-out";
+          e.style.transition = "opacity " + CARD_FADE_IN_MS + "ms ease-out";
         }
         e.style.opacity = "1";
       });
@@ -2507,7 +2509,8 @@
     function animateOut() { fadeCardContent(); }
 
     let practicing = false; // a practice round started from the Review Complete screen is running
-    const LEVELUP_MS = 1100; // how long the card shows its new rank before moving on
+    const LEVELUP_MS = 2000; // how long the card shows its new rank before moving on
+    const LU_FADE_MS = 350;  // the rank-up overlay fades away over this long at the end
 
     function advanceAfter(ms) {
       const startedIn = epoch;
@@ -2533,7 +2536,7 @@
       isScoring = true;
 
       const notice = document.getElementById("toastNotice");
-      let ms = 160;
+      let ms = PASS_SWAP_MS;
 
       if (action === "Pass") {
         playLevelUp(1, 1);
@@ -2544,7 +2547,7 @@
           snapshot(currentIndex), "Level Up \u00B7 " + card.reference
         );
         ms = LEVELUP_MS;
-        setTimeout(fadeOutLevelUp, ms - 140);
+        setTimeout(fadeOutLevelUp, ms - LU_FADE_MS - 20);
       } else {
         const alreadySeen = isSeen(card.reference); // moving past a dimmed verse keeps its original snooze
         if (!alreadySeen) learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
@@ -2592,7 +2595,7 @@
         }
         enqueueSubmit(null, snapshot(currentIndex + 1));
         animateOut();
-        advanceAfter(320);
+        advanceAfter(REPEAT_SWAP_MS);
         return;
       }
 
@@ -2698,14 +2701,14 @@
       if (isFastTrackRestored || graduated) {
         playLevelUp(newGroup, newRep);
         const ms = newGroup >= 8 ? LEVELUP_MS + 500 : LEVELUP_MS;
-        setTimeout(fadeOutLevelUp, ms - 140);
+        setTimeout(fadeOutLevelUp, ms - LU_FADE_MS - 20);
         advanceAfter(ms);
       } else if (action === "Fail" && card.group > 0) {
         animateOut();
-        advanceAfter(320);
+        advanceAfter(REPEAT_SWAP_MS);
       } else {
         animateOut();
-        advanceAfter(160);
+        advanceAfter(PASS_SWAP_MS);
       }
     }
 
