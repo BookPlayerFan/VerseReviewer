@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-43'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-44'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -961,29 +961,39 @@ const CONTEXT_LAST_KEY = 'VR_CTX_LAST'; // last API problem, for troubleshooting
 
 const CONTEXT_SYSTEM = 'You are a careful Bible study helper inside a personal Scripture-memorization app. ' +
   'Give the reader background that makes one passage come alive and easier to remember, the way a knowledgeable friend would explain it. ' +
-  'Be concrete and specific: name the people and the situation, say what the key Hebrew or Greek word meant, and say what the passage\'s own words picture. Prefer particular detail over general statements. ' +
-  'Be accurate: use widely agreed information about the author, audience, date, occasion, genre, and where the passage sits in its book. Never invent details. ' +
+  'The most useful thing you can give is the story or argument that leads into the passage, and where the passage sits within its chapter and its book. ' +
+  'Be concrete and specific: name the people and the situation, refer to chapters and verses, say what the key Hebrew or Greek word meant, and say what the passage\'s own words picture. Prefer particular detail over general statements. ' +
+  'Be accurate: use widely agreed information about the author, audience, date, occasion, genre, and the shape of the book. Never invent details. ' +
   'When something is genuinely uncertain, say so briefly where it matters. Do not open with disclaimers about authorship or date, and do not hedge everything. ' +
   'Do not argue denominational or doctrinal positions; where translations or scholars differ in a way that changes how the passage reads, mention only the one or two most important differences, briefly, without taking a side. ' +
-  'Write in plain, warm language. No markdown and no bullet points. Keep the whole answer to about 250 words.';
+  'Write in plain, warm language. No markdown and no bullet points. Keep the whole answer to about 300 words.';
 
-// Two worked examples (other passages than the ones most likely to be studied) set the depth, detail and tone.
+// Worked examples set the depth, detail and tone.
 const CONTEXT_EXAMPLES = [
+  ['Job 19:25-27 (ESV)',
+   'SUMMARY: In the middle of his worst suffering, Job declares that he knows his Redeemer lives and will stand up for him at last. He expects to see God for himself, as a friend rather than an enemy, and the thought leaves him almost overwhelmed with longing.\n' +
+   'LEAD-UP: Job is a righteous man who has lost his children, his wealth and his health. His three friends insist he must have sinned to deserve this, and chapter 19 is his answer to the second speech from Bildad, one of those friends. Job has just described how God seems to have turned against him, and how his family, his servants and even his closest friends have pulled away (verses 13-22). He begs for pity, and then, in a sudden turn, wishes his words could be carved in rock forever (verses 23-24). These verses are what he wants carved there.\n' +
+   'WHERE IT SITS: Job is a long poem about why a righteous person suffers. It is made of speeches between Job and his friends, and it ends with God\'s own answer. Chapter 19 falls in the middle of the second round of speeches, and these three verses are the high point of Job\'s argument so far, a flash of hope in a very dark stretch. Right after, in verses 28-29, Job warns his friends that they should fear judgment for how they are treating him.\n' +
+   'KEY WORD: In Hebrew, "Redeemer" is the go\'el, a family member who steps in to defend a relative, buy back lost property, or set a wrong right. Job pictures someone who will take his side in a courtroom and clear his name.\n' +
+   'WORTH KNOWING: Verse 26 is hard to translate, and Bible versions differ. "In my flesh I shall see God" could mean seeing God in a body after death, or from beyond death, or being vindicated while still alive. Many Christians read the passage as pointing to resurrection hope and to Christ. Many scholars think Job\'s immediate hope is that God himself will vindicate him, even if that comes after he dies.\n' +
+   'KEY POINT: Job\'s hope does not depend on his circumstances getting better. It depends on who he believes God is.'],
   ['Romans 5:8 (ESV)',
    'SUMMARY: Paul says God\'s love is not just a feeling or a promise; it was shown in a specific act. Christ died for people while they were still sinners, not after they had cleaned up their lives.\n' +
-   'SETTING: Paul wrote this letter to the Christians in Rome, a church he had not yet visited, most likely from Corinth around AD 57. By chapter 5 he has spent four chapters arguing that everyone, Jew and non-Jew, needs God\'s mercy and is put right with God by faith rather than by earning it. Now he turns to what that gift produces: peace with God and a steady hope.\n' +
-   'WHERE IT FITS: Verse 7 sets the scene: hardly anyone would die for a righteous person, and perhaps someone might dare to die for a good one. Then verse 8 breaks the pattern. The word "shows" means to demonstrate or put on display, so the cross is presented as the proof of God\'s love. Right after, in verses 9-10, Paul reasons that if God did this for his enemies, he will surely save those who are now his friends.\n' +
+   'LEAD-UP: Paul wrote to the Christians in Rome, a church he had not yet visited, most likely from Corinth around AD 57. In the first four chapters he argued that everyone, Jew and non-Jew alike, stands guilty before God and is put right with him by faith rather than by earning it, using Abraham as his proof. Chapter 5 opens with what that gift produces: peace with God and a hope that holds even in suffering (verses 1-5). Verse 6 then begins to show why that hope is secure: Christ died for the ungodly "at the right time."\n' +
+   'WHERE IT SITS: Romans moves from the problem of everyone\'s sin (chapters 1-3), to the gift of being put right by faith (3-5), to life in the Spirit (6-8), and then on to God\'s plan for Israel and everyday Christian living. Verse 8 is the center of this chapter\'s argument. Right after it, in verses 9-10, Paul reasons that if God did this for his enemies, he will surely save those who are now his friends.\n' +
+   'KEY WORD: The word "shows" means to demonstrate or put on display, so the cross is presented as the proof of God\'s love. Verse 7 sets up the contrast: hardly anyone would die for a righteous person, though someone might dare to die for a good one.\n' +
    'KEY POINT: God\'s love does not wait for us to deserve it; it came to us at our worst.'],
   ['Psalm 121:1-2 (ESV)',
    'SUMMARY: The psalm opens with a question: looking up at the hills, where will help come from? The answer comes at once. It will not come from the hills but from the LORD, who made heaven and earth.\n' +
-   'SETTING: This is one of the "Songs of Ascents" (Psalms 120-134), which pilgrims sang as they climbed toward Jerusalem for the festivals. The road ran through rugged hill country where travelers faced real dangers: heat, rough ground and robbers. The psalm names no author.\n' +
-   'WHERE IT FITS: The rest of the psalm (verses 3-8) unfolds the answer. The LORD does not sleep, he is a shade at your right hand, and he guards your going out and your coming in. The Hebrew word for "keep" or "guard" appears six times in these eight verses, so protection is the psalm\'s main theme.\n' +
+   'LEAD-UP: This is one of the "Songs of Ascents" (Psalms 120-134), which pilgrims sang as they climbed toward Jerusalem for the festivals. The road ran through rugged hill country where travelers faced real dangers: heat, rough ground and robbers. The psalm before it, Psalm 120, is the cry of someone far from home in distress. Psalm 121 names no author, and it begins with a traveler looking up at that landscape and asking where help will come from.\n' +
+   'WHERE IT SITS: Psalm 121 is an early step on the pilgrims\' journey, and its two opening verses are the question and the answer. The rest of the psalm (verses 3-8) unfolds the answer: the LORD does not sleep, he is a shade at your right hand, and he guards your going out and your coming in, "from this time forth and forevermore."\n' +
+   'KEY WORD: The Hebrew word for "keep" or "guard" appears six times in these eight verses, so protection is the psalm\'s main theme.\n' +
    'WORTH KNOWING: "The hills" can be read as the dangers of the road, or as the hilltop shrines where people worshiped other gods. Either way, the point is the same: help comes from the Creator, not from the landscape.\n' +
    'KEY POINT: When the road ahead looks dangerous, the psalm turns your eyes past the obstacle to the one who made it.']
 ];
 
 function contextPrompt_(ref, version, text) {
-  let out = 'Two examples of the depth, detail and tone wanted, for other passages. Match their style and length, but never reuse their wording for a different passage. ' +
+  let out = 'Here are worked examples of the depth, detail and tone wanted, for other passages. Match their style and length, but never reuse their wording for a different passage. ' +
     'Note that the WORTH KNOWING label is left out when there is nothing real to flag.\n\n';
   CONTEXT_EXAMPLES.forEach(function(ex) { out += '--- Example: ' + ex[0] + ' ---\n' + ex[1] + '\n\n'; });
   out += '--- Your turn ---\n' +
@@ -991,8 +1001,9 @@ function contextPrompt_(ref, version, text) {
     'Text (any bracketed numbers are verse numbers): ' + text + '\n\n' +
     'Answer using exactly these labels, each at the start of its own line, in this order:\n' +
     'SUMMARY: two or three sentences in plain words on what the passage says and how its thought or feeling moves. Name its main figure or idea directly.\n' +
-    'SETTING: who is speaking or writing, to whom, and what is happening at that point in the story, poem or letter. Lead with the situation.\n' +
-    'WHERE IT FITS: how it connects to what comes just before and after it, and what one key word or image means and why it matters.\n' +
+    'LEAD-UP: the story or argument that leads into these verses: who is speaking or writing, to whom, and what has been happening just before, in this chapter and the book so far. Be specific and refer to chapters and verses. Four or five sentences.\n' +
+    'WHERE IT SITS: one sentence on what the whole book is and how it moves, then where this chapter and these verses fall in that movement, and what comes right after them.\n' +
+    'KEY WORD: what one important word or image means in the original language and why it matters. Leave this label out only if no word stands out.\n' +
     'WORTH KNOWING: only if translations or scholars differ in a way that changes how the passage reads, or there is a common misunderstanding. Give at most the one or two most important points, in three sentences or fewer. If there is nothing like that, leave this label out completely.\n' +
     'KEY POINT: one sentence giving the takeaway, what to hold on to. Do not just repeat the summary.';
   return out;

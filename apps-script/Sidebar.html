@@ -1707,7 +1707,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-126';
+    const CLIENT_BUILD = 'sync-127';
 
     let queue = [];
     let currentIndex = 0;
@@ -2093,15 +2093,16 @@
     // The server asks Claude once per verse and keeps the answer on the "Context" tab; later opens are instant.
     const ctxCache = {};
     let ctxToken = 0;
-    const CTX_LABELS = { "SUMMARY": "Summary", "SETTING": "Setting", "WHERE IT FITS": "Where it fits", "WORTH KNOWING": "Worth knowing", "KEY POINT": "Key point" };
+    // (SETTING and WHERE IT FITS are the labels used by earlier answers that are already saved on your sheet)
+    const CTX_LABELS = { "SUMMARY": "Summary", "LEAD-UP": "Lead-up", "WHERE IT SITS": "Where it sits", "KEY WORD": "Key word", "SETTING": "Setting", "WHERE IT FITS": "Where it fits", "WORTH KNOWING": "Worth knowing", "KEY POINT": "Key point" };
 
     function parseContext(text) {
       const out = [];
       let cur = null;
       String(text || "").replace(/\r/g, "").split("\n").forEach(function(line) {
         const clean = line.replace(/\*\*/g, "").trim();
-        const m = clean.match(/^(SUMMARY|SETTING|WHERE IT FITS|WORTH KNOWING|KEY POINT)\s*:\s*(.*)$/i);
-        if (m) { cur = { key: m[1].toUpperCase(), text: m[2] }; out.push(cur); }
+        const m = clean.match(/^(SUMMARY|LEAD[- ]UP|WHERE IT SITS|KEY WORD|SETTING|WHERE IT FITS|WORTH KNOWING|KEY POINT)\s*:\s*(.*)$/i);
+        if (m) { const k = m[1].toUpperCase(); cur = { key: k === "LEAD UP" ? "LEAD-UP" : k, text: m[2] }; out.push(cur); }
         else if (clean) {
           if (cur) cur.text += (cur.text ? " " : "") + clean;
           else { cur = { key: "", text: clean }; out.push(cur); }
