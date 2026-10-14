@@ -1666,7 +1666,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-122';
+    const CLIENT_BUILD = 'sync-123';
 
     let queue = [];
     let currentIndex = 0;
@@ -2470,6 +2470,9 @@
     function handleVerseClick(index, event) {
       if (event) event.stopPropagation();
       if (isScoring) return;
+      // Review tab: a tap anywhere in the verse box, even on one verse, just reveals the next hidden verse.
+      // (The New tab keeps tap-a-verse-to-toggle.)
+      if (mode !== 'learning') { handleContainerClick(event); return; }
 
       segmentStates[index] = segmentStates[index] === 'revealed' ? 'hidden' : 'revealed';
       syncFlipState();
