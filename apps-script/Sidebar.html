@@ -1654,7 +1654,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-113';
+    const CLIENT_BUILD = 'sync-114';
 
     let queue = [];
     let currentIndex = 0;
@@ -3163,9 +3163,11 @@
     // "Paste verse": the paste box opens right away (so the keyboard and iPhone's Paste bubble work, as they did
     // originally), and in the background we try to read the clipboard for you. If that works, the box is skipped
     // and the popup shows the verse it understood.
+    // Automatic clipboard reading is switched off while we check it isn't what blocks iPhone's own Paste bubble.
+    let AUTO_CLIP_READ = false;
     function startPaste() {
       openPaste();
-      if (pasteReading) return;
+      if (!AUTO_CLIP_READ || pasteReading) return;
       let direct = null;
       try { direct = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { direct = null; }
       const cb = direct ? direct.catch(function() { return readClipViaShell(); }) : readClipViaShell();
