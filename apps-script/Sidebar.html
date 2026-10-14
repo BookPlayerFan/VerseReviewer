@@ -1655,7 +1655,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-116';
+    const CLIENT_BUILD = 'sync-117';
 
     let queue = [];
     let currentIndex = 0;
@@ -3156,7 +3156,13 @@
       document.getElementById("pasteModal").classList.add("open");
       try { window.refreshPasteDiag(); } catch (e) {}
       if (prefill) updatePasteHint();
-      setTimeout(function() { try { document.getElementById("pasteText").focus(); } catch (e) {} }, 50);
+      // Focus right here, while the tap that opened the box is still in progress: iPhone only raises the keyboard
+      // for a focus that comes straight from a tap (a delayed focus leaves a blinking cursor and no typing).
+      try {
+        const t = document.getElementById("pasteText");
+        t.focus();
+        const n = t.value.length; t.setSelectionRange(n, n);
+      } catch (e) {}
     }
 
     function closePaste() {
