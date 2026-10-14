@@ -951,11 +951,11 @@ function deleteUnassignedVerse(rowIndex, reference) {
 // ───────────── Verse context (AI) ─────────────
 // Hold a verse reference in the app to see a short background note (summary, setting, where it fits).
 // It is written by Claude through the Anthropic API, using the key saved in Script Properties as ANTHROPIC_KEY.
-// Each verse is asked for once; the answer is kept on a "Context" tab (created automatically) and reused after that.
-// Delete a row on that tab, or use Regenerate in the app, to get a fresh one.
+// Each verse is asked for once. The answer is kept in column I of that verse's row on the Verses tab and reused after that.
+// Clear the cell, or use Regenerate in the app, to get a fresh one.
 const CONTEXT_MODEL = 'claude-sonnet-5-5'; // a cheaper, faster choice is 'claude-haiku-5-5'
-const CONTEXT_SHEET = 'Context';
-const CONTEXT_HEADERS = ['Reference', 'Context', 'Model', 'Created'];
+const CONTEXT_COL = 9;                     // column I on the Verses tab
+const CONTEXT_OLD_SHEET = 'Context';       // an earlier build kept answers on this tab; they are reused if it exists
 const CONTEXT_MAX_TOKENS = 2500;
 const CONTEXT_LAST_KEY = 'VR_CTX_LAST'; // last API problem, for troubleshooting
 
@@ -977,44 +977,44 @@ function contextPrompt_(ref, version, text) {
     'KEY POINT: one sentence.';
 }
 
-function getContextSheet_(create) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(CONTEXT_SHEET);
-  if (!sheet && create) {
-    sheet = ss.insertSheet(CONTEXT_SHEET);
-    sheet.appendRow(CONTEXT_HEADERS);
-    try { sheet.setFrozenRows(1); } catch (e) {}
-    try { sheet.setColumnWidth(2, 600); } catch (e) {}
-  }
-  return sheet;
+function versesSheet_() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
 }
 
+// The kept answer for a verse (found by reference, like everywhere else), or ''.
 function readContext_(ref) {
-  const sheet = getContextSheet_(false);
-  if (!sheet) return null;
-  const last = sheet.getLastRow();
-  if (last < 2) return null;
-  const want = cleanRef_(ref).toLowerCase();
-  const vals = sheet.getRange(2, 1, last - 1, 4).getValues();
-  for (let i = 0; i < vals.length; i++) {
-    if (cleanRef_(vals[i][0]).toLowerCase() === want && String(vals[i][1] || '').trim()) {
-      return { row: i + 2, text: String(vals[i][1]), model: String(vals[i][2] || ''), at: String(vals[i][3] || '') };
-    }
-  }
-  return null;
+  const sheet = versesSheet_();
+  if (!sheet) return '';
+  const row = findRowByRef_(sheet, ref);
+  if (!row) return '';
+  const v = sheet.getRange(row, CONTEXT_COL).getValue();
+  return v === null || v === undefined ? '' : String(v).trim();
 }
 
-function saveContext_(ref, text, model) {
+// Answers saved by an earlier build on a separate "Context" tab.
+function oldContext_(ref) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONTEXT_OLD_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return '';
+    const want = cleanRef_(ref).toLowerCase();
+    const vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      if (cleanRef_(vals[i][0]).toLowerCase() === want && String(vals[i][1] || '').trim()) return String(vals[i][1]).trim();
+    }
+  } catch (e) {}
+  return '';
+}
+
+function saveContext_(ref, text) {
   const lock = LockService.getScriptLock();
   let got = false;
   try { got = lock.tryLock(10000); } catch (e) {}
   if (!got) return false; // the answer is still shown; it just is not kept this time
   try {
-    const sheet = getContextSheet_(true);
-    const old = readContext_(ref);
-    const row = [ref, text, model, new Date().toISOString()];
-    if (old) sheet.getRange(old.row, 1, 1, 4).setValues([row]);
-    else sheet.appendRow(row);
+    const sheet = versesSheet_();
+    const row = sheet ? findRowByRef_(sheet, ref) : 0; // looked up again: rows may have moved while Claude was thinking
+    if (!row) return false;
+    sheet.getRange(row, CONTEXT_COL).setValue(text);
     return true;
   } catch (e) {
     console.error('Context save failed: ' + e);
@@ -1074,12 +1074,16 @@ function getVerseContext(reference, version, text, force) {
   const ref = cleanRef_(reference);
   if (!ref) return { ok: false, code: 'bad', message: 'No verse given.' };
   if (!force) {
-    const hit = readContext_(ref);
-    if (hit) return { ok: true, text: hit.text, cached: true, model: hit.model, at: hit.at };
+    let kept = readContext_(ref);
+    if (!kept) {
+      kept = oldContext_(ref);
+      if (kept) saveContext_(ref, kept); // move it to column I
+    }
+    if (kept) return { ok: true, text: kept, cached: true };
   }
   let body = String(text || '').trim();
   if (!body) {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+    const sheet = versesSheet_();
     const row = sheet ? findRowByRef_(sheet, ref) : 0;
     if (row) body = cleanRef_(sheet.getRange(row, 8).getValue());
   }
@@ -1088,8 +1092,8 @@ function getVerseContext(reference, version, text, force) {
 
   const ans = askClaude_(CONTEXT_SYSTEM, contextPrompt_(ref, cleanRef_(version), body));
   if (!ans.ok) return ans;
-  const kept = saveContext_(ref, ans.text, CONTEXT_MODEL);
-  return { ok: true, text: ans.text, cached: false, kept: kept, model: CONTEXT_MODEL, at: new Date().toISOString() };
+  const kept = saveContext_(ref, ans.text);
+  return { ok: true, text: ans.text, cached: false, kept: kept, model: CONTEXT_MODEL };
 }
 
 // ── Keeping the Verses tab sorted ──

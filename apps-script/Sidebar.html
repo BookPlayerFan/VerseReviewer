@@ -798,20 +798,21 @@
     .pv-btns button { flex: 1; min-height: 0; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; flex-direction: row; justify-content: center; }
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
+    .pv-undo { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
+    .uc-body { text-align: center; font-size: 16px; line-height: 1.45; margin: 2px 0 8px; color: var(--text-primary); }
+    .uc-body .uc-sub { margin-top: 4px; font-size: 14px; color: var(--text-muted); }
     .pv-del { background: var(--btn-fail-bg); color: var(--btn-fail-text); }
     /* Hold the reference: background note (Context) under it */
     .ref-header { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
-    .ref-header { position: relative; isolation: isolate; }
-    .ref-header::before { content: ""; position: absolute; z-index: -1; left: var(--hl-l, -12px); right: var(--hl-r, -12px); top: var(--hl-t, -2px); bottom: var(--hl-b, -2px); border-radius: 14px; background: transparent; }
-    .ref-header.lp-down::before, .ref-header.um-open::before { background: var(--btn-restart-bg); }
     .card-header-group { position: relative; }
     .ctx-panel { position: absolute; left: 50%; transform: translateX(-50%); width: 100%; max-width: 380px; z-index: 30; box-sizing: border-box;
       display: flex; flex-direction: column; text-align: left; background: var(--bg-card); border: 1px solid var(--border-card);
       border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.22); font-size: 15px; line-height: 1.5; color: var(--text-primary); }
+    .ctx-panel::before { content: ""; position: absolute; left: 50%; top: -7px; width: 12px; height: 12px; background: var(--bg-card);
+      border-left: 1px solid var(--border-card); border-top: 1px solid var(--border-card); transform: translateX(-50%) rotate(45deg); }
+    .card-header-group.ctx-open .meta-tag, .card-header-group.ctx-open .pips-container { visibility: hidden; } /* the note flows straight out of the reference */
     .ctx-panel button { border: 0; background: none; color: var(--text-accent); font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
     .ctx-panel button:active { opacity: .6; }
-    .ctx-undo { display: block; width: 100% !important; text-align: left; color: var(--text-primary) !important; font-weight: 600 !important; padding: 12px 14px !important;
-      border-bottom: 1px solid var(--border-body) !important; border-radius: 16px 16px 0 0 !important; }
     .ctx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 6px 7px 14px; border-bottom: 1px solid var(--border-body); flex-shrink: 0; }
     .ctx-title { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--text-muted); }
     .ctx-x { font-size: 17px !important; line-height: 1 !important; padding: 6px 10px !important; color: var(--text-muted) !important; }
@@ -1016,6 +1017,17 @@
         <button type="button" class="pv-close" onclick="closePreview()">Close</button>
         <button type="button" class="pv-del" id="pvDel" style="display:none"></button>
         <button type="button" class="pv-add" id="pvAdd">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pv" id="undoConfirm" onclick="if (event.target === this) closeUndoConfirm()">
+    <div class="pv-card">
+      <div class="pv-head" id="ucTitle">Undo last review?</div>
+      <div class="uc-body" id="ucBody"></div>
+      <div class="pv-btns">
+        <button type="button" class="pv-close" id="ucCancel" onclick="closeUndoConfirm()">Cancel</button>
+        <button type="button" class="pv-undo" id="ucGo" onclick="confirmUndo()">Undo</button>
       </div>
     </div>
   </div>
@@ -1695,7 +1707,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-125';
+    const CLIENT_BUILD = 'sync-126';
 
     let queue = [];
     let currentIndex = 0;
@@ -1763,6 +1775,10 @@
       const tn = document.getElementById("tabNew");
       const heldTab = attachLongPress(tn, function() { addNewVerse(); });
       tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+      // hold the Review tab to undo the last review (asks first)
+      const tr = document.getElementById("tabReview");
+      const heldRevTab = attachLongPress(tr, function() { openUndoConfirm(); });
+      tr.addEventListener("click", function(e) { if (heldRevTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       if (initialSession && Array.isArray(initialSession.cards)) {
         adoptSession(initialSession);
       } else {
@@ -2105,7 +2121,7 @@
     function closeContext(fromOutsideTap) {
       ctxToken++; // any answer still on its way is ignored
       document.querySelectorAll(".ctx-panel").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
-      const r = document.getElementById("cardRef"); if (r) r.classList.remove("um-open");
+      document.querySelectorAll(".card-header-group.ctx-open").forEach(function(g) { g.classList.remove("ctx-open"); });
       document.removeEventListener("pointerdown", onCtxOutside, true);
       if (fromOutsideTap) swallowNextClick(); // the tap that closes it must not also reveal a verse or press a button
     }
@@ -2183,13 +2199,6 @@
       const p = ctxEl("div", "ctx-panel");
       p.setAttribute("role", "dialog");
       p.setAttribute("aria-label", "Background for " + card.reference);
-      // Undo used to live in this spot's old menu; until it has a new home it stays reachable here while an undo is available.
-      if (undoAvailable()) {
-        const u = ctxEl("button", "ctx-undo", "↶ Undo " + undoLabel);
-        u.type = "button";
-        u.onclick = function(e) { e.stopPropagation(); closeContext(); undoLast(); };
-        p.appendChild(u);
-      }
       const head = ctxEl("div", "ctx-head");
       head.appendChild(ctxEl("span", "ctx-title", "Background"));
       const x = ctxEl("button", "ctx-x", "✕");
@@ -2200,50 +2209,52 @@
       p.appendChild(ctxEl("div", "ctx-scroll"));
       p.appendChild(ctxEl("div", "ctx-foot"));
       grp.appendChild(p);
-      // sits under the reference block (the reference stays visible, highlighted) and may reach down to the bottom of the verse box (the buttons stay visible)
-      const top = grp.getBoundingClientRect().height + 6;
+      // sits right under the reference with a little caret pointing up at it, and may reach down to the bottom of the verse box (the buttons stay visible)
+      const top = ref.getBoundingClientRect().bottom - grp.getBoundingClientRect().top + 12;
       p.style.top = top + "px";
       const wrap = document.querySelector("#activeCard .verse-wrap");
       const room = wrap ? wrap.getBoundingClientRect().bottom - (grp.getBoundingClientRect().top + top) : 360;
       p.style.maxHeight = Math.max(200, Math.min(room, 480)) + "px";
-      ref.classList.add("um-open");
+      grp.classList.add("ctx-open");
       setTimeout(function() { document.addEventListener("pointerdown", onCtxOutside, true); }, 0);
 
       if (ctxCache[card.reference]) ctxRender(p, card, { text: ctxCache[card.reference] }, false);
       else ctxLoad(p, card, false);
     }
-    // Size the blue highlight to the real ink of the reference (works with any font, so it looks centered on every device).
-    function fitRefHighlight() {
-      try {
-        const ref = document.getElementById("cardRef");
-        const cs = getComputedStyle(ref);
-        const ctx = document.createElement("canvas").getContext("2d");
-        ctx.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
-        const txt = ref.firstChild && ref.firstChild.nodeType === 3 ? ref.firstChild.nodeValue : ref.textContent;
-        const m = ctx.measureText(txt), cap = ctx.measureText("H");
-        const probe = document.createElement("span");
-        probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
-        ref.appendChild(probe);
-        const rr = ref.getBoundingClientRect(), base = probe.getBoundingClientRect().bottom - rr.top;
-        ref.removeChild(probe);
-        const capMid = base + (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2;
-        const padY = 15, padX = 14;
-        const w = m.width, inkL = (rr.width - w) / 2 - m.actualBoundingBoxLeft, inkR = (rr.width - w) / 2 + m.actualBoundingBoxRight;
-        ref.style.setProperty("--hl-l", (-(inkL - (-0)) - padX) + "px");
-        ref.style.setProperty("--hl-r", (-(rr.width - inkR) - padX) + "px");
-        ref.style.setProperty("--hl-t", (capMid - padY) + "px");
-        ref.style.setProperty("--hl-b", (rr.height - capMid - padY) + "px");
-      } catch (e) {}
-    }
     let heldRef = null;
     function attachRefHold() {
       const ref = document.getElementById("cardRef");
       // both tabs: hold the reference to open its background note
-      heldRef = attachLongPress(ref, function() { if (hasActiveCard()) openContext(); }, function(e) { if (e.target.closest(".ctx-panel")) return false; fitRefHighlight(); return true; });
+      heldRef = attachLongPress(ref, function() { if (hasActiveCard()) openContext(); }, function(e) { return !e.target.closest(".ctx-panel"); });
       ref.addEventListener("click", function(e) { if (heldRef()) { e.stopPropagation(); e.preventDefault(); } }, true);
     }
 
-    function undoLast() {
+    // Hold the Review tab: a small popup asks before undoing the last review.
+    function openUndoConfirm() {
+      if (isScoring) return;
+      const ok = undoAvailable();
+      document.getElementById("ucTitle").textContent = ok ? "Undo last review?" : "Nothing to undo";
+      const body = document.getElementById("ucBody");
+      body.textContent = "";
+      if (ok) {
+        const m = document.createElement("div"); m.textContent = undoLabel || "Your last review";
+        const sub = document.createElement("div"); sub.className = "uc-sub"; sub.textContent = "It goes back to how it was before you scored it.";
+        body.appendChild(m); body.appendChild(sub);
+      } else {
+        body.textContent = "Undo works for 2 minutes after you score a card.";
+      }
+      document.getElementById("ucGo").style.display = ok ? "" : "none";
+      document.getElementById("ucCancel").textContent = ok ? "Cancel" : "OK";
+      document.getElementById("undoConfirm").classList.add("open");
+    }
+    function closeUndoConfirm() { document.getElementById("undoConfirm").classList.remove("open"); }
+    function confirmUndo() {
+      closeUndoConfirm();
+      // show the Review card that comes back, wherever you were
+      undoLast(function() { goTab("review"); });
+    }
+
+    function undoLast(afterOk) {
       if (!undoAvailable()) { if (!undoId) return; flashNotice("Nothing to undo"); return; }
       const id = undoId;
       hideUndo();
@@ -2253,6 +2264,7 @@
           isScoring = false;
           if (res && res.session) {
             adoptSession(res.session);
+            if (res.ok && typeof afterOk === "function") afterOk();
             flashNotice(res.ok ? "Undone" : "Nothing to undo");
           } else {
             flashNotice("Couldn't undo");
@@ -2460,7 +2472,10 @@
 
     function setMode(m) {
       mode = m;
+      // Changing tabs doesn't change the deck, so a review from the last couple of minutes can still be undone afterwards
+      const keep = { id: undoId, label: undoLabel, exp: undoExp };
       enqueueSubmit(null, snapshot(currentIndex)); // saves the screen you're on so any device reopens here
+      undoId = keep.id; undoLabel = keep.label; undoExp = keep.exp;
       render();
     }
 
@@ -3713,7 +3728,7 @@
         return;
       }
       // Not while a popup is open
-      const popupOpen = ["picker", "pickerPreview", "pasteModal", "pastePreview"].some(function(id) {
+      const popupOpen = ["picker", "pickerPreview", "pasteModal", "pastePreview", "undoConfirm"].some(function(id) {
         return document.getElementById(id).classList.contains("open");
       });
       if (popupOpen) return;
