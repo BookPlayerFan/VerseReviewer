@@ -805,7 +805,7 @@
     /* Hold the reference: background note (Context) under it */
     .ref-header { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
     .card-header-group { position: relative; }
-    .ctx-panel { position: absolute; left: 50%; transform: translateX(-50%); width: 100%; max-width: 380px; z-index: 30; box-sizing: border-box;
+    .ctx-panel { position: absolute; left: 50%; transform: translateX(-50%); width: calc(100% + 18px); max-width: 400px; z-index: 30; box-sizing: border-box;
       display: flex; flex-direction: column; text-align: left; background: var(--bg-card); border: 1px solid var(--border-card);
       border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.22); font-size: 15px; line-height: 1.5; color: var(--text-primary); }
     .ctx-panel::before { content: ""; position: absolute; left: 50%; top: -7px; width: 12px; height: 12px; background: var(--bg-card);
@@ -825,9 +825,9 @@
     .ctx-msg.err { color: var(--text-primary); }
     .ctx-hint { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
     .ctx-retry { font-weight: 700 !important; padding: 8px 0 0 !important; }
-    .ctx-foot:empty { display: none; }
-    .ctx-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px 6px 14px; border-top: 1px solid var(--border-body); font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
-    .ctx-foot button { font-size: 12px !important; font-weight: 700 !important; padding: 6px 6px !important; }
+    /* disclaimer + Regenerate sit at the very end of the scrolling note, out of the way until you scroll down to them */
+    .ctx-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 18px; padding-top: 6px; border-top: 1px solid var(--border-body); font-size: 12px; color: var(--text-muted); }
+    .ctx-foot button { font-size: 12px !important; font-weight: 700 !important; padding: 6px 0 6px 6px !important; }
     .ctx-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--border-card); border-top-color: var(--text-accent); border-radius: 50%;
       animation: ctxspin .9s linear infinite; vertical-align: -3px; margin-right: 8px; }
     @keyframes ctxspin { to { transform: rotate(360deg); } }
@@ -1707,7 +1707,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-127';
+    const CLIENT_BUILD = 'sync-128';
 
     let queue = [];
     let currentIndex = 0;
@@ -2137,8 +2137,8 @@
 
     // st: { loading } | { text } | { error, code }   (force remembers whether "Try again" should ask Claude afresh)
     function ctxRender(p, card, st, force) {
-      const sc = p.querySelector(".ctx-scroll"), ft = p.querySelector(".ctx-foot");
-      sc.textContent = ""; ft.textContent = "";
+      const sc = p.querySelector(".ctx-scroll");
+      sc.textContent = ""; sc.scrollTop = 0;
       if (st.loading) {
         const m = ctxEl("p", "ctx-msg");
         m.appendChild(ctxEl("span", "ctx-spin"));
@@ -2162,11 +2162,13 @@
         d.appendChild(ctxEl("p", "ctx-text", sec.text));
         sc.appendChild(d);
       });
+      const ft = ctxEl("div", "ctx-foot");
       ft.appendChild(ctxEl("span", "", "AI-generated · can contain mistakes"));
       const g = ctxEl("button", "", "Regenerate");
       g.type = "button";
       g.onclick = function(e) { e.stopPropagation(); ctxLoad(p, card, true); };
       ft.appendChild(g);
+      sc.appendChild(ft);
     }
 
     function ctxLoad(p, card, force) {
@@ -2208,14 +2210,13 @@
       head.appendChild(x);
       p.appendChild(head);
       p.appendChild(ctxEl("div", "ctx-scroll"));
-      p.appendChild(ctxEl("div", "ctx-foot"));
       grp.appendChild(p);
       // sits right under the reference with a little caret pointing up at it, and may reach down to the bottom of the verse box (the buttons stay visible)
       const top = ref.getBoundingClientRect().bottom - grp.getBoundingClientRect().top + 12;
       p.style.top = top + "px";
       const wrap = document.querySelector("#activeCard .verse-wrap");
       const room = wrap ? wrap.getBoundingClientRect().bottom - (grp.getBoundingClientRect().top + top) : 360;
-      p.style.maxHeight = Math.max(200, Math.min(room, 480)) + "px";
+      p.style.maxHeight = Math.max(220, Math.min(room, 620)) + "px";
       grp.classList.add("ctx-open");
       setTimeout(function() { document.addEventListener("pointerdown", onCtxOutside, true); }, 0);
 
