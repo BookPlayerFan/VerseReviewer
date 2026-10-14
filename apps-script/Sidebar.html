@@ -461,9 +461,6 @@
       display: inline-block;
     }
 
-    /* invisible, larger tap area around the verse number (about 28px wide, a full line tall) */
-    .v-num { position: relative; cursor: pointer; }
-    .v-num::after { content: ""; position: absolute; left: -8px; right: -8px; top: -9px; bottom: -9px; }
     .v-text {
       border-radius: 4px;
       padding: 2px 4px;
@@ -1669,7 +1666,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-121';
+    const CLIENT_BUILD = 'sync-122';
 
     let queue = [];
     let currentIndex = 0;
@@ -1694,7 +1691,6 @@
 
     let parsedSegments = [];
     let segmentStates = [];
-    let revealFrom = -1; // last verse you touched; "next" carries on after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
     let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
@@ -1775,7 +1771,7 @@
           render();
           const shown = Array.isArray(d.revealed) ? d.revealed : [];
           if (at >= 0 && shown.length && parsedSegments.length) {
-            segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; }); revealFrom = -1;
+            segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; });
             syncFlipState();
             renderCardBody();
           }
@@ -2280,7 +2276,7 @@
 
       isFlipped = false;
       parsedSegments = parseVerseSegments(card.text, card.reference);
-      segmentStates = parsedSegments.map(() => 'hidden'); revealFrom = -1;
+      segmentStates = parsedSegments.map(() => 'hidden');
 
       cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
@@ -2358,7 +2354,7 @@
       isFlipped = false;
 
       parsedSegments = parseVerseSegments(card.text, card.reference);
-      segmentStates = parsedSegments.map(() => 'hidden'); revealFrom = -1;
+      segmentStates = parsedSegments.map(() => 'hidden');
 
       cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
@@ -2446,8 +2442,8 @@
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
         html += `
-          <span class="verse-unit" data-idx="${idx}">
-            ${seg.num ? `<sup class="v-num" onclick="handleNumberClick(${idx}, event)">${escapeHtml(seg.num)}</sup>` : ''}
+          <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
+            ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}
             <span class="v-text ${isRev ? 'revealed' : 'blurred'}">${escapeHtml(seg.text)}</span>
           </span>
         `;
@@ -2471,26 +2467,21 @@
       }, true);
     }
 
-    // Tap a verse number: show or hide just that verse. "Next" then carries on from there
-    // (after showing a verse, the next hidden one after it; after hiding one, that same verse comes back next).
-    function handleNumberClick(index, event) {
+    function handleVerseClick(index, event) {
       if (event) event.stopPropagation();
-      if (isScoring || !hasActiveCard()) return;
-      if (segmentStates[index] === 'revealed') { segmentStates[index] = 'hidden'; revealFrom = index - 1; }
-      else { segmentStates[index] = 'revealed'; revealFrom = index; }
+      if (isScoring) return;
+
+      segmentStates[index] = segmentStates[index] === 'revealed' ? 'hidden' : 'revealed';
       syncFlipState();
       renderCardBody();
     }
 
-    // Tap anywhere else on the verse box: show the next hidden verse (after the last one you touched, else from the top).
     function handleContainerClick(event) {
       if (isScoring || !hasActiveCard()) return;
 
-      let nextHiddenIdx = segmentStates.findIndex(function(st, i) { return i > revealFrom && st === 'hidden'; });
-      if (nextHiddenIdx === -1) nextHiddenIdx = segmentStates.findIndex(function(st) { return st === 'hidden'; });
+      const nextHiddenIdx = segmentStates.findIndex(s => s === 'hidden');
       if (nextHiddenIdx !== -1) {
         segmentStates[nextHiddenIdx] = 'revealed';
-        revealFrom = nextHiddenIdx;
         syncFlipState();
         renderCardBody();
       }
@@ -2502,7 +2493,7 @@
 
       const allRevealed = segmentStates.every(s => s === 'revealed');
       const targetState = allRevealed ? 'hidden' : 'revealed';
-      segmentStates = segmentStates.map(() => targetState); revealFrom = -1;
+      segmentStates = segmentStates.map(() => targetState);
 
       syncFlipState();
       renderCardBody();
