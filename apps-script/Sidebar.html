@@ -247,6 +247,10 @@
     .vl-seg button { background: transparent; border: 0; box-shadow: none; min-height: 0; width: auto;
       padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--text-muted); border-radius: 0; flex-direction: row; }
     .vl-seg button.active { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); color: var(--text-accent, #1a73e8); }
+    .vl-chips { display: flex; gap: 8px; margin: 0 0 8px; }
+    .vl-chips button { flex: 1; background: transparent; border: 1px solid var(--border-card); box-shadow: none; min-height: 0; width: auto;
+      padding: 7px 0; font-size: 13px; font-weight: 600; color: var(--text-muted); border-radius: 999px; flex-direction: row; }
+    .vl-chips button.active { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); color: var(--text-accent, #1a73e8); border-color: var(--text-accent, #1a73e8); }
     .vl-row { display: flex; align-items: center; justify-content: space-between; width: 100%;
       background: none; border: 0; box-shadow: none; min-height: 0; padding: 12px 4px;
       border-bottom: 1px solid var(--border-card); flex-direction: row; border-radius: 0; text-align: left; }
@@ -938,6 +942,11 @@
         <button type="button" id="vlSortDate" onclick="setVlSort('date')">Date</button>
       </div>
     </div>
+    <div class="vl-chips" id="vlChips">
+      <button type="button" id="vlTestAll" class="active" onclick="setVlTest('all')">All</button>
+      <button type="button" id="vlTestOld" onclick="setVlTest('old')">Old</button>
+      <button type="button" id="vlTestNew" onclick="setVlTest('new')">New</button>
+    </div>
     <div class="picker-list" id="vlList"></div>
   </div>
 
@@ -1241,6 +1250,7 @@
 
     let vlVerses = [];
     let vlSort = "book";
+    let vlTest = "all"; // Book view filter: all, old (Genesis to Malachi) or new (Matthew to Revelation); always starts at all
     let vlOpen = {};
 
 
@@ -1309,6 +1319,7 @@
       document.getElementById("vlTotal").textContent = "Loading…";
       document.getElementById("vlList").textContent = "";
       vlSort = "book";
+      vlTest = "all";
       vlOpen = {};
       updateVlSeg();
       google.script.run
@@ -1328,6 +1339,7 @@
 
     function closeVerseList() {
       hideVerseTip();
+      vlTest = "all";
       resetVlSearch();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
@@ -1335,12 +1347,24 @@
 
     function setVlSort(mode) {
       vlSort = mode;
+      vlTest = "all";
+      vlOpen = {};
+      updateVlSeg();
+      renderVerseList();
+    }
+
+    function setVlTest(t) {
+      if (vlTest === t) return;
+      vlTest = t;
       vlOpen = {};
       updateVlSeg();
       renderVerseList();
     }
 
     function updateVlSeg() {
+      document.getElementById("vlTestAll").classList.toggle("active", vlTest === "all");
+      document.getElementById("vlTestOld").classList.toggle("active", vlTest === "old");
+      document.getElementById("vlTestNew").classList.toggle("active", vlTest === "new");
       document.getElementById("vlSortBook").classList.toggle("active", vlSort === "book");
       document.getElementById("vlSortRank").classList.toggle("active", vlSort === "rank");
       document.getElementById("vlSortDate").classList.toggle("active", vlSort === "date");
@@ -1564,9 +1588,14 @@
       const box = document.getElementById("vlList");
       box.textContent = "";
       document.querySelector("#verseListView .vl-seg").style.visibility = vlQuery.trim() ? "hidden" : "";
+      document.getElementById("vlChips").style.display = (vlSort === "book" && !vlQuery.trim()) ? "" : "none";
       if (vlQuery.trim() && renderVlSearch(box)) return;
-      const refCount = vlVerses.length;
-      const verseTotal = vlVerses.reduce(function(sum, v) { return sum + v.n; }, 0);
+      // Old / New chips filter the Book view only (the other views and search always cover everything).
+      const shown = (vlSort === "book" && vlTest !== "all")
+        ? vlVerses.filter(function(v) { return vlTest === "old" ? (v.p.book < 39) : (v.p.book >= 39 && v.p.book < 999); })
+        : vlVerses;
+      const refCount = shown.length;
+      const verseTotal = shown.reduce(function(sum, v) { return sum + v.n; }, 0);
       document.getElementById("vlTotal").textContent =
         verseTotal + (verseTotal === 1 ? " Verse" : " Verses") + " · " +
         refCount + (refCount === 1 ? " Reference" : " References");
@@ -1574,7 +1603,7 @@
       if (total === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
-        e.textContent = "No verses yet";
+        e.textContent = vlTest === "old" && vlSort === "book" ? "No Old Testament verses yet" : vlTest === "new" && vlSort === "book" ? "No New Testament verses yet" : "No verses yet";
         box.appendChild(e);
         return;
       }
@@ -1600,7 +1629,7 @@
       } else {
         const groups = [];
         const byKey = {};
-        vlVerses.forEach(function(v) {
+        shown.forEach(function(v) {
           const k = v.p.book === 999 ? "x:" + v.p.name : "b:" + v.p.book;
           if (!byKey[k]) { byKey[k] = { name: v.p.name, verses: [] }; groups.push(byKey[k]); }
           byKey[k].verses.push(v);
@@ -1615,7 +1644,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-100';
+    const CLIENT_BUILD = 'sync-101';
 
     let queue = [];
     let currentIndex = 0;
