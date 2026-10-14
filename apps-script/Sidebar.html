@@ -723,7 +723,7 @@
       -webkit-tap-highlight-color: transparent; }
     .tab:active { transform: none; filter: none; }
     body.lp-active, body.lp-active * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
-    .pv-card, .pv-card * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .pv-card:not(.paste-card), .pv-card:not(.paste-card) * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8;
       stroke-linecap: round; stroke-linejoin: round; }
     .tab.on { color: var(--text-accent); }
@@ -1002,7 +1002,7 @@
   </div>
 
   <div class="pv" id="pasteModal" onclick="if (event.target === this) closePaste()">
-    <div class="pv-card">
+    <div class="pv-card paste-card">
       <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Paste new verse</div>
       <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
         placeholder="Paste a verse here (reference + text), or type it:&#10;Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="updatePasteHint()" onpaste="pasteLanded()"></textarea>
@@ -1654,7 +1654,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-112';
+    const CLIENT_BUILD = 'sync-113';
 
     let queue = [];
     let currentIndex = 0;
@@ -3160,27 +3160,31 @@
       document.getElementById("pasteModal").classList.remove("open");
     }
 
-    // "Paste verse": take what is on the clipboard, or fall back to the paste box.
+    // "Paste verse": the paste box opens right away (so the keyboard and iPhone's Paste bubble work, as they did
+    // originally), and in the background we try to read the clipboard for you. If that works, the box is skipped
+    // and the popup shows the verse it understood.
     function startPaste() {
+      openPaste();
       if (pasteReading) return;
       let direct = null;
       try { direct = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { direct = null; }
-      // direct read first; if this frame isn't allowed, ask the shell page to read it instead
       const cb = direct ? direct.catch(function() { return readClipViaShell(); }) : readClipViaShell();
       pasteReading = true;
-      // iPhone can leave the clipboard request waiting on a tiny "Paste" bubble (or never answer inside the app frame).
-      // If nothing comes back quickly, open the paste box so the button never feels dead.
-      const guard = setTimeout(function() { pasteReading = false; openPaste(); }, 1200);
+      const guard = setTimeout(function() { pasteReading = false; }, 20000);
       cb.then(function(text) {
         clearTimeout(guard); pasteReading = false;
         text = String(text || "").trim();
-        if (!text) { openPaste("", "The clipboard is empty. Copy a verse first, then paste it here."); return; }
+        const box = document.getElementById("pasteText");
+        const boxOpen = document.getElementById("pasteModal").classList.contains("open");
+        const previewOpen = document.getElementById("pastePreview").classList.contains("open");
+        if (!boxOpen || previewOpen) return;                       // you already moved on
+        if (box.value.trim() && box.value.trim() !== text) return; // you typed or pasted something yourself
+        if (!text) return;
         const p = parsePasted(text);
-        if (p.error || p.empty) { openPaste(text, p.error); return; }
+        if (p.error || p.empty) { box.value = text; updatePasteHint(); return; }
         showPastePreview(p);
       }, function() {
-        clearTimeout(guard); pasteReading = false;
-        openPaste(); // this phone won't let the page read the clipboard: paste into the box instead
+        clearTimeout(guard); pasteReading = false; // no clipboard access here: the open paste box is the way in
       });
     }
 
