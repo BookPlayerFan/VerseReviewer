@@ -668,6 +668,12 @@
       .flawless-badge { color: #f2c94c; border-color: rgba(242, 201, 76, 0.45);
         background: linear-gradient(110deg, rgba(242, 201, 76, 0.12) 30%, rgba(255, 230, 140, 0.35) 50%, rgba(242, 201, 76, 0.12) 70%); }
     }
+    .flawless-badge.pop { animation: flawless-pop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both; }
+    @keyframes flawless-pop {
+      0%   { opacity: 0; transform: translateX(-50%) scale(0.4); }
+      60%  { opacity: 1; transform: translateX(-50%) scale(1.14); }
+      100% { opacity: 1; transform: translateX(-50%) scale(1); }
+    }
     .summary-card.top { justify-content: flex-start; padding-top: clamp(36px, 11vh, 110px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .tomorrow-note {
       position: absolute;
@@ -1590,7 +1596,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-96';
+    const CLIENT_BUILD = 'sync-97';
 
     let queue = [];
     let currentIndex = 0;
@@ -2660,19 +2666,30 @@
         document.getElementById("statGradBox").classList.toggle("gold", sessionStats.graduated >= 7);
         document.getElementById("statFailed").textContent = sessionStats.failed;
         // A day with reviews and no repeats gets the gold badge.
-        document.getElementById("flawlessBadge").style.display = (sessionStats.reviewed > 0 && sessionStats.failed === 0) ? "block" : "none";
         updateStatLists();
         // Count up only when the numbers actually changed; clearing a same-day repeat or evening card leaves them as they were.
         const sig = [sessionStats.reviewed, sessionStats.passed, sessionStats.graduated, sessionStats.failed].join("|");
+        // The gold badge pops in once the numbers finish counting; with no count-up it is simply there.
+        let counting = false;
         if (countUpPending) {
           countUpPending = false;
-          if (sig !== lastCountUpSig) runCountUp();
+          if (sig !== lastCountUpSig) { counting = true; runCountUp(); }
         }
         lastCountUpSig = sig;
+        if (!counting) showFlawlessBadge(false);
       }
     }
 
     // When you finish the deck, the four numbers count up one after another (once; reopening the app shows them straight away).
+    // Gold "Flawless day" badge: reviewed something and no repeats. animate = pop in like a badge earned.
+    function showFlawlessBadge(animate) {
+      const el = document.getElementById("flawlessBadge");
+      el.classList.remove("pop");
+      if (!(sessionStats.reviewed > 0 && sessionStats.failed === 0)) { el.style.display = "none"; return; }
+      el.style.display = "block";
+      if (animate) { void el.offsetWidth; el.classList.add("pop"); }
+    }
+
     function runCountUp() {
       const items = [
         ["statReviewed", sessionStats.reviewed], ["statPassed", sessionStats.passed],
@@ -2690,9 +2707,13 @@
       });
       plan.forEach(function(p) { document.getElementById(p.id).textContent = 0; });
       gold.classList.remove("gold");
+      const flawlessEl = document.getElementById("flawlessBadge");
+      flawlessEl.classList.remove("pop");
+      flawlessEl.style.display = "none";
       function finish() {
         plan.forEach(function(p) { document.getElementById(p.id).textContent = p.v; });
         gold.classList.toggle("gold", sessionStats.graduated >= 7);
+        if (token === countUpToken) showFlawlessBadge(false);
       }
       (function tick() {
         const summary = document.getElementById("summaryView");
@@ -2708,6 +2729,7 @@
         });
         gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 7);
         if (!done) setTimeout(tick, 33);
+        else showFlawlessBadge(true);
       })();
     }
 
