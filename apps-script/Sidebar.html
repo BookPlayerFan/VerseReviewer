@@ -1651,7 +1651,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-107';
+    const CLIENT_BUILD = 'sync-108';
 
     let queue = [];
     let currentIndex = 0;
@@ -2358,14 +2358,15 @@
         metaTag.textContent = `⚡ Fast-Track · back to ${rankName(fastTrackTarget)}`;
         metaTag.classList.add("is-fasttrack-badge");
         btnFailText.textContent = "Repeat";
-        btnPassText.textContent = "Pass";
+        btnPassText.textContent = "Level Up";
         btnFail.style.display = "flex";
 
         pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
       } else {
         setRankBadge(metaTag, card.group);
         btnFailText.textContent = "Repeat";
-        btnPassText.textContent = "Pass";
+        // last rep of a level: this Pass moves the verse up; Diamond has nowhere to go, so it just says Review
+        btnPassText.textContent = card.group === 8 ? "Review" : (card.rep >= card.repsNeeded ? "Level Up" : "Pass");
         btnFail.style.display = "flex";
 
         if (card.group === 8) {
