@@ -757,6 +757,9 @@
     .paste-area { width: 100%; min-height: 200px; resize: none; outline: none; border: 1px solid var(--border-card); border-radius: 10px;
       background: transparent; color: var(--text-primary); font-size: 16px; line-height: 1.4; padding: 10px 12px; user-select: text; }
     .pv-card .paste-area { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+    /* the paste box must accept typing and the iPhone Paste bubble, whatever the page-wide no-select rules say */
+    textarea, input { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+    .pv-card #pasteText, body.lp-active #pasteText { -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; -webkit-user-modify: read-write-plaintext-only; touch-action: manipulation; pointer-events: auto; }
     .paste-area:focus { border-color: var(--text-accent); }
     .pp-note { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
     .pp-note.bad { color: var(--badge-fail); }
@@ -1651,7 +1654,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-110';
+    const CLIENT_BUILD = 'sync-111';
 
     let queue = [];
     let currentIndex = 0;
@@ -3148,7 +3151,9 @@
       try { cb = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { cb = null; }
       if (!cb) { openPaste(); return; }
       pasteReading = true;
-      const guard = setTimeout(function() { pasteReading = false; }, 10000);
+      // iPhone can leave the clipboard request waiting on a tiny "Paste" bubble (or never answer inside the app frame).
+      // If nothing comes back quickly, open the paste box so the button never feels dead.
+      const guard = setTimeout(function() { pasteReading = false; openPaste(); }, 1200);
       cb.then(function(text) {
         clearTimeout(guard); pasteReading = false;
         text = String(text || "").trim();
