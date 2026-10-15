@@ -1808,7 +1808,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-152';
+    const CLIENT_BUILD = 'sync-153';
 
     let queue = [];
     let currentIndex = 0;
@@ -1834,7 +1834,7 @@
 
     let parsedSegments = [];
     let segmentStates = [];
-    let hintMode = false;   // New tab: while on, revealed pieces show only their first letters (hidden ones stay hidden; never saved); resets when the app reloads
+    let hintMode = false;   // New tab: while on, revealed pieces show only their first letters (hidden ones stay hidden). The on / off choice is kept by the shell page, so it survives closing the app
     let revealCursor = -1;  // the piece revealed most recently; a tap reveals the next hidden piece after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
@@ -1959,7 +1959,13 @@
       if (!d || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
       if (d.type === "VR_EARLY") applyEarly(d);
       else if (d.type === "VR_REPLAY") replayLearn(d.items);
-      else if (d.type === "VR_SHELL") { shellInfo = d; renderDiag(); }
+      else if (d.type === "VR_SHELL") {
+        shellInfo = d; renderDiag();
+        if (!shellHintApplied && typeof d.hint === "boolean") {
+          shellHintApplied = true;
+          if (d.hint !== hintMode) { hintMode = d.hint; if (mode === 'learning' && learningCards.length) renderCardBody(); }
+        }
+      }
       else if (d.type === "VR_CLIP_TEXT" && clipWait && d.id === clipWait.id) {
         const w = clipWait; clipWait = null; clearTimeout(w.timer);
         if (d.ok) w.resolve(String(d.text || "")); else w.reject(new Error(d.error || "blocked"));
@@ -3142,8 +3148,11 @@
     function toggleHintMode() {
       if (isScoring || mode !== 'learning' || !hasActiveCard()) return;
       hintMode = !hintMode;
+      shellHintApplied = true;
+      try { window.top.postMessage({ type: 'VR_HINT', on: hintMode }, '*'); } catch (e) {}
       renderCardBody();
     }
+    let shellHintApplied = false;   // the saved hint choice is applied once per page load, then your own taps rule
 
     // Press and hold in the verse box (New tab): hints on / off. The click that ends a hold must not also reveal a piece.
     let heldBody = null;
