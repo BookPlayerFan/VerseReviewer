@@ -990,6 +990,8 @@
 
     .notice.is-error { color: var(--badge-fail); }
 
+    .sync-warning.is-update { padding: 5px 13px; border-radius: 999px; font-size: 12px; background: var(--text-accent); color: var(--bg-card);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
     .sync-warning {
       flex-direction: row;
       min-height: 0;
@@ -1558,7 +1560,7 @@
       learningCards.forEach(function(c) { if (c.unlockAt > now && c.unlockAt < next) next = c.unlockAt; });
       if (next < Infinity) badgeTimer = setTimeout(function() { sortLearning(); updateTabs(); }, Math.min(next - now + 500, 2147483000));
     }
-    document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
+    document.addEventListener("visibilitychange", function() { if (!document.hidden) { updateTabs(); autoReloadIfIdle(); } });
 
     // Fetches the verse list and keeps it in vlVerses (sorted in Bible order); the Verses tab and the Upcoming sheet both use it.
     function loadVlVerses(done, failed) {
@@ -1965,7 +1967,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-160';
+    const CLIENT_BUILD = 'sync-161';
 
     let queue = [];
     let currentIndex = 0;
@@ -2435,10 +2437,21 @@
 
     // "Saving…" appears only when a save is taking longer than a few seconds, so you know not to close the app yet.
     // "Update ready" appears when the server says a newer copy of this page exists than the one the phone is showing.
-    let savingTimer = null, savingShown = false, updateReady = false;
+    let savingTimer = null, savingShown = false, updateReady = false, reloadFailed = false;
     function noteClientBuild(n) {
       const mine = Number((String(CLIENT_BUILD).match(/(\d+)\s*$/) || [])[1]) || 0;
-      if (Number(n) > mine && !updateReady) { updateReady = true; updateSyncWarning(); }
+      if (Number(n) > mine && !updateReady) { updateReady = true; updateSyncWarning(); autoReloadIfIdle(); }
+    }
+    // On the Review Complete screen with nothing waiting to save, a newer page loads by itself (nothing on screen to lose).
+    // The home-screen page lets this happen at most once per 10 minutes, so it can never loop.
+    let autoTried = false;
+    function autoReloadIfIdle() {
+      if (!updateReady || reloadFailed || autoTried || pendingCount() > 0) return;
+      if (document.hidden) return;
+      if (document.getElementById("summaryView").style.display === "none") return;
+      if (document.getElementById("verseListView").classList.contains("open")) return;
+      autoTried = true;
+      setTimeout(function() { if (pendingCount() === 0) reloadApp(true); }, 1500);
     }
     function updateSyncWarning() {
       const el = document.getElementById("syncWarning");
@@ -2459,17 +2472,21 @@
         el.textContent = "⚠ Save problem · Reload";
         el.style.display = "inline-flex";
       } else if (updateReady && pendingCount() === 0) {
-        el.textContent = "Update ready \u00B7 Tap to reload";
+        el.textContent = reloadFailed ? "Swipe the app away and reopen to update" : "Update ready \u00B7 Tap to reload";
+        el.classList.add("is-update");
         el.style.display = "inline-flex";
       } else {
         el.style.display = "none";
       }
+      if (!(updateReady && pendingCount() === 0 && !savingShown && !submitFailed && problemCount === 0)) el.classList.remove("is-update");
     }
 
     // Asks the home-screen page to load the app again with a fresh address, so the phone cannot hand back an old copy.
-    function reloadApp() {
+    function reloadApp(auto) {
       if (pendingCount() > 0) return;
-      try { window.top.postMessage({ type: 'VR_RELOAD' }, '*'); } catch (e) {}
+      try { window.top.postMessage({ type: 'VR_RELOAD', auto: auto === true }, '*'); } catch (e) {}
+      // A reload replaces this page within a second or so. If we are still here, the home-screen page did not act on it.
+      if (auto !== true) setTimeout(function() { reloadFailed = true; updateSyncWarning(); flashNotice("Couldn\u2019t reload here. Swipe the app away and reopen."); }, 3500);
     }
 
     function onSyncWarningTap() {
@@ -2741,6 +2758,7 @@
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
       renderMonthStrip(onComplete);
+      if (onComplete) autoReloadIfIdle();
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       el.textContent = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
       el.style.display = "block";
