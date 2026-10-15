@@ -1759,7 +1759,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-140';
+    const CLIENT_BUILD = 'sync-141';
 
     let queue = [];
     let currentIndex = 0;
@@ -2856,7 +2856,7 @@
     // Swipe sideways in the verse box. It fires as soon as the finger has clearly gone sideways (no need to lift),
     // mostly-vertical drags are left alone so a long verse still scrolls (the box allows vertical panning only),
     // and the very edge of the screen is left to iOS.
-    const SWIPE_MIN = 30;      // px sideways
+    const SWIPE_MIN = 25;      // px sideways
     const SWIPE_RATIO = 1.2;   // sideways must beat vertical by this much
     let swipeFired = false;
     function attachSwipe() {
