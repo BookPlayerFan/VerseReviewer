@@ -260,19 +260,32 @@
     }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
-    .vl-row:active, .vl-seg button:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
-    .vl-row, .vl-seg button, .picker-close { transition: none; }
+    .vl-row:active, .vl-pill:active, .vl-strip:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
+    .vl-row, .vl-pill, .vl-strip, .picker-close { transition: none; }
     .vl-row .chev { transition: transform 0.15s ease; }
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
-    .vl-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; gap: 10px; }
-    .vl-seg { display: inline-flex; border: 1px solid var(--border-card); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
-    .vl-seg button { background: transparent; border: 0; box-shadow: none; min-height: 0; width: auto;
-      padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--text-muted); border-radius: 0; flex-direction: row; }
-    .vl-seg button.active { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); color: var(--text-accent, #1a73e8); }
-    .vl-chips { display: flex; gap: 8px; margin: 0 0 8px; }
-    .vl-chips button { flex: 1; background: transparent; border: 1px solid var(--border-card); box-shadow: none; min-height: 0; width: auto;
-      padding: 7px 0; font-size: 13px; font-weight: 600; color: var(--text-muted); border-radius: 999px; flex-direction: row; }
-    .vl-chips button.active { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); color: var(--text-accent, #1a73e8); border-color: var(--text-accent, #1a73e8); }
+    /* Old / New Testament filter buttons in the header: tap one to show only that testament, tap again for everything. */
+    .vl-pills { display: inline-flex; gap: 6px; }
+    .vl-pills.off { opacity: 0.35; pointer-events: none; }
+    .vl-pill { background: transparent; border: 1px solid var(--border-card); box-shadow: none; min-height: 0; width: auto;
+      padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text-muted); flex-direction: row; }
+    .vl-pill.on { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); border-color: var(--text-accent, #1a73e8); color: var(--text-accent, #1a73e8); }
+    /* The Treasury strip: total points and a bar of how many verses sit at each rank. Tapping it switches the list to the rank view. */
+    .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 4px; padding: 10px 14px; border-radius: 12px; min-height: 0;
+      flex-direction: row; box-shadow: none; text-align: left; color: var(--text-primary); border: 1px solid var(--border-card); background: var(--bg-card); }
+    .vl-strip.on { border-color: var(--text-accent, #1a73e8); background: var(--badge-pass-bg, rgba(26,115,232,0.12)); }
+    .vs-pts { font-weight: 800; font-size: 15px; white-space: nowrap; }
+    .vs-pts small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+    .vs-bar { display: flex; flex: 1; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border-card); }
+    .vs-bar i { display: block; background: var(--rl); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vs-bar i { background: var(--rd); } }
+    :root[data-theme="dark"] .vs-bar i { background: var(--rd); }
+    .vs-lbl { font-size: 12px; font-weight: 700; color: var(--text-accent, #1a73e8); }
+    .vl-sect { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px 6px; border-bottom: 1px solid var(--border-card); }
+    .vl-sect.first { padding-top: 8px; }
+    .vl-sect b { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); }
+    .vl-sect span { font-size: 12px; color: var(--text-meta); }
+    .vl-foot { text-align: center; font-size: 12px; color: var(--text-meta); padding: 16px 0 20px; }
     .vl-row { display: flex; align-items: center; justify-content: space-between; width: 100%;
       background: none; border: 0; box-shadow: none; min-height: 0; padding: 12px 4px;
       border-bottom: 1px solid var(--border-card); flex-direction: row; border-radius: 0; text-align: left; }
@@ -287,7 +300,7 @@
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
-    #verseListView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #verseListView, #upcomingView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -774,14 +787,20 @@
     .summary-card.top { justify-content: flex-start; padding-top: clamp(84px, 21vh, 170px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .tomorrow-note {
       position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 10px;
-      font-size: 11px;
-      color: var(--text-meta);
-      opacity: 0.8;
+      left: 50%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: 90%;
+      bottom: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-accent, #1a73e8);
+      background: var(--badge-pass-bg, rgba(26,115,232,0.12));
+      padding: 8px 16px;
+      border-radius: 999px;
       text-align: center;
-      pointer-events: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
 
 
@@ -820,9 +839,10 @@
     .vl-iconbtn.on svg { stroke: var(--text-muted); }
     #verseListView .picker-head { gap: 10px; }
     #verseListView .picker-title { flex: none; }
-    #verseListView .vl-total { flex: 1; min-width: 0; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #verseListView .vl-bar .vl-seg { width: 100%; }
-    #verseListView .vl-bar .vl-seg button { flex: 1; }
+    #verseListView .vl-titleblock { flex: 1; min-width: 0; }
+    #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #verseListView .vl-total:empty { display: none; }
+    #upcomingView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
     .vl-search { margin: 0 0 2px; }
     .vl-search .picker-search { margin-bottom: 8px; }
     .vl-verse.hit { flex-wrap: wrap; }
@@ -1029,7 +1049,7 @@
       </div>
       <div class="fail-list" id="failList" style="display: none;"></div>
 
-      <div class="tomorrow-note" id="tomorrowNote" style="display: none;"></div>
+      <div class="tomorrow-note" id="tomorrowNote" role="button" onclick="openUpcoming()" style="display: none;"></div>
 
       <div class="summary-btn-stack">
         <div class="notice" id="summaryNotice"></div>
@@ -1045,27 +1065,29 @@
 
   <div class="picker" id="verseListView">
     <div class="picker-head">
-      <span class="picker-title" id="vlTitle" onclick="toggleDiag()">Verse List</span>
-      <span class="vl-total" id="vlTotal"></span>
+      <div class="vl-titleblock">
+        <span class="picker-title" id="vlTitle" onclick="toggleDiag()">Verse List</span>
+        <span class="vl-total" id="vlTotal"></span>
+      </div>
+      <span class="vl-pills" id="vlPills">
+        <button type="button" class="vl-pill" id="vlPillOld" onclick="setVlTest('old')">OT</button>
+        <button type="button" class="vl-pill" id="vlPillNew" onclick="setVlTest('new')">NT</button>
+      </span>
       <button type="button" class="vl-iconbtn" id="vlSearchBtn" onclick="toggleVlSearch()" aria-label="Search verses"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
     <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
-    <div class="vl-bar">
-      <div class="vl-seg">
-        <button type="button" id="vlSortBook" class="active" onclick="setVlSort('book')">Book</button>
-        <button type="button" id="vlSortRank" onclick="setVlSort('rank')">Rank</button>
-        <button type="button" id="vlSortDate" onclick="setVlSort('date')">Date</button>
-      </div>
-    </div>
-    <div class="vl-chips" id="vlChips">
-      <button type="button" id="vlTestAll" class="active" onclick="setVlTest('all')">All</button>
-      <button type="button" id="vlTestOld" onclick="setVlTest('old')">Old</button>
-      <button type="button" id="vlTestNew" onclick="setVlTest('new')">New</button>
-    </div>
+    <button type="button" class="vl-strip" id="vlStrip" style="display:none" onclick="toggleVlRank()"></button>
     <div class="picker-list" id="vlList"></div>
   </div>
 
+  <div class="picker" id="upcomingView">
+    <div class="picker-head">
+      <span class="picker-title">Upcoming reviews</span>
+      <button type="button" class="picker-close" onclick="closeUpcoming()">Back</button>
+    </div>
+    <div class="picker-list" id="upList"></div>
+  </div>
 
   <nav class="tabbar" id="tabbar">
     <div class="progress-track"><div class="progress-fill" id="sessionProgressFill"></div></div>
@@ -1454,6 +1476,7 @@
 
     // ── Bottom tabs ──
     function goTab(t) {
+      closeUpcoming();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       if (t === "verses") {
         if (!listOpen) openVerseList();
@@ -1519,6 +1542,19 @@
     }
     document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
 
+    // Fetches the verse list and keeps it in vlVerses (sorted in Bible order); the Verses tab and the Upcoming sheet both use it.
+    function loadVlVerses(done, failed) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !Array.isArray(res.verses)) { failed(); return; }
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
+          vlVerses.sort(compareVerses);
+          done();
+        })
+        .withFailureHandler(failed)
+        .getVerseList();
+    }
+
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
       resetVlSearch();
@@ -1528,18 +1564,8 @@
       vlSort = "book";
       vlTest = "all";
       vlOpen = {};
-      updateVlSeg();
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (!res || !Array.isArray(res.verses)) { document.getElementById("vlTotal").textContent = "Couldn't load."; return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
-          vlVerses.sort(compareVerses);
-          renderVerseList();
-        })
-        .withFailureHandler(function() {
-          document.getElementById("vlTotal").textContent = "Couldn't load.";
-        })
-        .getVerseList();
+      updateVlControls();
+      loadVlVerses(renderVerseList, function() { document.getElementById("vlTotal").textContent = "Couldn't load."; });
     }
 
     document.addEventListener("click", function() { hideVerseTip(); });
@@ -1552,33 +1578,81 @@
       updateTabs();
     }
 
-    function setVlSort(mode) {
-      vlSort = mode;
-      vlTest = "all";
+    // The Treasury strip switches between the Book list and the Rank list.
+    function toggleVlRank() {
+      vlSort = vlSort === "rank" ? "book" : "rank";
       vlOpen = {};
-      updateVlSeg();
+      updateVlControls();
       renderVerseList();
     }
 
+    // OT / NT buttons: tap one to show only that testament, tap it again to show everything (Book list only).
     function setVlTest(t) {
-      if (vlTest === t) return;
-      vlTest = t;
+      vlTest = vlTest === t ? "all" : t;
       vlOpen = {};
-      updateVlSeg();
+      updateVlControls();
       renderVerseList();
     }
 
-    function updateVlSeg() {
-      document.getElementById("vlTestAll").classList.toggle("active", vlTest === "all");
-      document.getElementById("vlTestOld").classList.toggle("active", vlTest === "old");
-      document.getElementById("vlTestNew").classList.toggle("active", vlTest === "new");
-      document.getElementById("vlSortBook").classList.toggle("active", vlSort === "book");
-      document.getElementById("vlSortRank").classList.toggle("active", vlSort === "rank");
-      document.getElementById("vlSortDate").classList.toggle("active", vlSort === "date");
+    function updateVlControls() {
+      const searching = vlQuery.trim() !== "";
+      document.getElementById("vlPillOld").classList.toggle("on", vlTest === "old");
+      document.getElementById("vlPillNew").classList.toggle("on", vlTest === "new");
+      document.getElementById("vlPills").classList.toggle("off", vlSort !== "book" || searching);
+      const strip = document.getElementById("vlStrip");
+      strip.classList.toggle("on", vlSort === "rank");
+      strip.setAttribute("aria-pressed", vlSort === "rank" ? "true" : "false");
     }
 
-    function vlGroup(key, label, count, verses, showPills) {
-      const box = document.getElementById("vlList");
+    // Strip content: total points (Bronze 1 ... Diamond 8 per verse) and a bar sized by how many verses sit at each rank.
+    function renderVlStrip() {
+      const strip = document.getElementById("vlStrip");
+      const searching = document.getElementById("vlSearchRow").style.display !== "none";
+      if (searching || !vlVerses.length) { strip.style.display = "none"; return; }
+      const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+      let pts = 0;
+      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += g; });
+      let bar = "";
+      for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
+      strip.innerHTML = '<span class="vs-pts">' + pts + ' <small>pts</small></span><span class="vs-bar">' + bar + '</span><span class="vs-lbl">Ranks</span>';
+      strip.setAttribute("aria-label", "Treasury, " + pts + " points. Show verses by rank");
+      strip.style.display = "";
+    }
+
+    // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
+    function renderUpcoming() {
+      const box = document.getElementById("upList");
+      box.textContent = "";
+      const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      for (let d = 0; d < 14; d++) {
+        const dt = new Date();
+        dt.setHours(12, 0, 0, 0);
+        dt.setDate(dt.getDate() + d);
+        let label = DOW[dt.getDay()] + ", " + MON[dt.getMonth()] + " " + dt.getDate();
+        if (d === 0) label = "Today · " + label; else if (d === 1) label = "Tomorrow · " + label;
+        const vs = vlVerses.filter(function(v) { return v.d === d; });
+        vlGroup("d" + d, label, vs.length, vs, true, box);
+      }
+    }
+    function openUpcoming() {
+      hideVerseTip();
+      const box = document.getElementById("upList");
+      box.textContent = "";
+      const e = document.createElement("div");
+      e.className = "picker-empty";
+      e.textContent = "Loading…";
+      box.appendChild(e);
+      document.getElementById("upcomingView").classList.add("open");
+      loadVlVerses(renderUpcoming, function() { e.textContent = "Couldn't load."; });
+    }
+    function closeUpcoming() {
+      hideVerseTip();
+      document.getElementById("upcomingView").classList.remove("open");
+    }
+
+    function vlGroup(key, label, count, verses, showPills, into) {
+      const box = into || document.getElementById("vlList");
       const row = document.createElement("button");
       row.type = "button";
       row.className = "vl-row" + (count ? "" : " zero") + (vlOpen[key] ? " open" : "");
@@ -1701,6 +1775,8 @@
         row.style.display = "";
         document.getElementById("vlSearchBtn").classList.add("on");
         input.focus();
+        updateVlControls();
+        renderVlStrip();
       } else {
         resetVlSearch();
         renderVerseList();
@@ -1714,6 +1790,7 @@
       if (row) row.style.display = "none";
       const btn = document.getElementById("vlSearchBtn");
       if (btn) btn.classList.remove("on");
+      if (document.getElementById("vlPills")) { updateVlControls(); renderVlStrip(); }
     }
     function onVlSearch() {
       vlQuery = document.getElementById("vlSearch").value;
@@ -1803,64 +1880,66 @@
       hideVerseTip();
       const box = document.getElementById("vlList");
       box.textContent = "";
-      document.querySelector("#verseListView .vl-seg").style.visibility = vlQuery.trim() ? "hidden" : "";
-      document.getElementById("vlChips").style.display = (vlSort === "book" && !vlQuery.trim()) ? "" : "none";
+      updateVlControls();
+      renderVlStrip();
       if (vlQuery.trim() && renderVlSearch(box)) return;
-      // Old / New chips filter the Book view only (the other views and search always cover everything).
+      document.getElementById("vlTotal").textContent = "";
+      // The OT / NT buttons filter the Book list only (the Rank list always covers everything).
       const shown = (vlSort === "book" && vlTest !== "all")
         ? vlVerses.filter(function(v) { return vlTest === "old" ? (v.p.book < 39) : (v.p.book >= 39 && v.p.book < 999); })
         : vlVerses;
       const refCount = shown.length;
       const verseTotal = shown.reduce(function(sum, v) { return sum + v.n; }, 0);
-      document.getElementById("vlTotal").textContent =
-        verseTotal + (verseTotal === 1 ? " Verse" : " Verses") + " · " +
-        refCount + (refCount === 1 ? " Reference" : " References");
-      const total = refCount;
-      if (total === 0) {
+      if (refCount === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
         e.textContent = vlTest === "old" && vlSort === "book" ? "No Old Testament verses yet" : vlTest === "new" && vlSort === "book" ? "No New Testament verses yet" : "No verses yet";
         box.appendChild(e);
         return;
       }
-      if (vlSort === "date") {
-        // The next 14 days (today first); overdue verses count as due today.
-        const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-        for (let d = 0; d < 14; d++) {
-          const dt = new Date();
-          dt.setHours(12, 0, 0, 0);
-          dt.setDate(dt.getDate() + d);
-          let label = DOW[dt.getDay()] + ", " + MON[dt.getMonth()] + " " + dt.getDate();
-          if (d === 0) label = "Today · " + label; else if (d === 1) label = "Tomorrow · " + label;
-          const vs = vlVerses.filter(function(v) { return v.d === d; });
-          vlGroup("d" + d, label, vs.length, vs, true);
-        }
-      } else if (vlSort === "rank") {
+      if (vlSort === "rank") {
         for (let g = 8; g >= 0; g--) {
           const vs = vlVerses.filter(function(v) { return v.g === g; });
           if (g === 0 && vs.length === 0) continue;
           vlGroup("g" + g, makePill(g), vs.length, vs, false);
         }
       } else {
-        const groups = [];
+        // Books in Bible order under an Old Testament / New Testament heading (anything else, such as a custom name, goes last).
+        const sections = [["Old Testament", []], ["New Testament", []], ["Other", []]];
         const byKey = {};
         shown.forEach(function(v) {
           const k = v.p.book === 999 ? "x:" + v.p.name : "b:" + v.p.book;
-          if (!byKey[k]) { byKey[k] = { name: v.p.name, verses: [] }; groups.push(byKey[k]); }
+          if (!byKey[k]) {
+            byKey[k] = { name: v.p.name, verses: [] };
+            sections[v.p.book < 39 ? 0 : v.p.book < 999 ? 1 : 2][1].push(byKey[k]);
+          }
           byKey[k].verses.push(v);
         });
-        groups.forEach(function(gr, i) {
-          vlGroup("k" + gr.name, gr.name, gr.verses.length, gr.verses, true);
+        let first = true;
+        sections.forEach(function(sec) {
+          if (!sec[1].length) return;
+          const total = sec[1].reduce(function(sum, gr) { return sum + gr.verses.reduce(function(s2, v) { return s2 + v.n; }, 0); }, 0);
+          const head = document.createElement("div");
+          head.className = "vl-sect" + (first ? " first" : "");
+          first = false;
+          const t = document.createElement("b"); t.textContent = sec[0];
+          const n = document.createElement("span"); n.textContent = total + (total === 1 ? " verse" : " verses");
+          head.appendChild(t); head.appendChild(n);
+          box.appendChild(head);
+          sec[1].forEach(function(gr) { vlGroup("k" + gr.name, gr.name, gr.verses.length, gr.verses, true); });
         });
       }
+      const foot = document.createElement("div");
+      foot.className = "vl-foot";
+      foot.textContent = verseTotal + (verseTotal === 1 ? " verse" : " verses") + " · " + refCount + (refCount === 1 ? " reference" : " references");
+      box.appendChild(foot);
     }
 
     const RESTART_LABEL = "Try again";
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-155';
+    const CLIENT_BUILD = 'sync-156';
 
     let queue = [];
     let currentIndex = 0;
@@ -2595,7 +2674,7 @@
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
-      el.textContent = tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow";
+      el.textContent = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
       el.style.display = "block";
     }
 
