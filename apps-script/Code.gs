@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-52'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-53'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -313,14 +313,14 @@ function isLevelZero_(raw) {
   return s !== '' && Number(s) === 0;
 }
 
-// Number of unlocked New cards right now, split by stage: { learn, lock }.
+// Unlocked New cards right now, split by stage: { learn, lock } counts, plus learnRefs / lockRefs (references, sheet order).
 function newCardCounts_(data, now) {
-  const out = { learn: 0, lock: 0 };
+  const out = { learn: 0, lock: 0, learnRefs: [], lockRefs: [] };
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5]) || !isLevelZero_(data[i][4])) continue;
     const c = learningCard_(data[i], i, now);
     if (c.unlockAt) continue;
-    if (c.stage === 'lock') out.lock++; else out.learn++;
+    if (c.stage === 'lock') { out.lock++; out.lockRefs.push(c.reference); } else { out.learn++; out.learnRefs.push(c.reference); }
   }
   return out;
 }
@@ -1613,6 +1613,27 @@ function cancelSnoozePush_(ref) {
   } catch (e) { console.error('cancelSnoozePush_ failed: ' + e); }
 }
 
+// "Romans 8:35-37", or "Romans 8:35-37 and 1 more" when several verses are waiting.
+function refsText_(refs) {
+  return refs[0] + (refs.length > 1 ? ' and ' + (refs.length - 1) + ' more' : '');
+}
+
+// The title names what is waiting ("Review", "Learn, Lock", "Review, Learn, Lock"); the text gives the specifics.
+function pushWords_(due, learnRefs, lockRefs) {
+  const titles = [], bits = [];
+  if (due > 0) { titles.push('Review'); bits.push('review ' + due + (due === 1 ? ' verse' : ' verses')); }
+  if (learnRefs.length) { titles.push('Learn'); bits.push('learn ' + refsText_(learnRefs)); }
+  if (lockRefs.length) { titles.push('Lock'); bits.push('lock ' + refsText_(lockRefs)); }
+  if (!bits.length) return null;
+  const cap = function(t) { return t.charAt(0).toUpperCase() + t.slice(1); };
+  let text;
+  if (bits.length === 1) text = 'Time to ' + bits[0] + '.';
+  else if (due > 0 && bits.length === 2) text = cap(bits[0]) + ', then ' + bits[1] + '.';
+  else if (bits.length === 2) text = cap(bits[0]) + ' and ' + bits[1] + '.';
+  else text = cap(bits[0]) + ', ' + bits[1] + ', ' + bits[2] + '.';
+  return { title: titles.join(', '), text: text };
+}
+
 // Runs from the daily trigger (installDailyPush), around 6 AM. One push for everything waiting at that point:
 // due reviews, a Learn card and a Lock AM card (both unlock at 4 AM). Sent once a day, and only if something is waiting.
 function dailyPush() {
@@ -1621,13 +1642,10 @@ function dailyPush() {
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;
   const nc = newCardCounts_(readSheetData_(), nowMs_());
-  const parts = [];
-  if (due > 0) parts.push(due === 1 ? '1 review' : due + ' reviews');
-  if (nc.learn > 0) parts.push(nc.learn === 1 ? '1 verse to learn' : nc.learn + ' verses to learn');
-  if (nc.lock > 0) parts.push(nc.lock === 1 ? '1 lock review' : nc.lock + ' lock reviews');
-  if (parts.length === 0) return;
+  const words = pushWords_(due, nc.learnRefs, nc.lockRefs);
+  if (!words) return;
   const go = due > 0 ? 'review' : 'new';
-  const r = osSend_('Verse Review', parts.join(', ') + ' ready today.', 0, 'vr-daily', go);
+  const r = osSend_(words.title, words.text, 0, 'vr-daily', go);
   if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
 }
 
@@ -1673,8 +1691,7 @@ function scheduleLearnPush_(ref, card) {
     const at = learnPushTime_(card.unlockAt);
     if (!at || at <= Date.now() + 30000) return;
     const lockCard = card.stage === 'lock';
-    const msg = lockCard ? ref + ' is ready to Promote.' : ref + ' is ready for its next learn review.';
-    const r = osSend_(lockCard ? 'Lock' : 'Learn', msg, at, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
+    const r = osSend_(lockCard ? 'Lock' : 'Learn', 'Time to ' + (lockCard ? 'lock ' : 'learn ') + ref + '.', at, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
     if (r.ok && r.json && r.json.id) {
       const map = pendingPush_();
       map[ref] = r.json.id;
