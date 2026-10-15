@@ -564,6 +564,26 @@
     }
     .btn-pass.clear { background: var(--btn-restart-bg); color: var(--btn-restart-text); }   /* repeat cards: blue, like the New tab's Review button */
 
+    .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time) */
+    .lock-chips { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .lock-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      padding: 3px 10px 3px 8px; border-radius: 999px; border: 1.5px solid var(--border-card); color: var(--text-muted); background: transparent; }
+    .lock-chip svg { width: 15px; height: 15px; display: block; fill: currentColor; }
+    .lock-chip.on { background: var(--text-accent); border-color: var(--text-accent); color: #fff; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .lock-chip.on { color: #0b1a33; } }
+    :root[data-theme="dark"] .lock-chip.on { color: #0b1a33; }
+    .pt-right { display: inline-flex; align-items: center; gap: 10px; }
+    .v-num.dim { opacity: 0.45; }                           /* verses other than the one you are learning today */
+    .lm-item { display: block; width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 700;
+      background: var(--btn-restart-bg); color: var(--btn-restart-text); }
+    .lm-item.go { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
+    .lm-item.alt { background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border-card); }
+    .lm-note { font-size: 13px; color: var(--text-muted); text-align: center; margin: 0 0 8px; }
+    @keyframes luCap { to { opacity: 1; } }
+    @keyframes luDots { to { opacity: 0; } }
+    .lu-caption { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; white-space: nowrap; opacity: 0;
+      font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rc, var(--text-accent)); animation: luCap 0.45s ease-out 0.75s forwards; }
+    .lu-pipfade { animation: luDots 0.3s ease-out 0.7s forwards; }
     .shortcut-hint { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 2px; }
     @media (max-width: 480px) {
       .shortcut-hint { display: none; }
@@ -1085,6 +1105,7 @@
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
         <div class="help-row"><span>Undo the last review</span><kbd>Hold Review tab</kbd></div>
+        <div class="help-row"><span>Press early, or skip ahead (New tab)</span><kbd>Hold the button</kbd></div>
         <div class="help-row"><span>This gesture list</span><kbd>Hold Verse List</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
@@ -1095,6 +1116,15 @@
         <div class="help-row"><span>Show / hide this menu</span><kbd>?</kbd></div>
       </div>
       <div class="pv-btns"><button type="button" class="pv-close" onclick="toggleHelp(false)">Close</button></div>
+    </div>
+  </div>
+
+  <div class="pv" id="learnMenu" onclick="if (event.target === this) closeLearnMenu()">
+    <div class="pv-card">
+      <div class="pv-head" id="lmTitle" style="color: var(--text-primary); font-size: 16px;">Options</div>
+      <div class="lm-note" id="lmNote"></div>
+      <div id="lmList"></div>
+      <div class="pv-btns"><button type="button" class="pv-close" onclick="closeLearnMenu()">Cancel</button></div>
     </div>
   </div>
 
@@ -1142,7 +1172,7 @@
     // Review intervals live on the server, which computes every due date.
     const GROUP_CONFIG = {
       0: { name: "New",       repsNeeded: 1 },
-      1: { name: "Bronze",     repsNeeded: 4 },
+      1: { name: "Bronze",     repsNeeded: 3 },
       2: { name: "Silver",     repsNeeded: 3 },
       3: { name: "Gold",     repsNeeded: 2 },
       4: { name: "Platinum",    repsNeeded: 2 },
@@ -1192,7 +1222,7 @@
     function clearLevelUp() {
       if (luOverlay) { luOverlay.remove(); luOverlay = null; }
     }
-    function playLevelUp(toG, rep) {
+    function playLevelUp(toG, rep, caption) {
       clearLevelUp();
       const card = document.getElementById("activeCard");
       const deck = document.getElementById("deckContainer");
@@ -1214,8 +1244,17 @@
           const filled = rep >= 1 && rep <= cfg.repsNeeded ? rep : 1;
           for (let i = 1; i <= cfg.repsNeeded; i++) {
             const p = document.createElement("div");
-            p.className = "pip" + (i <= filled ? " filled" : "");
+            p.className = "pip" + (i <= filled ? " filled" : "") + (caption ? " lu-pipfade" : "");
             pips.appendChild(p);
+          }
+          if (caption) {
+            // the dots give way to a one-word caption in the rank's colour (no extra height, so the card does not jump)
+            pips.classList.remove("lock-chips");
+            pips.style.position = "relative";
+            const cap = document.createElement("span");
+            cap.className = "lu-caption";
+            cap.textContent = caption;
+            pips.appendChild(cap);
           }
         }
       }
@@ -1383,9 +1422,7 @@
     }
 
     function updateTabs() {
-      if (mode === "learning" && learningCards[learningIndex]) {
-        { const b = document.getElementById("btnFail"); const sn = isSeen(learningCards[learningIndex].reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn); }
-      }
+      if (mode === "learning" && learningCards[learningIndex] && !isScoring) paintLearningButton(learningCards[learningIndex]);
       updateProgressBar();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       const which = listOpen ? "verses" : (mode === "learning" ? "new" : "review");
@@ -1401,21 +1438,32 @@
       scheduleBadgeReturn();
     }
 
-    // "Reviewed" on a New verse marks it as looked at for 2 hours; the New tab's count only shows verses
-    // that are still waiting. The marks are saved with the session, so every device agrees.
-    const NEW_SNOOZE_MS = 2 * 60 * 60 * 1000;
-    let learningSeen = {};
+    // ── New cards (Learn and Lock) ──
+    // The server owns every stage and unlock time. Each New card arrives with: stage ('learn' or 'lock'), verseIndex, verseCount,
+    // dot (1 to 7 while learning), lockPart ('am' or 'pm'), label (the button's words) and unlockAt (a time in ms; 0 = ready now).
+    // This page only draws them and sends presses. The New tab's count is the number of cards that are unlocked right now.
+    let learningSeen = {};   // the old 2-hour snooze marks; no longer used, kept so an older server's session still loads
+    let srvSkew = 0;         // the server's clock minus this phone's clock, so unlock times do not depend on the phone's clock
     let badgeTimer = null;
-    function isSeen(ref) { return (learningSeen[ref] || 0) > Date.now(); }
+    let learnPending = false;
+    let learnHintTimer = null;
+    function nowSrv() { return Date.now() + srvSkew; }
+    function isLocked(c) { return !!(c && c.unlockAt && c.unlockAt > nowSrv()); }
+    function sortLearning() {
+      learningCards.sort(function(a, b) {
+        return ((a.unlockAt > nowSrv() ? 1 : 0) - (b.unlockAt > nowSrv() ? 1 : 0)) ||
+          ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
+      });
+    }
     function unseenCount() {
-      return learningCards.length && !isSeen(learningCards[0].reference) ? 1 : 0; // one new verse at a time
+      return learningCards.filter(function(c) { return !isLocked(c); }).length;
     }
     function scheduleBadgeReturn() {
       if (badgeTimer) { clearTimeout(badgeTimer); badgeTimer = null; }
-      const now = Date.now();
+      const now = nowSrv();
       let next = Infinity;
-      Object.keys(learningSeen).forEach(function(k) { if (learningSeen[k] > now && learningSeen[k] < next) next = learningSeen[k]; });
-      if (next < Infinity) badgeTimer = setTimeout(updateTabs, Math.min(next - now + 500, 2147483000));
+      learningCards.forEach(function(c) { if (c.unlockAt > now && c.unlockAt < next) next = c.unlockAt; });
+      if (next < Infinity) badgeTimer = setTimeout(function() { sortLearning(); updateTabs(); }, Math.min(next - now + 500, 2147483000));
     }
     document.addEventListener("visibilitychange", function() { if (!document.hidden) updateTabs(); });
 
@@ -1760,7 +1808,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-144';
+    const CLIENT_BUILD = 'sync-146';
 
     let queue = [];
     let currentIndex = 0;
@@ -1837,6 +1885,9 @@
       const heldTab = attachLongPress(tn, function() { addNewVerse(); });
       tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       // hold the Review tab to undo the last review (asks first)
+      const pb = document.getElementById("btnPass");
+      const heldPass = attachLongPress(pb, function() { openLearnMenu(); }, function() { return mode === "learning" && !!learningCards[learningIndex] && !isScoring; });
+      pb.addEventListener("click", function(e) { if (heldPass()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       const tr = document.getElementById("tabReview");
       const heldRevTab = attachLongPress(tr, function() { openUndoConfirm(); });
       tr.addEventListener("click", function(e) { if (heldRevTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
@@ -1858,6 +1909,8 @@
         const cards = learningCards.slice(0, 1).map(function(c) { // one new verse at a time
           return {
             f: c.reference, v: c.version || "", day: c.day || 0,
+            stage: c.stage === 'lock' ? 'lock' : 'learn', vi: c.verseIndex || 1, vc: c.verseCount || 1, dot: c.dot || 1,
+            part: c.lockPart || "", label: c.label || "Review", unlockAt: c.unlockAt || 0,
             segs: buildUnits(parseVerseSegments(c.text, c.reference), true).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
           };
         });
@@ -1939,8 +1992,11 @@
     // Replaces everything on screen with the server's version of today's session.
     function adoptSession(session) {
       queue = session.cards || [];
+      srvSkew = typeof session.serverNow === 'number' ? session.serverNow - Date.now() : 0;
       learningCards = session.learning || [];
-      learningSeen = session.seen || {};
+      learningSeen = {};
+      learnPending = false;
+      sortLearning();
       learningIndex = 0;
       mode = (session.mode === 'learning') ? 'learning' : 'review';
       baseCount = session.baseCount || 0;
@@ -2056,6 +2112,43 @@
       pumpOutbox();
     }
 
+    // A press on a New card goes through the same queue as review saves, so it stays in order and is retried if the phone is offline.
+    function enqueueLearn(l) {
+      outbox.push({ learn: l });
+      pumpOutbox();
+    }
+
+    function pumpLearn(item) {
+      const l = item.learn;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          inFlight = false;
+          learnPending = false;
+          if (res && res.ok) {
+            if (typeof res.version === 'number') sessionVersion = res.version;
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; renderTomorrowNote(); }
+            outbox.shift();
+            if (!res.promoted && res.card) applyLearnCard(res.card);
+          } else if (res && res.card) {
+            // Locked or out of date (another phone got there first): show what the server has.
+            outbox.shift();
+            applyLearnCard(res.card);
+            if (res.reason === "locked") showLockedHint(res.card);
+          } else {
+            outbox.shift();
+            problemCount++;
+          }
+          pumpOutbox();
+        })
+        .withFailureHandler(function() {
+          inFlight = false;
+          submitFailed = true;
+          updateSyncWarning();
+          checkSettled();
+        })
+        .learnAction(l.ref, l.action, l.rep);
+    }
+
     function pumpOutbox() {
       if (inFlight || submitFailed || outbox.length === 0) {
         updateSyncWarning();
@@ -2065,6 +2158,7 @@
       const item = outbox[0];
       inFlight = true;
       updateSyncWarning();
+      if (item.learn) { pumpLearn(item); return; }
       google.script.run
         .withSuccessHandler(function(res) {
           inFlight = false;
@@ -2604,13 +2698,11 @@
       cardEl.style.opacity = "1";
 
 
-      const doneLabel = "Review";
       document.getElementById("sessionProgressFill").style.width = "0%";
-
-      const metaTag = document.getElementById("cardMeta");
-      metaTag.className = "meta-tag";
-      metaTag.textContent = card.day > 0 ? "New Verse · Day " + card.day : "New Verse";
-      document.getElementById("cardPips").innerHTML = ""; // one new verse at a time: nothing to count here
+      document.getElementById("btnFail").style.display = "none";            // one button on the New tab
+      document.getElementById("btnFail").classList.remove("seen", "only", "review");
+      revealCursor = curStart();
+      paintLearningHeader(card);
 
       const versionBadge = document.getElementById("cardVersion");
       const ver = (card.version || "").trim();
@@ -2621,17 +2713,134 @@
         versionBadge.style.display = "none";
       }
 
-      document.getElementById("btnPassText").textContent = "Level Up";
-      document.getElementById("btnPass").classList.remove("clear");
-      document.getElementById("btnFailText").textContent = doneLabel;
-      document.getElementById("btnFail").style.display = "flex";
-      document.getElementById("btnFail").classList.add("review");
-      { const b = document.getElementById("btnFail"); const sn = isSeen(card.reference); b.classList.toggle("seen", sn); b.classList.toggle("only", sn); }
-
       document.getElementById("cardRef").textContent = card.reference;
       renderCardBody();
       showCardContent();
     }
+
+    // ── New card pieces ──
+    const SUN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></g></svg>';
+    const MOON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>';
+
+    // Where a plain tap starts on a multi-verse Learn card: just before the verse you are on today (so it runs to the end, then wraps).
+    function curStart() {
+      if (mode !== 'learning') return -1;
+      const c = learningCards[learningIndex];
+      if (!c || c.stage !== 'learn' || !(c.verseCount > 1)) return -1;
+      const i = parsedSegments.findIndex(function(p) { return p.vi === c.verseIndex - 1; });
+      return i > 0 ? i - 1 : -1;
+    }
+
+    function paintLearningHeader(card) {
+      const metaTag = document.getElementById("cardMeta");
+      metaTag.className = "meta-tag";
+      metaTag.textContent = "";
+      const pill = document.createElement("span");
+      pill.className = "rank-badge is-new";
+      pill.textContent = card.stage === 'lock' ? "Lock" : "Learn";
+      metaTag.appendChild(pill);
+      const pips = document.getElementById("cardPips");
+      pips.innerHTML = "";
+      pips.classList.toggle("lock-chips", card.stage === 'lock');
+      if (card.stage === 'lock') {
+        [["am", SUN_SVG, "AM"], ["pm", MOON_SVG, "PM"]].forEach(function(c) {
+          const chip = document.createElement("span");
+          chip.className = "lock-chip" + ((c[0] === "am" || card.lockPart === "pm") ? " on" : "");
+          chip.innerHTML = c[1] + c[2];
+          pips.appendChild(chip);
+        });
+      } else {
+        const dot = card.dot || 1;
+        for (let i = 1; i <= 7; i++) {
+          const pip = document.createElement("div");
+          pip.className = "pip" + (i <= dot ? " filled" : "");
+          pips.appendChild(pip);
+        }
+      }
+      paintLearningButton(card);
+    }
+
+    // The one button: blue Review, or green Next Verse / Learned / Promote. Dimmed while it waits for its unlock time (still tappable).
+    function paintLearningButton(card) {
+      if (learnHintTimer) { clearTimeout(learnHintTimer); learnHintTimer = null; }
+      const label = card.label || "Review";
+      const b = document.getElementById("btnPass");
+      document.getElementById("btnPassText").textContent = label;
+      b.classList.toggle("clear", label === "Review");
+      b.classList.toggle("locked", isLocked(card) || learnPending);
+    }
+
+    function clockWords(ms) {
+      const d = new Date(ms), n = new Date(nowSrv());
+      const t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const dayDiff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 86400000);
+      if (dayDiff <= 0) return "at " + t;
+      if (dayDiff === 1) return "tomorrow " + t;
+      return d.toLocaleDateString([], { weekday: "long" }) + " " + t;
+    }
+    function lockedText(card) {
+      const when = clockWords(card.unlockAt);
+      if (card.stage === 'lock') return card.lockPart === 'pm' ? "Promote opens " + when : "Lock opens " + when;
+      if ((card.dot || 1) === 1) return card.verseIndex > 1 ? "Verse " + card.verseIndex + " starts " + when : "Starts " + when;
+      return "Next review " + when;
+    }
+    function showLockedHint(card) {
+      if (learnHintTimer) clearTimeout(learnHintTimer);
+      document.getElementById("btnPassText").textContent = lockedText(card);
+      learnHintTimer = setTimeout(function() {
+        learnHintTimer = null;
+        const c = learningCards[learningIndex];
+        if (c) document.getElementById("btnPassText").textContent = c.label || "Review";
+      }, 2500);
+    }
+
+    // Puts the server's version of a card on screen. Stays on the same card (keeping what you have revealed) unless another card is now due.
+    function applyLearnCard(c) {
+      const shown = learningCards[learningIndex] ? learningCards[learningIndex].reference : null;
+      const at = learningCards.findIndex(function(x) { return x.reference === c.reference; });
+      const oldVerse = at >= 0 ? learningCards[at].verseIndex : 0;
+      if (at >= 0) learningCards[at] = c; else learningCards.push(c);
+      sortLearning();
+      learningIndex = 0;
+      if (mode === 'learning' && !isScoring) {
+        if (learningCards[0] && learningCards[0].reference === shown) {
+          if (learningCards[0].verseIndex !== oldVerse || segmentStates.every(function(x) { return x === 'hidden'; })) revealCursor = curStart(); // taps start at the verse you are on
+          paintLearningHeader(learningCards[0]);
+          renderCardBody();
+          updateTabs();
+        } else {
+          render();
+        }
+      } else {
+        updateTabs();
+      }
+      postCache();
+    }
+
+    // ── Hold menu on the New card's button ──
+    function openLearnMenu() {
+      const card = learningCards[learningIndex];
+      if (!card || isScoring || learnPending) return;
+      const list = document.getElementById("lmList");
+      list.textContent = "";
+      const add = function(text, cls, fn) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "lm-item " + cls; b.textContent = text;
+        b.onclick = function() { closeLearnMenu(); fn(); };
+        list.appendChild(b);
+      };
+      const label = card.label || "Review";
+      if (isLocked(card)) add(label + " now", label === "Review" ? "" : "go", function() { pressLearning("now"); });
+      if (card.stage === 'learn') {
+        const last = !(card.verseIndex < card.verseCount);
+        add(last ? "Skip to Lock" : "Skip Verse", "alt", function() { pressLearning("skip"); });
+      }
+      if (!list.children.length) return;
+      document.getElementById("lmTitle").textContent = card.reference;
+      document.getElementById("lmNote").textContent = isLocked(card) ? lockedText(card) : "";
+      document.getElementById("learnMenu").classList.add("open");
+    }
+    function closeLearnMenu() { document.getElementById("learnMenu").classList.remove("open"); }
 
     // Gives the verse card its rank's color theme (no theme for New verses).
     function setCardRank(cardEl, g) {
@@ -2651,7 +2860,8 @@
       const versionBadge = document.getElementById("cardVersion");
       const btnFail = document.getElementById("btnFail");
       btnFail.classList.remove("seen", "only", "review");
-      document.getElementById("btnPass").classList.remove("clear");
+      document.getElementById("btnPass").classList.remove("clear", "locked");
+      pipsContainer.classList.remove("lock-chips");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
 
@@ -2749,7 +2959,10 @@
       const status = parsedSegments.length > 1
         ? `${revealedCount} of ${parsedSegments.length} revealed`
         : (allRevealed ? 'Revealed' : 'Tap to reveal');
-      let html = `<div class="passage-toolbar"><span class="passage-status">${status}</span>${flag}</div>`;
+      const lc = isNew ? learningCards[learningIndex] : null;
+      const multi = !!(lc && lc.stage === 'learn' && lc.verseCount > 1);
+      const verseTxt = multi ? `<span class="passage-status">Verse ${lc.verseIndex} of ${lc.verseCount}</span>` : '';
+      let html = `<div class="passage-toolbar"><span class="passage-status">${status}</span>${(verseTxt || flag) ? `<span class="pt-right">${verseTxt}${flag}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
@@ -2758,7 +2971,7 @@
         // phrases of a split verse show a small grey letter (a, b, c...) once they are revealed
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
-            ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter && isRev ? `<span class="p-let">${seg.letter}</span>` : ''}
+            ${seg.num ? `<sup class="v-num${multi && seg.vi !== lc.verseIndex - 1 ? ' dim' : ''}">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter && isRev ? `<span class="p-let">${seg.letter}</span>` : ''}
             <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}">${isHint ? hintMarkup(seg.text) : escapeHtml(seg.text)}</span>
           </span>
         `;
@@ -2822,7 +3035,7 @@
       const hidden = mine.filter(function(i) { return segmentStates[i] === 'hidden'; });
       if (hidden.length) { revealPiece(hidden[0]); return; }
       mine.forEach(function(i) { segmentStates[i] = 'hidden'; });
-      revealCursor = -1;
+      revealCursor = curStart();
       syncFlipState();
       renderCardBody();
     }
@@ -2830,7 +3043,7 @@
     function setAllPieces(reveal) {
       if (isScoring || !hasActiveCard()) return;
       segmentStates = segmentStates.map(function() { return reveal ? 'revealed' : 'hidden'; });
-      revealCursor = reveal ? segmentStates.length - 1 : -1;
+      revealCursor = reveal ? segmentStates.length - 1 : curStart();
       syncFlipState();
       renderCardBody();
     }
@@ -2843,7 +3056,7 @@
       const allRevealed = segmentStates.every(s => s === 'revealed');
       const targetState = allRevealed ? 'hidden' : 'revealed';
       segmentStates = segmentStates.map(() => targetState);
-      revealCursor = targetState === 'revealed' ? segmentStates.length - 1 : -1;
+      revealCursor = targetState === 'revealed' ? segmentStates.length - 1 : curStart();
 
       syncFlipState();
       renderCardBody();
@@ -2965,45 +3178,37 @@
     }
 
     // Learning screen: "Level Up" promotes the verse to Level 1; "Review" marks it as looked at for a while.
+    // A press on the New card's button (Pass is the only action here; the old second button is gone).
     function scoreLearning(action) {
-      if (isScoring) return;
+      if (action !== "Pass") return;
+      pressLearning("press");
+    }
+
+    // kind: 'press' (the button), 'now' (hold menu, ignores the lock) or 'skip' (Skip Verse / Skip to Lock).
+    function pressLearning(kind) {
+      if (isScoring || learnPending) return;
       const card = learningCards[learningIndex];
       if (!card) return;
-      // Already reviewed (dimmed): pressing again must not restart its snooze or push, so it does nothing.
-      if (action === "Fail" && isSeen(card.reference)) return;
-      isScoring = true;
-
-      const notice = document.getElementById("toastNotice");
-      let ms = PASS_SWAP_MS;
-
-      if (action === "Pass") {
-        playLevelUp(1, 1);
+      if (kind === "press" && isLocked(card)) { showLockedHint(card); return; }
+      learnPending = true;
+      const promote = card.stage === 'lock' && card.lockPart === 'pm' && kind !== 'skip';
+      enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
+      if (promote) {
+        // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
+        isScoring = true;
+        playLevelUp(1, 1, "Promoted");
         learningCards.splice(learningIndex, 1);
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
-        enqueueSubmit(
-          { rowIndex: card.rowIndex, reference: card.reference, rep: 1, group: 1 },
-          snapshot(currentIndex), "Level Up \u00B7 " + card.reference
-        );
-        ms = LEVELUP_MS;
-        setTimeout(fadeOutLevelUp, ms - LU_FADE_MS - 20);
+        const startedIn = epoch;
+        setTimeout(fadeOutLevelUp, LEVELUP_MS - LU_FADE_MS - 20);
+        setTimeout(function() {
+          if (startedIn !== epoch) return;
+          document.getElementById("toastNotice").textContent = "";
+          render();
+        }, LEVELUP_MS);
       } else {
-        const alreadySeen = isSeen(card.reference); // moving past a dimmed verse keeps its original snooze
-        if (!alreadySeen) learningSeen[card.reference] = Date.now() + NEW_SNOOZE_MS;
-        // ask the server for a push when this snooze ends (it is cancelled if the verse is finished first)
-        if (!alreadySeen) { try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).pushSnooze(card.reference, learningSeen[card.reference]); } catch (e) {} }
-        enqueueSubmit(null, snapshot(currentIndex));
-        // One new verse at a time, so there is nothing to move on to: the card stays put, the button dims and the badge clears.
-        isScoring = false;
-        updateTabs();
-        return;
+        paintLearningButton(card); // dims while the server answers
       }
-
-      const startedIn = epoch;
-      setTimeout(function() {
-        if (startedIn !== epoch) return;
-        document.getElementById("toastNotice").textContent = "";
-        render();
-      }, ms);
     }
 
     function scoreCard(action) {
@@ -3085,8 +3290,8 @@
             case 1:
               newGroup = 1; newRep = 1; break;
             case 2:
-              // Soft landing: drops to L1 at rep 3 of 4 (only 2 days to re-graduate)
-              newGroup = 1; newRep = 3; break;
+              // Soft landing: drops to Bronze at rep 2 of 3 (only 2 days to re-graduate)
+              newGroup = 1; newRep = 2; break;
             case 3:
               // Soft landing: drops to Silver at rep 2 of 3
               newGroup = 2; newRep = 2; break;
@@ -3128,9 +3333,7 @@
 
       // The server computes the due date and stores the session; we send the new level and rep.
       enqueueSubmit(
-        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup,
-          // first Bronze review passed: ask the server for the evening practice card
-          later: (action === "Pass" && card.group === 1 && card.rep === 1) ? true : undefined },
+        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup },
         snapshot(currentIndex + 1), (action === "Fail" ? "Miss" : action) + " \u00B7 " + card.reference
       );
 

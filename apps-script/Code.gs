@@ -30,12 +30,12 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-49'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-50'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
   0: { name: "New",               interval: 0,   repsNeeded: 1 },
-  1: { name: "Bronze",             interval: 1,   repsNeeded: 4 },
+  1: { name: "Bronze",             interval: 1,   repsNeeded: 3 },
   2: { name: "Silver",             interval: 2,   repsNeeded: 3 },
   3: { name: "Gold",             interval: 5,   repsNeeded: 2 },
   4: { name: "Platinum",            interval: 12,  repsNeeded: 2 },
@@ -177,6 +177,220 @@ function stampLearningDates_(preRead) {
     const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
     if (groupStr === '' || Number(groupStr) !== 0) continue;
     if (!toMidnight_(data[i][2])) { sheet.getRange(i + 1, 3).setValue(today); data[i][2] = today; }
+  }
+}
+
+// ───────────── New-verse stages: Learn -> Lock -> Bronze ─────────────
+//
+// A Level 0 verse is a "New" card. Its Rep (column D) is the rep you are ON, which is also the filled dot:
+//   rep 1 .. 7n   Learn   (n = number of verses; verse = ceil(rep / 7), dot = ((rep - 1) mod 7) + 1)
+//   rep 7n + 1    Lock AM
+//   rep 7n + 2    Lock PM  (its button is Promote: Level 1, Rep 1)
+// Column B (Next due) holds the time the button next unlocks (empty = live now). Level 0 rows ignore it everywhere else.
+// Learn unlocks at fixed times of the day, one press per time, nothing builds up if one is missed.
+const LEARN_SLOTS = [4 * 60, 8 * 60, 10 * 60, 12 * 60, 14 * 60, 16 * 60, 18 * 60]; // minutes after midnight
+const REPS_PER_VERSE = 7;
+const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM
+const LOCK_PM_MIN = 18 * 60;        // Lock PM unlocks at 6 PM
+const START_LIVE_BEFORE_MIN = 12 * 60; // a verse added before noon starts today; later it waits for 4 AM tomorrow
+const EVENING_CARDS = false;        // the old extra evening practice card; off now that Lock exists
+
+// The time (ms) of a clock time (minutes after midnight), dayOffset days from the day of `ms`.
+function atClock_(ms, dayOffset, mins) {
+  const d = new Date(ms);
+  d.setDate(d.getDate() + dayOffset);
+  d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  return d.getTime();
+}
+
+function minsOfDay_(ms) {
+  const d = new Date(ms);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+// The next Learn unlock time after `ms` (today's list, else tomorrow's first).
+function nextSlotAfter_(ms) {
+  for (let i = 0; i < LEARN_SLOTS.length; i++) {
+    const t = atClock_(ms, 0, LEARN_SLOTS[i]);
+    if (t > ms) return t;
+  }
+  return atClock_(ms, 1, LEARN_SLOTS[0]);
+}
+
+// The next 4 AM after `ms`.
+function nextDayStart_(ms) {
+  const t = atClock_(ms, 0, DAY_START_MIN);
+  return t > ms ? t : atClock_(ms, 1, DAY_START_MIN);
+}
+
+// When a verse added at `ms` can first be pressed: 0 = now (before noon), otherwise the next 4 AM.
+function startUnlock_(ms) {
+  const m = minsOfDay_(ms);
+  if (m < DAY_START_MIN) return atClock_(ms, 0, DAY_START_MIN);
+  if (m < START_LIVE_BEFORE_MIN) return 0;
+  return nextDayStart_(ms);
+}
+
+// Number of verses in a reference, from the [n] markers in its text (minimum 1).
+function verseCount_(text) {
+  const m = String(text === null || text === undefined ? '' : text).match(/\[(\d+)\]/g);
+  if (!m) return 1;
+  const seen = {};
+  let n = 0;
+  m.forEach(function(x) { if (!seen[x]) { seen[x] = 1; n++; } });
+  return Math.max(1, n);
+}
+
+// Everything the screen needs to know about a New card's position.
+function stageInfo_(rep, n, bRaw, now) {
+  const r = Math.max(1, Math.floor(Number(rep) || 1));
+  const total = REPS_PER_VERSE * n;
+  let unlockAt = 0;
+  if (bRaw instanceof Date) {
+    const t = bRaw.getTime();
+    if (!isNaN(t) && t > now) unlockAt = t;
+  }
+  const out = { stage: 'learn', verseIndex: 1, verseCount: n, dot: 1, lockPart: '', label: 'Review', unlockAt: unlockAt };
+  if (r <= total) {
+    out.verseIndex = Math.ceil(r / REPS_PER_VERSE);
+    out.dot = ((r - 1) % REPS_PER_VERSE) + 1;
+    if (out.dot === REPS_PER_VERSE) out.label = out.verseIndex < n ? 'Next Verse' : 'Learned';
+  } else {
+    out.stage = 'lock';
+    out.verseIndex = n;
+    out.dot = 0;
+    if (r === total + 1) { out.lockPart = 'am'; out.label = 'Review'; }
+    else { out.lockPart = 'pm'; out.label = 'Promote'; }
+  }
+  return out;
+}
+
+// What a press does. Returns { rep, unlock } (unlock 0 = live now) or { promote: true }.
+function nextStep_(info, rep, now) {
+  if (info.stage === 'learn') {
+    if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, unlock: nextSlotAfter_(now) };
+    return { rep: rep + 1, unlock: nextDayStart_(now) }; // Next Verse or Learned: starts again at 4 AM tomorrow
+  }
+  if (info.lockPart === 'am') {
+    const pm = atClock_(now, 0, LOCK_PM_MIN);
+    return { rep: rep + 1, unlock: pm > now ? pm : 0 };
+  }
+  return { promote: true };
+}
+
+// Skip Verse (before the last verse) or Skip to Lock (last verse). Learn cards only.
+function skipStep_(info, n, now) {
+  if (info.verseIndex < n) return { rep: REPS_PER_VERSE * info.verseIndex + 1, unlock: 0 };
+  return { rep: REPS_PER_VERSE * n + 1, unlock: nextDayStart_(now) };
+}
+
+// A Level 0 row as a card for the screen.
+function learningCard_(row, i, now) {
+  const ref = cleanRef_(row[5]);
+  const n = verseCount_(row[7]);
+  const rep = Number(row[3]) || 1;
+  const card = {
+    rowIndex: i + 1,
+    reference: ref,
+    version: row[6] ? String(row[6]).trim() : "",
+    text: row[7] ? String(row[7]) : "(No verse text found in Column H)",
+    group: 0,
+    groupName: GROUP_CONFIG[0].name,
+    rep: rep,
+    repsNeeded: GROUP_CONFIG[0].repsNeeded,
+    isRepeat: false,
+    day: learningDay_(row[2])
+  };
+  const info = stageInfo_(rep, n, row[1], now);
+  Object.keys(info).forEach(function(k) { card[k] = info[k]; });
+  return card;
+}
+
+function isLevelZero_(raw) {
+  const s = String(raw === null || raw === undefined ? '' : raw).trim();
+  return s !== '' && Number(s) === 0;
+}
+
+// Number of unlocked New cards right now, split by stage: { learn, lock }.
+function newCardCounts_(data, now) {
+  const out = { learn: 0, lock: 0 };
+  for (let i = 1; i < data.length; i++) {
+    if (!cleanRef_(data[i][5]) || !isLevelZero_(data[i][4])) continue;
+    const c = learningCard_(data[i], i, now);
+    if (c.unlockAt) continue;
+    if (c.stage === 'lock') out.lock++; else out.learn++;
+  }
+  return out;
+}
+
+/**
+ * A press on the New card's button.
+ *   action 'press'  - the button (refused with 'locked' until its unlock time)
+ *   action 'now'    - the same step, ignoring the lock (hold menu)
+ *   action 'skip'   - Skip Verse / Skip to Lock (Learn cards only)
+ * expectedRep is the rep the screen showed, so a second phone that is behind gets 'stale' and the current card.
+ * Lock PM is Promote: the verse becomes Bronze rep 1, due tomorrow.
+ */
+function learnAction(reference, action, expectedRep) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+    if (!sheet) return { ok: false, reason: 'nosheet', message: 'Sheet "Verses" not found.' };
+    const ref = cleanRef_(reference);
+    const row = ref ? findRowByRef_(sheet, ref) : 0;
+    if (!row) return { ok: false, reason: 'moved', message: 'That verse is no longer in the sheet.' };
+    const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
+    if (!isLevelZero_(vals[4])) return { ok: false, reason: 'notnew', message: 'That verse is not in Learn or Lock.' };
+    if (action !== 'press' && action !== 'now' && action !== 'skip') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
+
+    const now = nowMs_();
+    const n = verseCount_(vals[7]);
+    const rep = Number(vals[3]) || 1;
+    if (expectedRep !== undefined && expectedRep !== null && Number(expectedRep) !== rep) {
+      return { ok: false, reason: 'stale', card: learningCard_(vals, row - 1, now) };
+    }
+    const info = stageInfo_(rep, n, vals[1], now);
+
+    let step;
+    if (action === 'skip') {
+      if (info.stage !== 'learn') return { ok: false, reason: 'noskip', card: learningCard_(vals, row - 1, now) };
+      step = skipStep_(info, n, now);
+    } else {
+      if (action === 'press' && info.unlockAt) {
+        return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
+      }
+      step = nextStep_(info, rep, now);
+    }
+
+    let promoted = false;
+    let card = null;
+    if (step.promote) {
+      const w = writeReview_({ rowIndex: row, reference: ref, rep: 1, group: 1 });
+      if (!w.ok) return w;
+      promoted = true;
+      logEvent_({ ref: ref, result: 'Level Up', lb: 0, la: 1, rb: rep, ra: 1, tries: '', repeat: false });
+    } else {
+      sheet.getRange(row, 2).setValue(step.unlock ? new Date(step.unlock) : '');
+      sheet.getRange(row, 4).setValue(step.rep);
+      vals[1] = step.unlock ? new Date(step.unlock) : '';
+      vals[3] = step.rep;
+      logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : 'Dot', lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
+      card = learningCard_(vals, row - 1, now);
+    }
+
+    // Other phones notice the change through the session version, like any other review.
+    const s = readState_();
+    if (s && s.date === todayKey_()) { s.version++; writeState_(s); }
+
+    cancelSnoozePush_(ref);
+    if (card) scheduleLearnPush_(ref, card);
+
+    const result = { ok: true, promoted: promoted, card: card, version: s && s.date === todayKey_() ? s.version : undefined };
+    result.tomorrow = dueTomorrowCount_(readSheetData_());
+    return result;
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -393,6 +607,7 @@ function seenFor_(s, learning) {
 
 function hydrate_(s, preRead) {
   const data = preRead || readSheetData_();
+  const nowMs = nowMs_();
 
   const byRef = {};
   const learning = [];
@@ -401,22 +616,13 @@ function hydrate_(s, preRead) {
     if (!ref) continue;
     if (!Object.prototype.hasOwnProperty.call(byRef, ref)) byRef[ref] = i;
 
-    const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
-    if (groupStr !== '' && Number(groupStr) === 0) {
-      learning.push({
-        rowIndex: i + 1,
-        reference: ref,
-        version: data[i][6] ? String(data[i][6]).trim() : "",
-        text: data[i][7] ? String(data[i][7]) : "(No verse text found in Column H)",
-        group: 0,
-        groupName: GROUP_CONFIG[0].name,
-        rep: Number(data[i][3]) || 1,
-        repsNeeded: GROUP_CONFIG[0].repsNeeded,
-        isRepeat: false,
-        day: learningDay_(data[i][2])
-      });
-    }
+    if (isLevelZero_(data[i][4])) learning.push(learningCard_(data[i], i, nowMs));
   }
+  // Unlocked cards first, Lock before Learn, then sheet order.
+  learning.sort(function(a, b) {
+    return ((a.unlockAt > 0 ? 1 : 0) - (b.unlockAt > 0 ? 1 : 0)) ||
+      ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
+  });
 
   let idx = s.currentIndex;
   let base = s.baseCount;
@@ -451,6 +657,7 @@ function hydrate_(s, preRead) {
 
   return {
     build: BUILD,
+    serverNow: nowMs,
     version: s.version,
     date: s.date,
     mode: s.mode === 'learning' ? 'learning' : 'review',
@@ -788,7 +995,7 @@ function submitReview(expectedVersion, review, next) {
     }
 
     let laterRef = null;
-    if (review && review.later === true && Number(review.group) === 1 && Number(review.rep) === 2 && written) {
+    if (EVENING_CARDS && review && review.later === true && Number(review.group) === 1 && Number(review.rep) === 2 && written) {
       const at = laterAt_();
       if (at) {
         s.later = (Array.isArray(s.later) ? s.later : []).filter(function(e) { return e.f !== written.f; });
@@ -896,7 +1103,7 @@ function listUnassigned() {
   return out;
 }
 
-// Starts learning the verse you picked (Level 0, Day 1 = today).
+// Starts learning the verse you picked (Level 0). Its first rep is live now if it is before noon, otherwise it unlocks at 4 AM tomorrow.
 function addChosenVerse(rowIndex, reference) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -914,16 +1121,21 @@ function addChosenVerse(rowIndex, reference) {
     if (!(g === "" || g === null || g === undefined)) {
       return { success: false, message: 'That verse was already added.' };
     }
-    // one new verse at a time: refuse if another is already at Level 0 (a phone with an out-of-date screen could otherwise add a second)
+    // One verse in Learn at a time: refuse if another Level 0 verse is still in its Learn reps (a verse in Lock does not block).
+    // This also stops a phone with an out-of-date screen from adding a second.
     if (lastRow >= 2) {
-      const levels = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
-      for (let i = 0; i < levels.length; i++) {
-        const lv = String(levels[i][0] === null || levels[i][0] === undefined ? '' : levels[i][0]).trim();
-        if (lv !== '' && Number(lv) === 0) return { success: false, message: 'You already have a new verse. Level it up first, then add the next one.' };
+      const all = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+      for (let i = 0; i < all.length; i++) {
+        if (!cleanRef_(all[i][5]) || !isLevelZero_(all[i][4])) continue;
+        if ((Number(all[i][3]) || 1) <= REPS_PER_VERSE * verseCount_(all[i][7])) {
+          return { success: false, message: 'You already have a verse in Learn. Finish its reps first, then add the next one.' };
+        }
       }
     }
-    sheet.getRange(row, 2, 1, 4).setValues([["", today_(), 1, 0]]);
-    return { success: true, reference: want, rowIndex: row };
+    // Starts today if added before noon, otherwise at 4 AM tomorrow (before 4 AM: at 4 AM).
+    const unlock = startUnlock_(nowMs_());
+    sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
+    return { success: true, reference: want, rowIndex: row, unlockAt: unlock };
   } finally {
     lock.releaseLock();
   }
@@ -1321,8 +1533,10 @@ function getVerseList() {
 // Two kinds of reminder:
 //   - New verse snooze: when you press Review on a New verse, the app asks for a push at the end of its 2 hour
 //     snooze (pushSnooze). Finishing the verse cancels it (submitReview -> cancelSnoozePush_).
-//   - Daily: around 6:30 AM, if any reviews are due (dailyPush). Sent once a day.
-// New-verse pushes only go out between 7:30 AM and 8:30 PM (see newVerseWindow_). The daily push is once, at about 6:30 AM.
+//   - Daily: around 6:00 AM, one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
+//   - Learn / Lock unlocks: after each press the server schedules a push for the next unlock (scheduleLearnPush_): 8, 10, 12, 2, 4 PM,
+//     and 8 PM for the 6 PM unlock. The 4 AM unlocks are covered by the daily push. The next press cancels a pending one.
+// The old snooze push (pushSnooze) stays for older copies of the app. Its pushes only go out between 7:30 AM and 8:30 PM (see newVerseWindow_).
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
@@ -1469,24 +1683,31 @@ function pushSnooze(reference, endMs) {
   } catch (e) { console.error('pushSnooze failed: ' + e); return { ok: false }; }
 }
 
-// Runs from the daily trigger (installDailyPush). Sends one push if reviews are due and none was sent today.
+// Runs from the daily trigger (installDailyPush), around 6 AM. One push for everything waiting at that point:
+// due reviews, a Learn card and a Lock AM card (both unlock at 4 AM). Sent once a day, and only if something is waiting.
 function dailyPush() {
   const props = PropertiesService.getScriptProperties();
   const today = todayKey_();
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;
-  if (due < 1) return;
-  const r = osSend_('Daily Review', due === 1 ? '1 review is ready today.' : due + ' reviews are ready today.', 0, 'vr-daily', 'review');
+  const nc = newCardCounts_(readSheetData_(), nowMs_());
+  const parts = [];
+  if (due > 0) parts.push(due === 1 ? '1 review' : due + ' reviews');
+  if (nc.learn > 0) parts.push(nc.learn === 1 ? '1 verse to learn' : nc.learn + ' verses to learn');
+  if (nc.lock > 0) parts.push(nc.lock === 1 ? '1 lock review' : nc.lock + ' lock reviews');
+  if (parts.length === 0) return;
+  const go = due > 0 ? 'review' : 'new';
+  const r = osSend_('Verse Review', parts.join(', ') + ' ready today.', 0, 'vr-daily', go);
   if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
 }
 
-// Run once from the editor.
+// Run once from the editor (run it again after updating to this version so the trigger moves to about 6:00 AM).
 function installDailyPush() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'dailyPush') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('dailyPush').timeBased().atHour(6).nearMinute(30).everyDays(1).create();
-  console.log('Daily push trigger created for about 6:30 AM.');
+  ScriptApp.newTrigger('dailyPush').timeBased().atHour(6).nearMinute(0).everyDays(1).create();
+  console.log('Daily push trigger created for about 6:00 AM.');
 }
 
 // Run from the editor to check the connection. View -> Logs shows the answer.
@@ -1506,6 +1727,32 @@ function sendTestPush() {
   return { ok: !!r.ok, message: msg };
 }
 
+// When the push for a New card's unlock goes out. The 4 AM unlocks ride on the 6 AM daily push (dailyPush), so they get none
+// of their own; the 6 PM unlocks get theirs at 8 PM; every other unlock gets a push at its own time. 0 = none.
+function learnPushTime_(unlockMs) {
+  if (!unlockMs) return 0;
+  const m = minsOfDay_(unlockMs);
+  if (m === DAY_START_MIN) return 0;
+  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return unlockMs + 2 * 60 * 60 * 1000;
+  return unlockMs;
+}
+
+// Schedules the push for a New card's next unlock (called after a press). The next press, or Promote, cancels it.
+function scheduleLearnPush_(ref, card) {
+  try {
+    const at = learnPushTime_(card.unlockAt);
+    if (!at || at <= Date.now() + 30000) return;
+    const lockCard = card.stage === 'lock';
+    const msg = lockCard ? ref + ' is ready to Promote.' : ref + ' is ready for its next learn review.';
+    const r = osSend_(lockCard ? 'Lock' : 'Learn', msg, at, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
+    if (r.ok && r.json && r.json.id) {
+      const map = pendingPush_();
+      map[ref] = r.json.id;
+      setPendingPush_(map);
+    }
+  } catch (e) { console.error('scheduleLearnPush_ failed: ' + e); pushLog_('learn schedule ERROR', ref, 0, false, String(e)); }
+}
+
 // Push for the evening practice card, scheduled for the moment it joins the deck.
 function scheduleEveningPush_(ref, atMs) {
   try {
@@ -1519,4 +1766,60 @@ function scheduleEveningPush_(ref, atMs) {
       setPendingPush_(map);
     }
   } catch (e) { console.error('scheduleEveningPush_ failed: ' + e); pushLog_('evening schedule ERROR', ref, atMs, false, String(e)); }
+}
+
+// ───────────── One-time migration: Bronze goes from 4 reps to 3 ─────────────
+// 1) Run migrationPreview() from the editor and read View -> Logs. It changes nothing.
+// 2) Run migrationRun(). It first copies the Verses tab to a backup tab ("Verses backup <date time>"), then lowers every
+//    Bronze verse at rep 2 or higher by one, so a verse already part-way through keeps its Silver date. Bronze verses at rep 1 stay.
+//    Level 0 verses are already at rep 1 and simply start the new Learn flow.
+// It refuses to run a second time (script property VR_MIGRATED_BRONZE3).
+const MIGRATION_KEY = 'VR_MIGRATED_BRONZE3';
+
+function migrationPreview() { return migrateBronze_(false); }
+function migrationRun() { return migrateBronze_(true); }
+
+function migrateBronze_(apply) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (apply && props.getProperty(MIGRATION_KEY)) {
+      console.log('The migration already ran (' + props.getProperty(MIGRATION_KEY) + '). Nothing changed.');
+      return { ran: false, reason: 'already' };
+    }
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Verses');
+    if (!sheet) { console.log('Sheet "Verses" not found.'); return { ran: false, reason: 'nosheet' }; }
+    const data = readSheetData_();
+    const changes = [];
+    for (let i = 1; i < data.length; i++) {
+      const ref = cleanRef_(data[i][5]);
+      if (!ref) continue;
+      const g = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
+      if (g === '' || Number(g) !== 1) continue;
+      const rep = Number(data[i][3]) || 1;
+      if (rep >= 2) changes.push({ row: i + 1, ref: ref, from: rep, to: rep - 1 });
+    }
+    changes.forEach(function(c) { console.log((apply ? 'Changed ' : 'Would change ') + c.ref + ' (row ' + c.row + '): Bronze rep ' + c.from + ' -> ' + c.to); });
+    console.log((apply ? 'Changed ' : 'Would change ') + changes.length + ' verse(s).');
+    if (!apply) return { ran: false, preview: true, changes: changes };
+
+    const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HHmm');
+    let backupName = '';
+    try {
+      const copy = sheet.copyTo(ss);
+      backupName = 'Verses backup ' + stamp;
+      copy.setName(backupName);
+    } catch (e) {
+      console.log('Could not make the backup tab, so nothing was changed: ' + e);
+      return { ran: false, reason: 'backup' };
+    }
+    changes.forEach(function(c) { sheet.getRange(c.row, 4).setValue(c.to); });
+    props.setProperty(MIGRATION_KEY, stamp);
+    console.log('Done. Backup tab: ' + backupName);
+    return { ran: true, changes: changes, backup: backupName };
+  } finally {
+    lock.releaseLock();
+  }
 }
