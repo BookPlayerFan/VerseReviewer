@@ -1808,7 +1808,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-153';
+    const CLIENT_BUILD = 'sync-154';
 
     let queue = [];
     let currentIndex = 0;
@@ -3051,10 +3051,10 @@
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
         const isHint = isNew && isRev && hintMode;
-        // phrases of a split verse show a small grey letter (a, b, c...) once they are revealed
+        // phrases of a split verse always show a small grey letter (a, b, c...), so you can see a verse is split before revealing anything
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
-            ${seg.num ? `<sup class="v-num${multi && seg.vi !== lc.verseIndex - 1 ? ' dim' : ''}">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter && isRev ? `<span class="p-let">${seg.letter}</span>` : ''}
+            ${seg.num ? `<sup class="v-num${multi && seg.vi !== lc.verseIndex - 1 ? ' dim' : ''}">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter ? `<span class="p-let">${seg.letter}</span>` : ''}
             <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}">${isHint ? hintMarkup(seg.text) : escapeHtml(seg.text)}</span>
           </span>
         `;
