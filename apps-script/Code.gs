@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-51'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-52'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -193,7 +193,6 @@ const REPS_PER_VERSE = 7;
 const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM
 const LOCK_PM_MIN = 18 * 60;        // Lock PM unlocks at 6 PM
 const START_LIVE_BEFORE_MIN = 12 * 60; // a verse added before noon starts today; later it waits for 4 AM tomorrow
-const EVENING_CARDS = false;        // the old extra evening practice card; off now that Lock exists
 
 // The time (ms) of a clock time (minutes after midnight), dayOffset days from the day of `ms`.
 function atClock_(ms, dayOffset, mins) {
@@ -525,23 +524,6 @@ const LATER_HOUR = 18;
 const LATER_DELAY_MS = 60 * 60 * 1000;
 
 function nowMs_() { return Date.now(); }
-
-// When the evening card should appear, or 0 if it should be skipped today.
-//   - Passed before 6:00 PM          -> 6:00 PM
-//   - Passed from 6:00 to 7:30 PM    -> an hour after the pass
-//   - Passed from 7:30 to 8:30 PM    -> 8:30 PM (the last time it can appear)
-//   - Passed after 8:30 PM           -> skipped
-const LATER_LAST_SECS = 20 * 3600 + 30 * 60;
-function laterAt_() {
-  const tz = Session.getScriptTimeZone();
-  const now = nowMs_();
-  const nowD = new Date(now);
-  const secs = Number(Utilities.formatDate(nowD, tz, 'H')) * 3600 + Number(Utilities.formatDate(nowD, tz, 'm')) * 60 + Number(Utilities.formatDate(nowD, tz, 's'));
-  if (secs > LATER_LAST_SECS) return 0;
-  const wantSecs = secs < LATER_HOUR * 3600 ? LATER_HOUR * 3600 : secs + LATER_DELAY_MS / 1000;
-  const useSecs = Math.min(wantSecs, LATER_LAST_SECS);
-  return now + (useSecs - secs) * 1000;
-}
 
 // Moves any evening cards whose time has come onto the end of the deck. Returns true if it changed anything.
 function releaseLater_(s, now) {
@@ -997,17 +979,6 @@ function submitReview(expectedVersion, review, next) {
       }
     }
 
-    let laterRef = null;
-    if (EVENING_CARDS && review && review.later === true && Number(review.group) === 1 && Number(review.rep) === 2 && written) {
-      const at = laterAt_();
-      if (at) {
-        s.later = (Array.isArray(s.later) ? s.later : []).filter(function(e) { return e.f !== written.f; });
-        s.later.push({ r: written.r, f: written.f, at: at });
-        laterRef = written.f;
-        scheduleEveningPush_(written.f, at);
-      }
-    }
-
     let undoId = null;
     if (isScore) {
       undoId = s.version;
@@ -1020,8 +991,7 @@ function submitReview(expectedVersion, review, next) {
         processed: prev.processed,
         row: written,
         log: logRef,
-        tryRef: logRef ? logRef.f : null,
-        later: laterRef
+        tryRef: logRef ? logRef.f : null
       };
     }
 
@@ -1068,8 +1038,6 @@ function undoLast(undoId) {
 
     unlogEvent_(u.log);
     if (u.tryRef && s.tries && s.tries[u.tryRef]) s.tries[u.tryRef]--;
-    if (u.later && Array.isArray(s.later)) s.later = s.later.filter(function(e) { return e.f !== u.later; });
-    if (u.later) cancelSnoozePush_('evening:' + u.later);
 
     for (let i = 0; i < u.pushed; i++) s.queue.pop();
     s.currentIndex = u.idx;
@@ -1534,17 +1502,12 @@ function getVerseList() {
 //               2) Run installDailyPush() from the editor (creates the ~6:30 AM trigger; approve the permissions).
 //               3) Run testPush() to send yourself a test.
 // Two kinds of reminder:
-//   - New verse snooze: when you press Review on a New verse, the app asks for a push at the end of its 2 hour
-//     snooze (pushSnooze). Finishing the verse cancels it (submitReview -> cancelSnoozePush_).
 //   - Daily: around 6:00 AM, one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
 //   - Learn / Lock unlocks: after each press the server schedules a push for the next unlock (scheduleLearnPush_): 8, 10, 12, 2, 4 PM,
 //     and 8 PM for the 6 PM unlock. The 4 AM unlocks are covered by the daily push. The next press cancels a pending one.
-// The old snooze push (pushSnooze) stays for older copies of the app. Its pushes only go out between 7:30 AM and 8:30 PM (see newVerseWindow_).
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
-const NEW_PUSH_FROM = 7 * 60 + 30;  // New-verse pushes: no earlier than 7:30 AM
-const NEW_PUSH_TO = 20 * 60 + 30;   // ... and no later than 8:30 PM
 const PUSH_PENDING_KEY = 'VR_PUSH_PENDING'; // { reference: notificationId }
 const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
@@ -1608,24 +1571,6 @@ function osCall_(method, path, body) {
   return { ok: ok, code: code, text: text, json: json };
 }
 
-// When a New-verse push may go out: between 7:30 AM and 8:30 PM (local time).
-//   - Snooze ends earlier than 7:30 AM  -> 7:30 AM.
-//   - Snooze ends after 8:30 PM         -> 8:30 PM if you snoozed before then, otherwise next morning at 7:30 AM.
-function newVerseWindow_(endMs, nowMs) {
-  const tz = Session.getScriptTimeZone();
-  const mins = function(ms) {
-    return Number(Utilities.formatDate(new Date(ms), tz, 'H')) * 60 + Number(Utilities.formatDate(new Date(ms), tz, 'm'));
-  };
-  const day = function(ms) { return Utilities.formatDate(new Date(ms), tz, 'yyyy-MM-dd'); };
-  const m = mins(endMs), first = NEW_PUSH_FROM, last = NEW_PUSH_TO;
-  const MIN = 60000;
-  if (m >= first && m <= last) return endMs;
-  if (m < first) return endMs + (first - m) * MIN;
-  // after the last allowed time
-  if (day(nowMs) === day(endMs) && mins(nowMs) <= last) return endMs - (m - last) * MIN;
-  return endMs + (1440 - m + first) * MIN;
-}
-
 function osSend_(heading, message, whenMs, topic, go) {
   const body = {
     app_id: ONESIGNAL_APP_ID,
@@ -1666,24 +1611,6 @@ function cancelSnoozePush_(ref) {
     const c = osCall_('delete', '/notifications/' + encodeURIComponent(id) + '?app_id=' + ONESIGNAL_APP_ID);
     pushLog_('cancel', ref, 0, !!c.ok, 'id ' + id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
   } catch (e) { console.error('cancelSnoozePush_ failed: ' + e); }
-}
-
-// Called by the app (fire and forget) when a New verse is marked Reviewed. endMs = when its snooze ends.
-function pushSnooze(reference, endMs) {
-  try {
-    const ref = cleanRef_(reference);
-    const end = Number(endMs);
-    if (!ref || !end || end < Date.now() || end > Date.now() + 6 * 60 * 60 * 1000) return { ok: false };
-    cancelSnoozePush_(ref);
-    const when = newVerseWindow_(end, Date.now());
-    const r = osSend_('New Verse', ref + ' is ready to review again.', when, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
-    if (r.ok && r.json && r.json.id) {
-      const map = pendingPush_();
-      map[ref] = r.json.id;
-      setPendingPush_(map);
-    }
-    return { ok: !!r.ok };
-  } catch (e) { console.error('pushSnooze failed: ' + e); return { ok: false }; }
 }
 
 // Runs from the daily trigger (installDailyPush), around 6 AM. One push for everything waiting at that point:
@@ -1754,21 +1681,6 @@ function scheduleLearnPush_(ref, card) {
       setPendingPush_(map);
     }
   } catch (e) { console.error('scheduleLearnPush_ failed: ' + e); pushLog_('learn schedule ERROR', ref, 0, false, String(e)); }
-}
-
-// Push for the evening practice card, scheduled for the moment it joins the deck.
-function scheduleEveningPush_(ref, atMs) {
-  try {
-    const key = 'evening:' + ref;
-    pushLog_('evening card due', ref, atMs, null, 'asked to schedule the evening push');
-    cancelSnoozePush_(key);
-    const r = osSend_('Evening Review', ref + ' is ready for its evening review.', atMs, 'vr-eve-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'review');
-    if (r.ok && r.json && r.json.id) {
-      const map = pendingPush_();
-      map[key] = r.json.id;
-      setPendingPush_(map);
-    }
-  } catch (e) { console.error('scheduleEveningPush_ failed: ' + e); pushLog_('evening schedule ERROR', ref, atMs, false, String(e)); }
 }
 
 // ───────────── One-time migration: Bronze goes from 4 reps to 3 ─────────────
