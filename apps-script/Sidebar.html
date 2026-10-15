@@ -950,12 +950,19 @@
     button:disabled:active { transform: none; filter: none; }
 
 
-    /* Month line at the top of Review Complete: Perfect Days and Treasury points this month (not tappable). */
-    .month-strip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90%;
-      display: inline-flex; flex-direction: row; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px;
-      border: 1px solid var(--border-card); color: var(--text-muted); font-size: 13px; font-weight: 700; letter-spacing: 0.1px;
-      pointer-events: none; white-space: nowrap; }
-    .month-strip svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    /* Month line at the top of Review Complete: month | Perfect Days | points this month (one outlined pill, not tappable). */
+    .month-strip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%;
+      display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-card);
+      font-size: 13px; font-weight: 700; color: var(--text-muted); pointer-events: none; white-space: nowrap; }
+    .month-strip span { padding: 7px 14px; }
+    .month-strip span + span { border-left: 1px solid var(--border-card); }
+    .month-strip b { color: var(--text-primary); font-weight: 800; }
+    .month-strip .ms-mon { color: var(--text-primary); font-weight: 800; }
+    .month-strip .ms-star { color: #c98f00; }
+    .month-strip .ms-pts { color: var(--text-accent); }
+    .month-strip .ms-pts b { color: var(--text-primary); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .month-strip .ms-star { color: #f2c94c; } }
+    :root[data-theme="dark"] .month-strip .ms-star { color: #f2c94c; }
 
     /* Simple "pick a verse" sheet */
     .picker {
@@ -1956,7 +1963,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-158';
+    const CLIENT_BUILD = 'sync-159';
 
     let queue = [];
     let currentIndex = 0;
@@ -2684,7 +2691,6 @@
     }
 
     // ── Month line on Review Complete: Perfect Days and Treasury points this month ──
-    const CAL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
     let monthCache = null;   // { at, data } for the current month
     let monthBusy = false;
     function monthTotals(data) {
@@ -2692,19 +2698,16 @@
       Object.keys(data.days || {}).forEach(function(k) { const d = data.days[k]; if (d[0] > 0 && d[1] === 0) perfect++; pts += d[4]; });
       return { perfect: perfect, pts: pts };
     }
-    function setMonthStrip(text) {
-      const el = document.getElementById("monthStrip");
-      el.innerHTML = CAL_ICON;
-      const t = document.createElement("span");
-      t.textContent = text;
-      el.appendChild(t);
-      el.style.display = "inline-flex";
-    }
     function paintMonthStrip(data) {
       const t = monthTotals(data);
-      const pd = t.perfect > 0 ? "\u2726 " + t.perfect + " Perfect Day" + (t.perfect === 1 ? "" : "s") : "No Perfect Days yet";
-      const pts = t.pts === 0 ? "" : " \u00B7 " + (t.pts > 0 ? "+" : "\u2212") + Math.abs(t.pts) + " pts";
-      setMonthStrip(pd + pts);
+      const el = document.getElementById("monthStrip");
+      const seg = function(cls, html) { const e = document.createElement("span"); if (cls) e.className = cls; e.innerHTML = html; el.appendChild(e); };
+      el.textContent = "";
+      seg("ms-mon", ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][data.m - 1]);
+      if (t.perfect > 0) seg("", '<i class="ms-star" style="font-style:normal">\u2726</i> <b>' + t.perfect + "</b> Perfect Day" + (t.perfect === 1 ? "" : "s"));
+      else seg("", "No Perfect Days yet");
+      if (t.pts !== 0) seg("ms-pts", "<b>" + (t.pts > 0 ? "+" : "\u2212") + Math.abs(t.pts) + "</b> pts");
+      el.style.display = "inline-flex";
     }
     function renderMonthStrip(show) {
       const el = document.getElementById("monthStrip");
