@@ -1720,7 +1720,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-131';
+    const CLIENT_BUILD = 'sync-132';
 
     let queue = [];
     let currentIndex = 0;
@@ -1734,6 +1734,7 @@
     let loadedAt = 0;
     let tomorrowCount = null;
     let countUpPending = false;
+    let regularScoredThisLoad = false; // a real (non-repeat) card was scored since this page opened
     let countUpToken = 0;
     let lastCountUpSig = "";
     let undoId = null;
@@ -2861,10 +2862,13 @@
       setTimeout(function() {
         if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
         document.getElementById("toastNotice").textContent = "";
+        const doneCard = queue[currentIndex];
         currentIndex++;
         if (currentIndex >= activeEnd()) {
           if (practicing) practicing = false;
-          else if (totalCardsProcessed > 0) countUpPending = true; // just finished: play the count-up once
+          // just finished: play the count-up once. Clearing an evening / repeat card after the app was reopened changes no numbers,
+          // so it must not replay it (this page never saw the deck finish, so it can't tell by itself).
+          else if (totalCardsProcessed > 0 && !(doneCard && doneCard.isRepeat && !regularScoredThisLoad)) countUpPending = true;
         }
         render();
       }, ms);
@@ -2939,6 +2943,7 @@
         return;
       }
 
+      regularScoredThisLoad = true;
       const currentConfig = GROUP_CONFIG[card.group] || GROUP_CONFIG[0];
       const fastTrackTarget = getFastTrackTarget(card);
 
