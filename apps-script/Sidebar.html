@@ -1967,7 +1967,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-163';
+    const CLIENT_BUILD = 'sync-164';
 
     let queue = [];
     let currentIndex = 0;
@@ -2439,6 +2439,8 @@
     // "Update ready" appears when the server says a newer copy of this page exists than the one the phone is showing.
     let savingTimer = null, savingShown = false, updateReady = false, reloadFailed = false;
     function noteClientBuild(n) {
+      diag.expects = Number(n) || 0;
+      renderDiag();
       const mine = Number((String(CLIENT_BUILD).match(/(\d+)\s*$/) || [])[1]) || 0;
       if (Number(n) > mine && !updateReady) { updateReady = true; updateSyncWarning(); autoReloadIfIdle(); }
     }
@@ -4463,7 +4465,7 @@
       const el = document.getElementById("diagText");
       if (!el || !diagOn) return;
       el.textContent =
-        "page " + CLIENT_BUILD + " · server " + (serverBuild || "?") +
+        "page " + CLIENT_BUILD + " (server expects " + (diag.expects ? "sync-" + diag.expects : "?") + ")" + (updateReady ? " update waiting" : "") + " · server " + (serverBuild || "?") +
         " · v" + sessionVersion + " · " + (sessionDate || "no date") +
         " · last check " + (diag.checkedAt || "never") + ": " + diag.result +
         (diag.error ? " · error: " + diag.error : "") +
@@ -4474,7 +4476,7 @@
           " · access key " + (shellInfo.key ? "saved" : "not saved") + (shellInfo.works ? "" : " (storage blocked)") : "");
     }
 
-    // Sends a test push through the server (tap the "Verse List" title, then the button).
+    // Sends a test push through the server (hold the Verses tab, then the button).
     function sendTestPush() {
       const b = document.getElementById("diagTest");
       if (!b || b.disabled) return;
