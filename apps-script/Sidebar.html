@@ -1086,7 +1086,7 @@
   <div class="picker" id="verseListView">
     <div class="picker-head">
       <div class="vl-titleblock">
-        <span class="picker-title" id="vlTitle" onclick="toggleDiag()">Verse List</span>
+        <span class="picker-title" id="vlTitle">Verse List</span>
         <span class="vl-total" id="vlTotal"></span>
       </div>
       <span class="vl-pills" id="vlPills">
@@ -1119,7 +1119,7 @@
       <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       New<span class="tab-count" id="tabNewCount" style="display:none"></span>
     </button>
-    <button type="button" class="tab" id="tabVerses" onclick="goTab('verses')">
+    <button type="button" class="tab" id="tabVerses" onclick="onVersesTabClick()">
       <svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>
       Verses
     </button>
@@ -1967,7 +1967,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-162';
+    const CLIENT_BUILD = 'sync-163';
 
     let queue = [];
     let currentIndex = 0;
@@ -4486,9 +4486,17 @@
         .sendTestPush();
     }
 
-    // A tap outside the status panel only closes it (the tap does nothing else). Tapping the "Verse List" title still toggles it.
+    // Press and hold the Verses tab to show or hide the status panel. A tap outside the panel only closes it (the tap does
+    // nothing else); a plain tap on the Verses tab while it is open closes it too instead of switching tabs.
     let diagSwallow = false;
-    function diagOutside(e) { return diagOn && !(e.target.closest && (e.target.closest("#diagLine") || e.target.closest("#vlTitle"))); }
+    let versesTabHeld = null;
+    function onVersesTabClick() {
+      if (versesTabHeld && versesTabHeld()) return;   // the click that follows a hold is not a tap
+      if (diagOn) { toggleDiag(); return; }
+      goTab("verses");
+    }
+    versesTabHeld = attachLongPress(document.getElementById("tabVerses"), function() { toggleDiag(); });
+    function diagOutside(e) { return diagOn && !(e.target.closest && (e.target.closest("#diagLine") || e.target.closest("#tabVerses"))); }
     document.addEventListener("pointerdown", function(e) {
       if (!diagOutside(e)) return;
       toggleDiag();
