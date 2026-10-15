@@ -30,7 +30,11 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-53'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-54'; // shown in the app's status readout (tap the "Verse List" title)
+
+// The Sidebar.html build number that goes with this Code.gs. A page older than this is a stale copy (the phone kept an old one),
+// so it offers "Update ready - tap to reload". Raise it whenever a new Sidebar.html ships together with this file.
+const CLIENT_EXPECTED = 152;
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -642,6 +646,7 @@ function hydrate_(s, preRead) {
 
   return {
     build: BUILD,
+    client: CLIENT_EXPECTED,
     serverNow: nowMs,
     version: s.version,
     date: s.date,
@@ -739,7 +744,7 @@ function checkSession(clientVersion, clientDate) {
   const changed = !marker ||
                   marker !== clientDate + '|' + Number(clientVersion) ||
                   marker.split('|')[0] !== today;
-  return { changed: changed, build: BUILD, marker: marker || '', today: today };
+  return { changed: changed, build: BUILD, client: CLIENT_EXPECTED, marker: marker || '', today: today };
 }
 
 // Run this from the Apps Script editor to see what the server has stored (View -> Logs).

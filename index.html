@@ -131,7 +131,8 @@
     function loadApp() {
       var key = "";
       try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
-      var url = APP_URL + "?platform=mobile" + (key ? "&key=" + encodeURIComponent(key) : "");
+      // The changing "_" part only exists so the phone cannot reuse an old copy of the app; the server ignores it.
+      var url = APP_URL + "?platform=mobile&_=" + Date.now() + (key ? "&key=" + encodeURIComponent(key) : "");
       document.getElementById("appFrame").src = url;
     }
     loadApp();
@@ -350,6 +351,8 @@
       }
       if (d.type === 'VR_CACHE') {
         saveEarlyCache(d.cards);
+      } else if (d.type === 'VR_RELOAD') {
+        loadApp();
       } else if (d.type === 'VR_OUTBOX') {
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {

@@ -950,7 +950,7 @@
 </head>
 <body>
 
-  <div class="diag-line" id="diagLine" style="display: none;"><span id="diagText"></span><button type="button" class="diag-test" id="diagTest" onclick="sendTestPush()">Send test notification</button></div>
+  <div class="diag-line" id="diagLine" style="display: none;"><span id="diagText"></span><button type="button" class="diag-test" id="diagTest" onclick="sendTestPush()">Send test notification</button><button type="button" class="diag-test" id="diagReload" onclick="reloadApp()">Reload app</button></div>
 
   <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
 
@@ -1808,7 +1808,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-151';
+    const CLIENT_BUILD = 'sync-152';
 
     let queue = [];
     let currentIndex = 0;
@@ -2026,6 +2026,7 @@
       if (typeof session.tomorrow === 'number') tomorrowCount = session.tomorrow;
       hideUndo();
       serverBuild = session.build || "(old server code)";
+      if (session.client) noteClientBuild(session.client);
       diag.adopted = new Date().toLocaleTimeString();
       renderDiag();
       progressHigh = 0;
@@ -2270,7 +2271,12 @@
     }
 
     // "Saving…" appears only when a save is taking longer than a few seconds, so you know not to close the app yet.
-    let savingTimer = null, savingShown = false;
+    // "Update ready" appears when the server says a newer copy of this page exists than the one the phone is showing.
+    let savingTimer = null, savingShown = false, updateReady = false;
+    function noteClientBuild(n) {
+      const mine = Number((String(CLIENT_BUILD).match(/(\d+)\s*$/) || [])[1]) || 0;
+      if (Number(n) > mine && !updateReady) { updateReady = true; updateSyncWarning(); }
+    }
     function updateSyncWarning() {
       const el = document.getElementById("syncWarning");
       if (!el) return;
@@ -2289,13 +2295,22 @@
       } else if (problemCount > 0) {
         el.textContent = "⚠ Save problem · Reload";
         el.style.display = "inline-flex";
+      } else if (updateReady && pendingCount() === 0) {
+        el.textContent = "Update ready \u00B7 Tap to reload";
+        el.style.display = "inline-flex";
       } else {
         el.style.display = "none";
       }
     }
 
+    // Asks the home-screen page to load the app again with a fresh address, so the phone cannot hand back an old copy.
+    function reloadApp() {
+      if (pendingCount() > 0) return;
+      try { window.top.postMessage({ type: 'VR_RELOAD' }, '*'); } catch (e) {}
+    }
+
     function onSyncWarningTap() {
-      if (!submitFailed && problemCount === 0) return; // just "Saving…"
+      if (!submitFailed && problemCount === 0) { if (updateReady && pendingCount() === 0) reloadApp(); return; } // "Saving…" does nothing
       if (submitFailed) retrySubmit();
       else restartSession();
     }
@@ -4274,6 +4289,7 @@
         .withSuccessHandler(function(res) {
           if (!res) { noteCheck("empty reply"); return; }
           if (res.build) serverBuild = res.build;
+          if (res.client) noteClientBuild(res.client);
           if (!res.changed) { noteCheck("up to date"); return; }
           noteCheck("changed on server, loading");
           // Re-check: the user may have started scoring while the request was in flight.
