@@ -279,6 +279,27 @@
       }
     }
 
+    // Unsent New-card presses, kept here so closing the app before the server answers does not lose them.
+    function saveOutbox(items) {
+      try {
+        var clean = [];
+        (Array.isArray(items) ? items : []).slice(0, 20).forEach(function(it) {
+          if (!it || typeof it.ref !== "string" || !it.ref || it.ref.length > 120) return;
+          if (it.action !== "press" && it.action !== "now" && it.action !== "skip") return;
+          clean.push({ ref: it.ref, action: it.action, rep: Number(it.rep) || 1, promote: it.promote === true, id: String(it.id || "").slice(0, 40), at: Number(it.at) || 0 });
+        });
+        if (clean.length) localStorage.setItem("vr_outbox", JSON.stringify(clean)); else localStorage.removeItem("vr_outbox");
+      } catch (e) {}
+    }
+    function sendReplay(src) {
+      try {
+        var raw = localStorage.getItem("vr_outbox");
+        if (!raw) return;
+        var items = JSON.parse(raw);
+        if (Array.isArray(items) && items.length) src.postMessage({ type: "VR_REPLAY", items: items }, "*");
+      } catch (e) {}
+    }
+
     function handoff(src) {
       var st = earlyState || { f: "", revealed: [] };
       try { src.postMessage({ type: "VR_EARLY", f: st.f, revealed: st.revealed || [], n: st.n, hint: st.hint === true }, "*"); } catch (e) {}
@@ -323,8 +344,11 @@
       }
       if (d.type === 'VR_CACHE') {
         saveEarlyCache(d.cards);
+      } else if (d.type === 'VR_OUTBOX') {
+        saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
         sendGoto(e.source);
+        sendReplay(e.source);
         pushSource = e.source; sendPushState();
         if (earlyActive) handoff(e.source); else dismissSplash();
       } else if (d.type === 'VR_APPLIED') {

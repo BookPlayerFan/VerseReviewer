@@ -1809,7 +1809,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-148';
+    const CLIENT_BUILD = 'sync-149';
 
     let queue = [];
     let currentIndex = 0;
@@ -1946,6 +1946,7 @@
       const d = e.data;
       if (!d || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
       if (d.type === "VR_EARLY") applyEarly(d);
+      else if (d.type === "VR_REPLAY") replayLearn(d.items);
       else if (d.type === "VR_CLIP_TEXT" && clipWait && d.id === clipWait.id) {
         const w = clipWait; clipWait = null; clearTimeout(w.timer);
         if (d.ok) w.resolve(String(d.text || "")); else w.reject(new Error(d.error || "blocked"));
@@ -2115,7 +2116,41 @@
 
     // A press on a New card goes through the same queue as review saves, so it stays in order and is retried if the phone is offline.
     function enqueueLearn(l) {
+      l.id = l.id || (Date.now() + "-" + Math.random().toString(36).slice(2, 6));
+      l.at = l.at || Date.now();
       outbox.push({ learn: l });
+      persistLearn();
+      pumpOutbox();
+    }
+
+    // Unsent presses are also kept by the shell page (this frame's own storage is not reliable), so closing the app before the
+    // server answers does not lose them: the shell hands them back the next time the app opens and they are sent then.
+    // The server ignores a press it has already counted (it compares the rep), so sending one twice does no harm.
+    let learnSig = "[]";
+    function persistLearn() {
+      try {
+        const items = outbox.filter(function(o) { return o.learn; }).map(function(o) { return o.learn; });
+        const sig = JSON.stringify(items);
+        if (sig === learnSig) return;
+        learnSig = sig;
+        window.top.postMessage({ type: 'VR_OUTBOX', items: items }, '*');
+      } catch (e) {}
+    }
+    function replayLearn(items) {
+      if (!Array.isArray(items)) return;
+      const have = {};
+      outbox.forEach(function(o) { if (o.learn) have[o.learn.id] = 1; });
+      let added = 0;
+      items.slice(0, 20).forEach(function(it) {
+        if (!it || typeof it.ref !== 'string' || !it.ref || !it.id || have[it.id]) return;
+        if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip') return;
+        if (!(Number(it.rep) >= 1) || !(Date.now() - Number(it.at) < 6 * 3600 * 1000)) return;
+        outbox.push({ learn: { ref: it.ref, action: it.action, rep: Number(it.rep), promote: !!it.promote, id: String(it.id), at: Number(it.at) } });
+        have[it.id] = 1; added++;
+      });
+      if (!added) return;
+      learnPending = true;
+      persistLearn();
       pumpOutbox();
     }
 
@@ -2129,15 +2164,26 @@
             if (typeof res.version === 'number') sessionVersion = res.version;
             if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; renderTomorrowNote(); }
             outbox.shift();
-            if (!res.promoted && res.card) applyLearnCard(res.card);
+            if (res.promoted) {
+              // Normally the card is already gone (the Promote animation). After a resend it is still on screen, so take it off.
+              const at = learningCards.findIndex(function(x) { return x.reference === l.ref; });
+              if (at >= 0) {
+                learningCards.splice(at, 1);
+                learningIndex = 0;
+                if (!isScoring) { if (mode === 'learning') render(); else updateTabs(); }
+              }
+            } else if (res.card) {
+              applyLearnCard(res.card);
+            }
           } else if (res && res.card) {
-            // Locked or out of date (another phone got there first): show what the server has.
+            // Locked or out of date (another phone got there first, or this press was already counted): show what the server has.
             outbox.shift();
             applyLearnCard(res.card);
           } else {
             outbox.shift();
             problemCount++;
           }
+          persistLearn();
           pumpOutbox();
         })
         .withFailureHandler(function() {
@@ -2210,10 +2256,21 @@
       setTimeout(once, SETTLE_TIMEOUT_MS);
     }
 
+    // "Saving…" appears only when a save is taking longer than a few seconds, so you know not to close the app yet.
+    let savingTimer = null, savingShown = false;
     function updateSyncWarning() {
       const el = document.getElementById("syncWarning");
       if (!el) return;
-      if (submitFailed) {
+      if (!submitFailed && problemCount === 0 && pendingCount() > 0) {
+        if (!savingTimer && !savingShown) savingTimer = setTimeout(function() { savingTimer = null; savingShown = true; updateSyncWarning(); }, 3000);
+      } else {
+        if (savingTimer) { clearTimeout(savingTimer); savingTimer = null; }
+        savingShown = false;
+      }
+      if (savingShown && !submitFailed && problemCount === 0 && pendingCount() > 0) {
+        el.textContent = "Saving\u2026";
+        el.style.display = "inline-flex";
+      } else if (submitFailed) {
         el.textContent = "⚠ " + pendingCount() + " unsaved · Retry";
         el.style.display = "inline-flex";
       } else if (problemCount > 0) {
@@ -2225,6 +2282,7 @@
     }
 
     function onSyncWarningTap() {
+      if (!submitFailed && problemCount === 0) return; // just "Saving…"
       if (submitFailed) retrySubmit();
       else restartSession();
     }
