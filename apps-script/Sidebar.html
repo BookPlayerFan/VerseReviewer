@@ -1074,12 +1074,13 @@
     <div class="pv-card">
       <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Gestures</div>
       <div class="help-scroll">
-        <div class="help-sub">Verse box (both tabs)</div>
+        <div class="help-sub">Verse box</div>
         <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
-        <div class="help-row"><span>Reveal that verse's next piece, or hide it again</span><kbd>Hold a verse</kbd></div>
-        <div class="help-row"><span>Reveal all / hide all</span><kbd>Swipe right</kbd></div>
-        <div class="help-row"><span>First letters only, on / off (New tab)</span><kbd>Swipe left</kbd></div>
-        <div class="help-note">A piece is a whole verse on Review and a phrase on New. A blue bulb on the status line means everything revealed shows only its first letters, until you swipe left again.</div>
+        <div class="help-row"><span>Reveal that verse's next phrase, or hide it again (New tab)</span><kbd>Tap a verse</kbd></div>
+        <div class="help-row"><span>First letters only, on / off (New tab)</span><kbd>Hold</kbd></div>
+        <div class="help-row"><span>Reveal all</span><kbd>Swipe right</kbd></div>
+        <div class="help-row"><span>Hide all</span><kbd>Swipe left</kbd></div>
+        <div class="help-note">A piece is a whole verse on Review and a phrase on New. A blue bulb on the status line means everything revealed shows only its first letters, until you hold again.</div>
         <div class="help-sub">Other holds</div>
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
@@ -1759,7 +1760,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-143';
+    const CLIENT_BUILD = 'sync-144';
 
     let queue = [];
     let currentIndex = 0;
@@ -2777,12 +2778,13 @@
       }).join("");
     }
 
-    // ── Reveal gestures (the same on both tabs) ──
+    // ── Reveal gestures ──
     // A "piece" is one phrase on the New tab and one whole verse on the Review tab.
     //   Tap              reveal the next hidden piece after the one revealed most recently (wrapping round to any still hidden)
-    //   Hold a verse     reveal that verse's next hidden piece; hold it again once it is all showing to hide it
-    //   Swipe right      reveal everything, or hide everything if it is all showing
-    //   Swipe left       New tab only: hints on / off (while on, revealed pieces show only their first letters; hidden ones stay hidden)
+    //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again
+    //   Hold             New tab only: hints on / off (while on, revealed pieces show only their first letters; hidden ones stay hidden)
+    //   Swipe right      reveal everything
+    //   Swipe left       hide everything
     function nextHiddenAfter(from) {
       const n = segmentStates.length;
       for (let k = 1; k <= n; k++) {
@@ -2801,7 +2803,7 @@
 
     function handleVerseClick(index, event) {
       if (event) event.stopPropagation();
-      handleContainerClick(event);
+      if (mode === 'learning') tapVerse(index); else handleContainerClick(event);
     }
 
     function handleContainerClick(event) {
@@ -2810,21 +2812,30 @@
       if (i !== -1) revealPiece(i);
     }
 
-    function holdVerse(e) {
-      if (isScoring || !hasActiveCard()) return;
-      const u = e && e.target && e.target.closest ? e.target.closest(".verse-unit") : null;
-      if (!u) return; // holding empty space does nothing
-      const vi = parsedSegments[+u.getAttribute("data-idx")].vi;
+    // New tab: tapping a verse reveals that verse's next hidden phrase; tapping it once it is all showing hides it again.
+    // Hiding one verse sends the next plain tap back to the start of the reference.
+    function tapVerse(index) {
+      if (isScoring || !hasActiveCard() || !parsedSegments[index]) return;
+      const vi = parsedSegments[index].vi;
       const mine = [];
       parsedSegments.forEach(function(p, i) { if (p.vi === vi) mine.push(i); });
       const hidden = mine.filter(function(i) { return segmentStates[i] === 'hidden'; });
       if (hidden.length) { revealPiece(hidden[0]); return; }
-      mine.forEach(function(i) { segmentStates[i] = 'hidden'; });   // all showing: hide it again to try it from memory
-      revealCursor = mine[0] - 1;                                  // so the next tap shows this verse first
+      mine.forEach(function(i) { segmentStates[i] = 'hidden'; });
+      revealCursor = -1;
       syncFlipState();
       renderCardBody();
     }
 
+    function setAllPieces(reveal) {
+      if (isScoring || !hasActiveCard()) return;
+      segmentStates = segmentStates.map(function() { return reveal ? 'revealed' : 'hidden'; });
+      revealCursor = reveal ? segmentStates.length - 1 : -1;
+      syncFlipState();
+      renderCardBody();
+    }
+
+    // Used by the R key: reveal everything, or hide everything if it is all showing.
     function toggleRevealAll(event) {
       if (event && event.stopPropagation) event.stopPropagation();
       if (isScoring) return;
@@ -2844,11 +2855,11 @@
       renderCardBody();
     }
 
-    // Press and hold in the verse box. The click that ends a hold must not also reveal a piece.
+    // Press and hold in the verse box (New tab): hints on / off. The click that ends a hold must not also reveal a piece.
     let heldBody = null;
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
-      heldBody = attachLongPress(body, function(e) { holdVerse(e); }, function(e) { return !e.target.closest("button"); });
+      heldBody = attachLongPress(body, function() { toggleHintMode(); }, function(e) { return mode === 'learning' && !e.target.closest("button"); });
       body.addEventListener("click", function(e) {
         if (heldBody()) { e.stopImmediatePropagation(); e.preventDefault(); }
       }, true);
@@ -2877,7 +2888,7 @@
         if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
         tracking = false; swipeFired = true;
         if (isScoring || !hasActiveCard()) return;
-        if (dx > 0) toggleRevealAll(); else toggleHintMode();
+        if (dx > 0) setAllPieces(true); else setAllPieces(false);
       });
       window.addEventListener("pointerup", function() { tracking = false; });
       window.addEventListener("pointercancel", function() { tracking = false; });
