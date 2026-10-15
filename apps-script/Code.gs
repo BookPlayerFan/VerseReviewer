@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-55'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-56'; // shown in the app's status readout (tap the "Verse List" title)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1516,68 +1516,38 @@ function getVerseList() {
   return { verses: verses };
 }
 
-// ─────────────────────────── Month view (Perfect Days calendar) ───────────────────────────
+// ─────────────────────────── Month line (Perfect Days and points this month) ───────────────────────────
 //
-// Worked out from the Log tab (one row per scored card), nothing extra is stored. For each day:
-//   r = reviews (first tries), f = misses (including repeat tries; any miss means no Perfect Day), l = level-ups,
-//   p = new verses promoted to Bronze, d = net change in level points, m = misses (first tries only).
-// A Perfect Day is a day with at least one review and no miss. Also returns the first day in the Log, the best month so far
-// and this week's totals (Sunday to Saturday).
+// Worked out from the Log tab (one row per scored card), nothing extra is stored. For each day of the month:
+//   [reviews (first tries), misses (including repeat tries), level-ups, new verses promoted to Bronze,
+//    net change in level points, first-try misses]
+// A Perfect Day is a day with at least one review and no miss. Learn / Lock presses (Dot, Skip) are not reviews.
 function getMonthStats(year, month) {
   year = Number(year); month = Number(month);
   const tz = Session.getScriptTimeZone();
-  const key = function(d) { return Utilities.formatDate(d, tz, 'yyyy-MM-dd'); };
-  const out = { y: year, m: month, days: {}, first: '', best: null, today: todayKey_(),
-                week: { perfect: 0, levelUps: 0, promos: 0, bestRef: '', bestLevel: 0, start: '' } };
+  const out = { y: year, m: month, days: {}, today: todayKey_() };
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
-  const base = today_();
-  const wk = {};
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(base.getTime());
-    d.setDate(d.getDate() - base.getDay() + i);
-    wk[key(d)] = true;
-    if (i === 0) out.week.start = key(d);
-  }
   if (!sheet || sheet.getLastRow() < 2) return out;
   const vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues();
-  const byDay = {};
   vals.forEach(function(v) {
     const t = v[0] instanceof Date ? v[0] : new Date(v[0]);
     if (isNaN(t.getTime())) return;
+    const k = Utilities.formatDate(t, tz, 'yyyy-MM-dd');
+    if (Number(k.slice(0, 4)) !== year || Number(k.slice(5, 7)) !== month) return;
     const res = String(v[2] || '');
     const lb = Number(v[3]), la = Number(v[4]);
     if (isNaN(lb) || isNaN(la)) return;
     const repeat = String(v[8] || '') === 'Yes';
     const isReview = res === 'Pass' || res === 'Fail' || (res === 'Level Up' && lb >= 1);
     const isPromo = lb === 0 && la >= 1;
-    if (!isReview && !isPromo) return; // Learn / Lock presses (Dot, Skip) are not reviews
-    const k = key(t);
-    const day = byDay[k] || (byDay[k] = [0, 0, 0, 0, 0, 0]);
+    if (!isReview && !isPromo) return;
+    const dn = Number(k.slice(8, 10));
+    const day = out.days[dn] || (out.days[dn] = [0, 0, 0, 0, 0, 0]);
     if (isReview && !repeat) day[0]++;
     if (res === 'Fail') { day[1]++; if (!repeat) day[5]++; }
     if (isReview && !repeat && la > lb && lb >= 1) day[2]++;
     if (isPromo) day[3]++;
     day[4] += la - lb;
-    if (wk[k] && isReview && !repeat && la > lb && lb >= 1 && (la >= out.week.bestLevel)) {
-      out.week.bestLevel = la; out.week.bestRef = cleanRef_(v[1]);
-    }
-    if (wk[k] && isPromo) out.week.promos++;
-    if (wk[k] && isReview && !repeat && la > lb && lb >= 1) out.week.levelUps++;
-  });
-  const monthPerfect = {};
-  Object.keys(byDay).sort().forEach(function(k) {
-    const d = byDay[k];
-    if (!out.first) out.first = k;
-    const perfect = d[0] > 0 && d[1] === 0;
-    if (perfect) {
-      const ym = k.slice(0, 7);
-      monthPerfect[ym] = (monthPerfect[ym] || 0) + 1;
-      if (wk[k]) out.week.perfect++;
-    }
-    if (Number(k.slice(0, 4)) === year && Number(k.slice(5, 7)) === month) out.days[Number(k.slice(8, 10))] = d;
-  });
-  Object.keys(monthPerfect).sort().forEach(function(ym) {
-    if (!out.best || monthPerfect[ym] >= out.best.n) out.best = { y: Number(ym.slice(0, 4)), m: Number(ym.slice(5, 7)), n: monthPerfect[ym] };
   });
   return out;
 }
