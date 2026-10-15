@@ -358,12 +358,12 @@
       } else if (d.type === 'VR_HINT') {
         saveHint(d.on === true);
       } else if (d.type === 'VR_RELOAD') {
-        // An automatic reload (the page saw a newer copy) happens at most once per 10 minutes, so it can never loop;
+        // An automatic reload (the page saw a newer copy) happens at most once per minute, so a stuck old copy can only retry slowly, never spin;
         // a tap on "Update ready" or "Reload app" always goes through.
         if (d.auto === true) {
           try {
             var lastAuto = Number(localStorage.getItem("vr_auto") || 0);
-            if (Date.now() - lastAuto < 600000) return;
+            if (Date.now() - lastAuto < 60000) return;
             localStorage.setItem("vr_auto", String(Date.now()));
           } catch (err) { return; }
         }
