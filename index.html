@@ -121,6 +121,13 @@
 
     // Optional access key: only used if you add a VR_KEY script property in Apps Script.
     // It is stored on this device only, never in this public file.
+    // When this icon first opened, so the status readout can show whether its saved data ever got wiped (a wipe starts the date over).
+    try { if (!localStorage.getItem("vr_first")) localStorage.setItem("vr_first", String(Date.now())); } catch (e) {}
+    function shellInfo() {
+      var first = 0, key = false, works = false;
+      try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
+      return { type: "VR_SHELL", first: first, key: key, works: works };
+    }
     function loadApp() {
       var key = "";
       try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
@@ -348,6 +355,7 @@
       } else if (d.type === 'VR_READY') {
         sendGoto(e.source);
         sendReplay(e.source);
+        try { e.source.postMessage(shellInfo(), "*"); } catch (err) {}
         pushSource = e.source; sendPushState();
         if (earlyActive) handoff(e.source); else dismissSplash();
       } else if (d.type === 'VR_APPLIED') {

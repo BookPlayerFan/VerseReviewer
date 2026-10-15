@@ -1808,7 +1808,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-150';
+    const CLIENT_BUILD = 'sync-151';
 
     let queue = [];
     let currentIndex = 0;
@@ -1959,6 +1959,7 @@
       if (!d || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
       if (d.type === "VR_EARLY") applyEarly(d);
       else if (d.type === "VR_REPLAY") replayLearn(d.items);
+      else if (d.type === "VR_SHELL") { shellInfo = d; renderDiag(); }
       else if (d.type === "VR_CLIP_TEXT" && clipWait && d.id === clipWait.id) {
         const w = clipWait; clipWait = null; clearTimeout(w.timer);
         if (d.ok) w.resolve(String(d.text || "")); else w.reject(new Error(d.error || "blocked"));
@@ -4201,6 +4202,7 @@
     // We ask the server whether the session has moved on: when you come back to the app,
     // when the window gains focus, on a tap after a pause, and every few seconds.
 
+    let shellInfo = null;   // what the home-screen page says about itself (when this icon first opened, whether the key is saved)
     function renderDiag() {
       const el = document.getElementById("diagText");
       if (!el || !diagOn) return;
@@ -4211,7 +4213,9 @@
         (diag.error ? " · error: " + diag.error : "") +
         " · loaded " + (diag.adopted || "never") +
         (initialSession && initialSession.ms !== undefined ? " · server load " + initialSession.ms + " ms" : "") +
-        " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "");
+        " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "") +
+        (shellInfo ? " · this icon since " + (shellInfo.first ? new Date(shellInfo.first).toLocaleDateString([], { month: "short", day: "numeric" }) + " " + new Date(shellInfo.first).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?") +
+          " · access key " + (shellInfo.key ? "saved" : "not saved") + (shellInfo.works ? "" : " (storage blocked)") : "");
     }
 
     // Sends a test push through the server (tap the "Verse List" title, then the button).
