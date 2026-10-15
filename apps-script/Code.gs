@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-48'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-49'; // shown in the app's status readout (tap the "Verse List" title)
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
 const GROUP_CONFIG = {
@@ -1332,6 +1332,44 @@ const PUSH_PENDING_KEY = 'VR_PUSH_PENDING'; // { reference: notificationId }
 const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
 
+// ───────────── Push log ─────────────
+// Every notification the app asks OneSignal for (and every cancel) is added as a row on a "Push Log" tab, newest at the bottom,
+// so a missing notification can be traced: was it ever scheduled, for what time, and what did OneSignal answer?
+// Run pushReport() from the editor to add what OneSignal itself says happened to the 15 most recent notifications.
+// A logging problem never blocks a push.
+const PUSH_LOG_SHEET = 'Push Log';
+const PUSH_LOG_HEADERS = ['Logged', 'Event', 'Reference / topic', 'Scheduled for', 'Result', 'Detail'];
+const PUSH_LOG_KEEP = 400;
+
+function pushLog_(event, ref, whenMs, ok, detail) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(PUSH_LOG_SHEET);
+    if (!sheet) {
+      sheet = ss.insertSheet(PUSH_LOG_SHEET);
+      sheet.appendRow(PUSH_LOG_HEADERS);
+      try { sheet.setFrozenRows(1); } catch (e) {}
+      try { sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd hh:mm:ss'); sheet.getRange('D:D').setNumberFormat('yyyy-mm-dd hh:mm:ss'); } catch (e) {}
+    }
+    sheet.appendRow([new Date(), event, ref || '', whenMs ? new Date(whenMs) : '', ok === null ? '' : (ok ? 'ok' : 'FAILED'), String(detail || '').slice(0, 300)]);
+    const extra = sheet.getLastRow() - 1 - PUSH_LOG_KEEP;
+    if (extra > 0) sheet.deleteRows(2, extra);
+  } catch (e) { console.error('Push log write failed: ' + e); }
+}
+
+// Adds OneSignal's own account of the most recent notifications to the Push Log (run it from the editor, e.g. the next morning).
+function pushReport() {
+  const r = osCall_('get', '/notifications?app_id=' + ONESIGNAL_APP_ID + '&limit=15');
+  if (!r.ok || !r.json || !r.json.notifications) { pushLog_('report', '', 0, false, r.code + ' ' + String(r.text || '').slice(0, 200)); return; }
+  r.json.notifications.slice().reverse().forEach(function(n) {
+    const when = n.send_after ? Number(n.send_after) * 1000 : 0;
+    const done = n.completed_at ? new Date(Number(n.completed_at) * 1000).toISOString() : 'not yet';
+    pushLog_('report: ' + ((n.headings && n.headings.en) || '?'), n.web_push_topic || '', when, null,
+      'delivered ' + (n.successful || 0) + ', failed ' + (n.failed || 0) + ', errored ' + (n.errored || 0) + ', waiting ' + (n.remaining || 0) +
+      (n.canceled ? ', CANCELED' : '') + ', finished ' + done + ' [' + n.id + ']');
+  });
+}
+
 function osCall_(method, path, body) {
   const key = PropertiesService.getScriptProperties().getProperty('ONESIGNAL_KEY');
   if (!key) return { ok: false, text: 'ONESIGNAL_KEY is not set' };
@@ -1387,7 +1425,10 @@ function osSend_(heading, message, whenMs, topic, go) {
   if (whenMs && whenMs > Date.now() + 30000) {
     body.send_after = Utilities.formatDate(new Date(whenMs), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
   }
-  return osCall_('post', '/notifications?c=push', body);
+  const res = osCall_('post', '/notifications?c=push', body);
+  pushLog_('send: ' + heading, message, body.send_after ? whenMs : 0, !!res.ok,
+    (body.send_after ? 'send_after ' + body.send_after : 'immediate') + ' | ' + (res.ok && res.json && res.json.id ? 'id ' + res.json.id : res.code + ' ' + String(res.text || '').slice(0, 160)));
+  return res;
 }
 
 function pendingPush_() {
@@ -1405,7 +1446,8 @@ function cancelSnoozePush_(ref) {
     if (!id) return;
     delete map[ref];
     setPendingPush_(map);
-    osCall_('delete', '/notifications/' + encodeURIComponent(id) + '?app_id=' + ONESIGNAL_APP_ID);
+    const c = osCall_('delete', '/notifications/' + encodeURIComponent(id) + '?app_id=' + ONESIGNAL_APP_ID);
+    pushLog_('cancel', ref, 0, !!c.ok, 'id ' + id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
   } catch (e) { console.error('cancelSnoozePush_ failed: ' + e); }
 }
 
@@ -1468,6 +1510,7 @@ function sendTestPush() {
 function scheduleEveningPush_(ref, atMs) {
   try {
     const key = 'evening:' + ref;
+    pushLog_('evening card due', ref, atMs, null, 'asked to schedule the evening push');
     cancelSnoozePush_(key);
     const r = osSend_('Evening Review', ref + ' is ready for its evening review.', atMs, 'vr-eve-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'review');
     if (r.ok && r.json && r.json.id) {
@@ -1475,5 +1518,5 @@ function scheduleEveningPush_(ref, atMs) {
       map[key] = r.json.id;
       setPendingPush_(map);
     }
-  } catch (e) { console.error('scheduleEveningPush_ failed: ' + e); }
+  } catch (e) { console.error('scheduleEveningPush_ failed: ' + e); pushLog_('evening schedule ERROR', ref, atMs, false, String(e)); }
 }

@@ -496,7 +496,7 @@
       background-color: transparent;
     }
 
-    /* Hold a hidden phrase (New tab): its first letters show in blue, in the exact spot they will have once it is revealed.
+    /* Hint mode (New tab): a revealed phrase shows only its first letters in blue, in the exact spot the full text has.
        The rest of each word keeps its width but is invisible, so the verse does not change size or shift when it is revealed. */
     .v-text.hinted {
       filter: none;
@@ -1079,8 +1079,8 @@
         <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
         <div class="help-row"><span>Reveal that verse's next piece, or hide it again</span><kbd>Hold a verse</kbd></div>
         <div class="help-row"><span>Reveal all / hide all</span><kbd>Swipe right</kbd></div>
-        <div class="help-row"><span>Hints on / off (New tab)</span><kbd>Swipe left</kbd></div>
-        <div class="help-note">A piece is a whole verse on Review and a phrase on New. A blue bulb on the status line means hints are on.</div>
+        <div class="help-row"><span>First letters only, on / off (New tab)</span><kbd>Swipe left</kbd></div>
+        <div class="help-note">A piece is a whole verse on Review and a phrase on New. A blue bulb on the status line means everything revealed shows only its first letters, until you swipe left again.</div>
         <div class="help-sub">Other holds</div>
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
@@ -1759,7 +1759,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-137';
+    const CLIENT_BUILD = 'sync-138';
 
     let queue = [];
     let currentIndex = 0;
@@ -1785,7 +1785,7 @@
 
     let parsedSegments = [];
     let segmentStates = [];
-    let hintMode = false;   // New tab: while on, every hidden piece shows its first letters (a hint is not a reveal, never saved); resets when the app reloads
+    let hintMode = false;   // New tab: while on, revealed pieces show only their first letters (hidden ones stay hidden; never saved); resets when the app reloads
     let revealCursor = -1;  // the piece revealed most recently; a tap reveals the next hidden piece after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
@@ -2690,7 +2690,7 @@
 
       if (card.isRepeat) {
         // a verse you missed today comes back as a Practice card; any other repeat card is the evening Bronze card
-        metaTag.textContent = (wasMissedToday(card.reference) ? "Practice" : "Evening") + " \u00B7 " + rankName(card.group);
+        metaTag.textContent = (wasMissedToday(card.reference) ? "Missed Practice" : "Evening") + " \u00B7 " + rankName(card.group);
         metaTag.classList.add("is-repeat-badge");
         // Repeat cards (practice rounds and the evening card) only have Clear: a Repeat button would just put the card
         // back at the end, so you simply keep looking at it until you know it, then tap Clear.
@@ -2748,12 +2748,12 @@
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
-        const isHint = isNew && !isRev && hintMode;
+        const isHint = isNew && isRev && hintMode;
         // phrases of a split verse show a small grey letter (a, b, c...) once they are revealed
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
             ${seg.num ? `<sup class="v-num">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter && isRev ? `<span class="p-let">${seg.letter}</span>` : ''}
-            <span class="v-text ${isRev ? 'revealed' : (isHint ? 'hinted' : 'blurred')}">${isHint ? hintMarkup(seg.text) : escapeHtml(seg.text)}</span>
+            <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}">${isHint ? hintMarkup(seg.text) : escapeHtml(seg.text)}</span>
           </span>
         `;
       });
@@ -2777,7 +2777,7 @@
     //   Tap              reveal the next hidden piece after the one revealed most recently (wrapping round to any still hidden)
     //   Hold a verse     reveal that verse's next hidden piece; hold it again once it is all showing to hide it
     //   Swipe right      reveal everything, or hide everything if it is all showing
-    //   Swipe left       New tab only: hints on / off (every hidden piece shows its first letters)
+    //   Swipe left       New tab only: hints on / off (while on, revealed pieces show only their first letters; hidden ones stay hidden)
     function nextHiddenAfter(from) {
       const n = segmentStates.length;
       for (let k = 1; k <= n; k++) {
@@ -2849,36 +2849,36 @@
       }, true);
     }
 
-    // Swipe sideways in the verse box. Mostly-vertical drags are left alone so a long verse still scrolls
-    // (the box allows vertical panning only), and the screen edges are left to iOS.
-    const SWIPE_MIN = 56;
-    let swipedAt = 0;
+    // Swipe sideways in the verse box. It fires as soon as the finger has clearly gone sideways (no need to lift),
+    // mostly-vertical drags are left alone so a long verse still scrolls (the box allows vertical panning only),
+    // and the very edge of the screen is left to iOS.
+    const SWIPE_MIN = 36;      // px sideways
+    const SWIPE_RATIO = 1.2;   // sideways must beat vertical by this much
+    let swipeFired = false;
     function attachSwipe() {
       const body = document.getElementById("cardBody");
       let tracking = false, sx = 0, sy = 0;
       body.addEventListener("pointerdown", function(e) {
-        tracking = false;
+        tracking = false; swipeFired = false;
         if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
         if (e.target.closest("button")) return;
-        if (e.pointerType === "touch" && (e.clientX < 20 || e.clientX > window.innerWidth - 20)) return;
+        if (e.pointerType === "touch" && (e.clientX < 14 || e.clientX > window.innerWidth - 14)) return;
         tracking = true; sx = e.clientX; sy = e.clientY;
       });
       body.addEventListener("pointermove", function(e) {
         if (!tracking) return;
-        if (Math.abs(e.clientY - sy) > 12 && Math.abs(e.clientY - sy) > Math.abs(e.clientX - sx)) tracking = false;
-      });
-      window.addEventListener("pointerup", function(e) {
-        if (!tracking) return;
-        tracking = false;
         const dx = e.clientX - sx, dy = e.clientY - sy;
-        if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 1.6) return;
-        swipedAt = Date.now();
+        if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }   // a vertical scroll
+        if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
+        tracking = false; swipeFired = true;
         if (isScoring || !hasActiveCard()) return;
         if (dx > 0) toggleRevealAll(); else toggleHintMode();
       });
+      window.addEventListener("pointerup", function() { tracking = false; });
       window.addEventListener("pointercancel", function() { tracking = false; });
+      // the click that can follow a swipe must not also reveal a piece
       body.addEventListener("click", function(e) {
-        if (Date.now() - swipedAt < 250) { e.stopImmediatePropagation(); e.preventDefault(); }
+        if (swipeFired) { swipeFired = false; e.stopImmediatePropagation(); e.preventDefault(); }
       }, true);
     }
 
