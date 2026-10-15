@@ -1808,7 +1808,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-146';
+    const CLIENT_BUILD = 'sync-147';
 
     let queue = [];
     let currentIndex = 0;
@@ -2133,7 +2133,6 @@
             // Locked or out of date (another phone got there first): show what the server has.
             outbox.shift();
             applyLearnCard(res.card);
-            if (res.reason === "locked") showLockedHint(res.card);
           } else {
             outbox.shift();
             problemCount++;
@@ -2784,15 +2783,6 @@
       if ((card.dot || 1) === 1) return card.verseIndex > 1 ? "Verse " + card.verseIndex + " starts " + when : "Starts " + when;
       return "Next review " + when;
     }
-    function showLockedHint(card) {
-      if (learnHintTimer) clearTimeout(learnHintTimer);
-      document.getElementById("btnPassText").textContent = lockedText(card);
-      learnHintTimer = setTimeout(function() {
-        learnHintTimer = null;
-        const c = learningCards[learningIndex];
-        if (c) document.getElementById("btnPassText").textContent = c.label || "Review";
-      }, 2500);
-    }
 
     // Puts the server's version of a card on screen. Stays on the same card (keeping what you have revealed) unless another card is now due.
     function applyLearnCard(c) {
@@ -2830,7 +2820,7 @@
         list.appendChild(b);
       };
       const label = card.label || "Review";
-      if (isLocked(card)) add(label + " now", label === "Review" ? "" : "go", function() { pressLearning("now"); });
+      if (isLocked(card)) add(label + " Now", label === "Review" ? "" : "go", function() { pressLearning("now"); });
       if (card.stage === 'learn') {
         const last = !(card.verseIndex < card.verseCount);
         add(last ? "Skip to Lock" : "Skip Verse", "alt", function() { pressLearning("skip"); });
@@ -3189,7 +3179,7 @@
       if (isScoring || learnPending) return;
       const card = learningCards[learningIndex];
       if (!card) return;
-      if (kind === "press" && isLocked(card)) { showLockedHint(card); return; }
+      if (kind === "press" && isLocked(card)) return; // the unlock time is only in the hold menu
       learnPending = true;
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && kind !== 'skip';
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
