@@ -782,9 +782,7 @@
     .vl-iconbtn.on svg { stroke: var(--text-muted); }
     #verseListView .picker-head { gap: 10px; }
     #verseListView .picker-title { flex: none; }
-    #verseListView .picker-head { margin-bottom: 2px; }
-    #verseListView .picker-title { margin-right: auto; }
-    #verseListView .vl-total { display: block; margin: 0 0 10px; font-size: 12px; line-height: 16px; min-height: 16px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #verseListView .vl-total { flex: 1; min-width: 0; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-bar .vl-seg { width: 100%; }
     #verseListView .vl-bar .vl-seg button { flex: 1; }
     .vl-search { margin: 0 0 2px; }
@@ -1009,13 +1007,12 @@
 
   <div class="picker" id="verseListView">
     <div class="picker-head">
-      <span class="picker-title" onclick="toggleDiag()">Verse List</span>
+      <span class="picker-title" id="vlTitle" onclick="toggleDiag()">Verse List</span>
+      <span class="vl-total" id="vlTotal"></span>
       <button type="button" class="vl-iconbtn" id="vlBellBtn" onclick="enableReminders()" aria-label="Turn on reminders" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg></button>
       <button type="button" class="vl-iconbtn" id="vlSearchBtn" onclick="toggleVlSearch()" aria-label="Search verses"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
-      <button type="button" class="vl-iconbtn" id="vlHelpBtn" onclick="toggleHelp(true)" aria-label="Gestures and shortcuts"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.2c-.8.5-1.2 1-1.2 1.9"/><path d="M12 17h.01"/></svg></button>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
-    <div class="vl-total" id="vlTotal"></div>
     <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
     <div class="vl-bar">
       <div class="vl-seg">
@@ -1087,6 +1084,7 @@
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
         <div class="help-row"><span>Undo the last review</span><kbd>Hold Review tab</kbd></div>
+        <div class="help-row"><span>This gesture list</span><kbd>Hold Verse List</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
         <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
@@ -1761,7 +1759,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-139';
+    const CLIENT_BUILD = 'sync-140';
 
     let queue = [];
     let currentIndex = 0;
@@ -1830,6 +1828,10 @@
       attachRevealHold();
       attachSwipe();
       attachRefHold();
+      // hold "Verse List" for the gestures list (a plain tap still opens the status readout)
+      const vt = document.getElementById("vlTitle");
+      const heldTitle = attachLongPress(vt, function() { toggleHelp(true); });
+      vt.addEventListener("click", function(e) { if (heldTitle()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       const tn = document.getElementById("tabNew");
       const heldTab = attachLongPress(tn, function() { addNewVerse(); });
       tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
@@ -2854,7 +2856,7 @@
     // Swipe sideways in the verse box. It fires as soon as the finger has clearly gone sideways (no need to lift),
     // mostly-vertical drags are left alone so a long verse still scrolls (the box allows vertical panning only),
     // and the very edge of the screen is left to iOS.
-    const SWIPE_MIN = 36;      // px sideways
+    const SWIPE_MIN = 30;      // px sideways
     const SWIPE_RATIO = 1.2;   // sideways must beat vertical by this much
     let swipeFired = false;
     function attachSwipe() {
