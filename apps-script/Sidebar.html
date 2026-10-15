@@ -945,7 +945,7 @@
       <div class="action-container">
         <div class="btn-row">
           <button type="button" class="btn-fail" id="btnFail" onclick="scoreCard('Fail')" style="display: none;">
-            <span id="btnFailText">Repeat</span>
+            <span id="btnFailText">Miss</span>
             <span class="shortcut-hint">[D]</span>
           </button>
           <button type="button" class="btn-pass" id="btnPass" onclick="scoreCard('Pass')">
@@ -977,7 +977,7 @@
         </div>
         <div class="stat-box" id="statFailBox" onclick="toggleStatList('fail')">
           <div class="stat-val val-fail" id="statFailed">0</div>
-          <div class="stat-lbl">Repeats</div>
+          <div class="stat-lbl">Missed</div>
         </div>
       </div>
       <div class="fail-list" id="failList" style="display: none;"></div>
@@ -1068,7 +1068,7 @@
       <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
       <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
       <div class="help-row"><span>Pass</span><kbd>F</kbd></div>
-      <div class="help-row"><span>Repeat</span><kbd>D</kbd></div>
+      <div class="help-row"><span>Miss</span><kbd>D</kbd></div>
       <div class="help-row"><span>Undo</span><kbd>Z</kbd></div>
       <div class="help-row"><span>Show / hide this menu</span><kbd>?</kbd></div>
     </div>
@@ -1736,7 +1736,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-135';
+    const CLIENT_BUILD = 'sync-136';
 
     let queue = [];
     let currentIndex = 0;
@@ -2663,7 +2663,8 @@
       const fastTrackTarget = getFastTrackTarget(card);
 
       if (card.isRepeat) {
-        metaTag.textContent = `Repeat · ${rankName(card.group)}`;
+        // a verse you missed today comes back as a Practice card; any other repeat card is the evening Bronze card
+        metaTag.textContent = (wasMissedToday(card.reference) ? "Practice" : "Evening") + " \u00B7 " + rankName(card.group);
         metaTag.classList.add("is-repeat-badge");
         // Repeat cards (practice rounds and the evening card) only have Clear: a Repeat button would just put the card
         // back at the end, so you simply keep looking at it until you know it, then tap Clear.
@@ -2674,14 +2675,14 @@
         // ⚡ Fast-Track Recovery Mode
         metaTag.textContent = `⚡ Fast-Track · back to ${rankName(fastTrackTarget)}`;
         metaTag.classList.add("is-fasttrack-badge");
-        btnFailText.textContent = "Repeat";
+        btnFailText.textContent = "Miss";
         btnPassText.textContent = "Recover";
         btnFail.style.display = "flex";
 
         pipsContainer.innerHTML = `<span class="fast-track-pip" title="1 Pass restores ${rankName(fastTrackTarget)}">✦</span>`;
       } else {
         setRankBadge(metaTag, card.group);
-        btnFailText.textContent = "Repeat";
+        btnFailText.textContent = "Miss";
         // last rep of a level: this Pass moves the verse up; Diamond has nowhere to go, so it just says Review
         btnPassText.textContent = card.group === 8 ? "Review" : (card.rep >= card.repsNeeded ? "Level Up" : "Pass");
         btnFail.style.display = "flex";
@@ -3061,7 +3062,7 @@
         { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup,
           // first Bronze review passed: ask the server for the evening practice card
           later: (action === "Pass" && card.group === 1 && card.rep === 1) ? true : undefined },
-        snapshot(currentIndex + 1), (action === "Fail" ? "Repeat" : action) + " \u00B7 " + card.reference
+        snapshot(currentIndex + 1), (action === "Fail" ? "Miss" : action) + " \u00B7 " + card.reference
       );
 
       if (isFastTrackRestored || graduated) {
@@ -3188,6 +3189,10 @@
       if (!has) sessionStats.clearedRefs.push(ref);
     }
 
+    function wasMissedToday(ref) {
+      return (Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : []).some(function(r) { return (typeof r === "string" ? r : r.f) === ref; });
+    }
+
     // True once every verse in Repeats has been cleared at least once.
     function allRepeatsCleared() {
       const failed = Array.isArray(sessionStats.failedRefs) ? sessionStats.failedRefs : [];
@@ -3207,7 +3212,7 @@
     }
 
     const STAT_LISTS = {
-      fail: { key: "failedRefs", box: "statFailBox", title: "Repeats", count: "failed" },
+      fail: { key: "failedRefs", box: "statFailBox", title: "Missed", count: "failed" },
       grad: { key: "gradRefs", box: "statGradBox", title: "Leveled Up", count: "graduated" }
     };
     let openStatList = null;
