@@ -1759,7 +1759,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-142';
+    const CLIENT_BUILD = 'sync-143';
 
     let queue = [];
     let currentIndex = 0;
@@ -1874,6 +1874,7 @@
           if (mode !== 'learning') setMode('learning'); // saved like tapping the New tab
           learningIndex = 0;
           render();
+          if (at >= 0 && d.hint === true) { hintMode = true; renderCardBody(); }   // hints were on in the early view
           const shown = Array.isArray(d.revealed) ? d.revealed : [];
           if (at >= 0 && shown.length && parsedSegments.length && (typeof d.n !== 'number' || d.n === parsedSegments.length)) {
             segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; });
@@ -3921,11 +3922,20 @@
         .sendTestPush();
     }
 
-    // Any tap outside the status panel closes it (tapping the "Verse List" title still toggles it).
-    document.addEventListener("click", function(e) {
-      if (!diagOn) return;
-      if (e.target.closest && (e.target.closest("#diagLine") || e.target.closest("#vlTitle"))) return;
+    // A tap outside the status panel only closes it (the tap does nothing else). Tapping the "Verse List" title still toggles it.
+    let diagSwallow = false;
+    function diagOutside(e) { return diagOn && !(e.target.closest && (e.target.closest("#diagLine") || e.target.closest("#vlTitle"))); }
+    document.addEventListener("pointerdown", function(e) {
+      if (!diagOutside(e)) return;
       toggleDiag();
+      diagSwallow = true; setTimeout(function() { diagSwallow = false; }, 700);
+      e.stopPropagation();   // no hold or swipe starts from this touch
+    }, true);
+    document.addEventListener("click", function(e) {
+      if (diagSwallow) { diagSwallow = false; e.stopPropagation(); e.preventDefault(); return; }
+      if (!diagOutside(e)) return;
+      toggleDiag();
+      e.stopPropagation(); e.preventDefault();
     }, true);
     function toggleDiag() {
       diagOn = !diagOn;
