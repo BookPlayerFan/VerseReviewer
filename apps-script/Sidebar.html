@@ -223,6 +223,28 @@
     }
     @keyframes luSettle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
     .lu-settle { animation: luSettle 0.55s ease-out 0.45s both; }
+    /* Rank-up extras, by rank: a pulse of the rank colour around the card (Silver+), a light sweep (Platinum+),
+       drifting sparkles (Emerald+) and a second sweep (Diamond). The button fills with the rank colour at the start. */
+    @keyframes luPulse {
+      0%   { box-shadow: 0 0 0 0 transparent; }
+      35%  { box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc) 70%, transparent), 0 0 34px 8px color-mix(in srgb, var(--rc) 42%, transparent); }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    .lu-settle.lu-pulse { animation: luSettle 0.55s ease-out 0.45s both, luPulse 1.2s ease-out 0.3s both; }
+    .lu-sweepbox { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 9; }
+    .lu-sweepbox i { position: absolute; top: -10%; bottom: -10%; left: 0; width: 38%; transform: translateX(-130%) skewX(-18deg);
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.75), transparent); mix-blend-mode: soft-light;
+      animation: luSweep 0.95s ease-in-out both; animation-delay: var(--sw, 0.45s); }
+    @media (prefers-color-scheme: dark) { .lu-sweepbox i { opacity: 0.4; } }
+    :root[data-theme="dark"] .lu-sweepbox i { opacity: 0.4; }
+    :root[data-theme="light"] .lu-sweepbox i { opacity: 1; }
+    @keyframes luSweep { 0% { transform: translateX(-130%) skewX(-18deg); } 100% { transform: translateX(330%) skewX(-18deg); } }
+    .lu-twk { position: absolute; color: var(--rc); pointer-events: none; z-index: 9; opacity: 0; animation: luTwk 1.2s ease-in-out both; }
+    @keyframes luTwk { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
+    .lu-btnmorph { transition: background 0.35s ease, color 0.35s ease; background: var(--rc) !important; color: #fff !important; }
+    @media (prefers-color-scheme: dark) { .lu-btnmorph { color: #0b1a33 !important; } }
+    :root[data-theme="dark"] .lu-btnmorph { color: #0b1a33 !important; }
+    :root[data-theme="light"] .lu-btnmorph { color: #fff !important; }
     .lu-fx { position: relative; display: inline-block; --rc: var(--rl); }
     @media (prefers-color-scheme: dark) { .lu-fx { --rc: var(--rd); } }
     .lu-ring { position: absolute; inset: -1px; border-radius: 999px; border: 2px solid var(--rc); opacity: 0; pointer-events: none;
@@ -580,11 +602,6 @@
     .lm-item.go { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
     .lm-item.alt { background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border-card); }
     .lm-note { font-size: 13px; color: var(--text-muted); text-align: center; margin: 0 0 8px; }
-    @keyframes luCap { to { opacity: 1; } }
-    @keyframes luDots { to { opacity: 0; } }
-    .lu-caption { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; white-space: nowrap; opacity: 0;
-      font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rc, var(--text-accent)); animation: luCap 0.45s ease-out 0.75s forwards; }
-    .lu-pipfade { animation: luDots 0.3s ease-out 0.7s forwards; }
     .shortcut-hint { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 2px; }
     @media (max-width: 480px) {
       .shortcut-hint { display: none; }
@@ -1219,10 +1236,31 @@
     // Level-up moment: the card itself turns into the new rank (badge, dots, outline and tint cross-fade),
     // settles with a small bounce, then fades away. Higher ranks add a ring and sparkles around the new badge.
     let luOverlay = null;
+    let luSkipFn = null; // a tap while the rank-up shows ends it early
     function clearLevelUp() {
+      luSkipFn = null;
       if (luOverlay) { luOverlay.remove(); luOverlay = null; }
     }
-    function playLevelUp(toG, rep, caption) {
+    // Higher ranks get a longer moment: Bronze-Gold 2.0 s, Platinum/Sapphire 2.6 s, Emerald/Ruby 3.2 s, Diamond 4.0 s.
+    function luMs(g) { return g >= 8 ? 4000 : g >= 6 ? 3200 : g >= 4 ? 2600 : LEVELUP_MS; }
+    // Runs the fade-out and then finish() after ms; a tap (after the first 0.4 s) fades out at once and finishes right after.
+    function levelUpThen(ms, finish) {
+      const born = Date.now();
+      let over = false, fadeT, doneT;
+      function end() { if (over) return; over = true; clearTimeout(fadeT); clearTimeout(doneT); luSkipFn = null; finish(); }
+      fadeT = setTimeout(fadeOutLevelUp, ms - LU_FADE_MS - 20);
+      doneT = setTimeout(end, ms);
+      luSkipFn = function() {
+        if (over || Date.now() - born < 400) return;
+        luSkipFn = null;
+        clearTimeout(fadeT); clearTimeout(doneT);
+        fadeOutLevelUp();
+        doneT = setTimeout(end, LU_FADE_MS);
+      };
+    }
+    document.addEventListener("pointerdown", function() { if (luSkipFn) luSkipFn(); }, true);
+    // label: what the button says once it fills with the rank colour ("Promoted \u2713" for a New verse, else "Level Up \u2713").
+    function playLevelUp(toG, rep, label) {
       clearLevelUp();
       const card = document.getElementById("activeCard");
       const deck = document.getElementById("deckContainer");
@@ -1244,18 +1282,10 @@
           const filled = rep >= 1 && rep <= cfg.repsNeeded ? rep : 1;
           for (let i = 1; i <= cfg.repsNeeded; i++) {
             const p = document.createElement("div");
-            p.className = "pip" + (i <= filled ? " filled" : "") + (caption ? " lu-pipfade" : "");
+            p.className = "pip" + (i <= filled ? " filled" : "");
             pips.appendChild(p);
           }
-          if (caption) {
-            // the dots give way to a one-word caption in the rank's colour (no extra height, so the card does not jump)
-            pips.classList.remove("lock-chips");
-            pips.style.position = "relative";
-            const cap = document.createElement("span");
-            cap.className = "lu-caption";
-            cap.textContent = caption;
-            pips.appendChild(cap);
-          }
+          if (toG === 1) pips.classList.remove("lock-chips");
         }
       }
       const badge = meta && meta.querySelector(".rank-badge");
@@ -1285,6 +1315,28 @@
           sp.style.setProperty("--dy", Math.round(ey + Math.sin(ang) * more * 0.6) + "px");
           sp.style.setProperty("--sd", (0.4 + (i % 3) * 0.06) + "s");
           fx.appendChild(sp);
+        }
+      }
+      const passBtn = clone.querySelector(".btn-pass");
+      if (passBtn) setTimeout(function() { passBtn.textContent = label || "Level Up \u2713"; passBtn.classList.add("lu-btnmorph"); }, 450);
+      if (toG >= 2) clone.classList.add("lu-pulse");
+      if (toG >= 4) {
+        const sw = document.createElement("div");
+        sw.className = "lu-sweepbox";
+        sw.innerHTML = "<i></i>" + (toG >= 8 ? '<i style="--sw:1.7s"></i>' : "");
+        clone.appendChild(sw);
+      }
+      if (toG >= 6) {
+        const n = toG >= 8 ? 14 : 8, span = Math.max(0.6, luMs(toG) / 1000 - 1.6);
+        for (let k = 0; k < n; k++) {
+          const t = document.createElement("span");
+          t.className = "lu-twk";
+          t.textContent = k % 2 ? "\u2726" : "\u25CF";
+          t.style.left = (8 + Math.random() * 84) + "%";
+          t.style.top = (6 + Math.random() * 60) + "%";
+          t.style.fontSize = (7 + Math.random() * 7) + "px";
+          t.style.animationDelay = (0.3 + Math.random() * span) + "s";
+          clone.appendChild(t);
         }
       }
       const dr = deck.getBoundingClientRect(), cr = card.getBoundingClientRect();
@@ -1808,7 +1860,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-154';
+    const CLIENT_BUILD = 'sync-155';
 
     let queue = [];
     let currentIndex = 0;
@@ -3248,19 +3300,20 @@
 
     function advanceAfter(ms) {
       const startedIn = epoch;
-      setTimeout(function() {
-        if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
-        document.getElementById("toastNotice").textContent = "";
-        const doneCard = queue[currentIndex];
-        currentIndex++;
-        if (currentIndex >= activeEnd()) {
-          if (practicing) practicing = false;
-          // just finished: play the count-up once. Clearing an evening / repeat card after the app was reopened changes no numbers,
-          // so it must not replay it (this page never saw the deck finish, so it can't tell by itself).
-          else if (totalCardsProcessed > 0 && !(doneCard && doneCard.isRepeat && !regularScoredThisLoad)) countUpPending = true;
-        }
-        render();
-      }, ms);
+      setTimeout(function() { advanceCard(startedIn); }, ms);
+    }
+    function advanceCard(startedIn) {
+      if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
+      document.getElementById("toastNotice").textContent = "";
+      const doneCard = queue[currentIndex];
+      currentIndex++;
+      if (currentIndex >= activeEnd()) {
+        if (practicing) practicing = false;
+        // just finished: play the count-up once. Clearing an evening / repeat card after the app was reopened changes no numbers,
+        // so it must not replay it (this page never saw the deck finish, so it can't tell by itself).
+        else if (totalCardsProcessed > 0 && !(doneCard && doneCard.isRepeat && !regularScoredThisLoad)) countUpPending = true;
+      }
+      render();
     }
 
     // Learning screen: "Level Up" promotes the verse to Level 1; "Review" marks it as looked at for a while.
@@ -3282,16 +3335,15 @@
       if (promote) {
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
         isScoring = true;
-        playLevelUp(1, 1, "Promoted");
+        playLevelUp(1, 1, "Promoted \u2713");
         learningCards.splice(learningIndex, 1);
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
         const startedIn = epoch;
-        setTimeout(fadeOutLevelUp, LEVELUP_MS - LU_FADE_MS - 20);
-        setTimeout(function() {
+        levelUpThen(luMs(1), function() {
           if (startedIn !== epoch) return;
           document.getElementById("toastNotice").textContent = "";
           render();
-        }, LEVELUP_MS);
+        });
       } else {
         applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
       }
@@ -3454,9 +3506,8 @@
 
       if (isFastTrackRestored || graduated) {
         playLevelUp(newGroup, newRep);
-        const ms = newGroup >= 8 ? LEVELUP_MS + 500 : LEVELUP_MS;
-        setTimeout(fadeOutLevelUp, ms - LU_FADE_MS - 20);
-        advanceAfter(ms);
+        const startedIn = epoch;
+        levelUpThen(luMs(newGroup), function() { advanceCard(startedIn); });
       } else if (action === "Fail" && card.group > 0) {
         animateOut();
         advanceAfter(REPEAT_SWAP_MS);
