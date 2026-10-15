@@ -949,6 +949,50 @@
     button:disabled { opacity: 0.55; cursor: default; }
     button:disabled:active { transform: none; filter: none; }
 
+
+    /* Month pill on the Review Complete screen + "Your month" popup */
+    .month-strip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90%;
+      display: inline-flex; flex-direction: row; align-items: center; gap: 7px; min-height: 0; margin: 0;
+      padding: 7px 14px; border-radius: 999px; background: transparent; box-shadow: none;
+      border: 1px solid var(--border-card); color: var(--text-muted); font-size: 13px; font-weight: 700; letter-spacing: 0.1px; }
+    .month-strip svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .month-strip.gold { color: #a87400; border-color: rgba(184, 138, 0, 0.5); }
+    .month-strip:active { transform: translateX(-50%); filter: none; }
+    #monthView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; }
+    #monthView .picker-body { flex: 1; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: 12px; }
+    .mc-nav { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 10px; }
+    .mc-arrow { background: none; border: 0; box-shadow: none; min-height: 0; width: 44px; padding: 6px 0; font-size: 24px; line-height: 1; color: var(--text-accent); }
+    .mc-arrow:disabled { color: var(--text-muted); opacity: 0.35; }
+    .mc-name { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+    .mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 14px; }
+    .mc-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-meta); padding-bottom: 2px; }
+    .mc-day { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 13px; font-weight: 600;
+      color: var(--text-muted); border: 1px solid transparent; box-sizing: border-box; }
+    .mc-day.p { background: linear-gradient(180deg, rgba(255, 208, 70, 0.55), rgba(214, 158, 20, 0.35)); color: #6b4a00; font-weight: 800; }
+    .mc-day.k { background: rgba(26, 115, 232, 0.14); color: var(--text-primary); }
+    .mc-day.m { border: 1px dashed var(--border-card); color: var(--text-meta); }
+    .mc-day.f { color: var(--text-meta); opacity: 0.55; }
+    .mc-day.t { box-shadow: 0 0 0 2px var(--text-accent); }
+    .mc-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .mc-tile { border: 1px solid var(--border-card); border-radius: 12px; padding: 10px 12px; text-align: left; }
+    .mc-tile b { display: block; font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+    .mc-tile span { font-size: 12px; color: var(--text-muted); }
+    .mc-tile.gold b { color: #a87400; }
+    .mc-line { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 2px; border-top: 1px solid var(--border-card); font-size: 14px; color: var(--text-muted); }
+    .mc-line b { color: var(--text-primary); font-weight: 700; }
+    .mc-h { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-meta); padding: 14px 2px 2px; border-top: 1px solid var(--border-card); }
+    .mc-note { font-size: 13px; color: var(--text-muted); text-align: center; padding: 18px 0; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .month-strip.gold { color: #f2c94c; border-color: rgba(242, 201, 76, 0.5); }
+      :root:not([data-theme="light"]) .mc-day.p { background: linear-gradient(180deg, rgba(242, 201, 76, 0.42), rgba(200, 150, 20, 0.26)); color: #ffe38a; }
+      :root:not([data-theme="light"]) .mc-day.k { background: rgba(138, 180, 248, 0.2); }
+      :root:not([data-theme="light"]) .mc-tile.gold b { color: #f2c94c; }
+    }
+    :root[data-theme="dark"] .month-strip.gold { color: #f2c94c; border-color: rgba(242, 201, 76, 0.5); }
+    :root[data-theme="dark"] .mc-day.p { background: linear-gradient(180deg, rgba(242, 201, 76, 0.42), rgba(200, 150, 20, 0.26)); color: #ffe38a; }
+    :root[data-theme="dark"] .mc-day.k { background: rgba(138, 180, 248, 0.2); }
+    :root[data-theme="dark"] .mc-tile.gold b { color: #f2c94c; }
+
     /* Simple "pick a verse" sheet */
     .picker {
       position: fixed; inset: 0; z-index: 50;
@@ -1024,6 +1068,7 @@
     </div>
 
     <div class="summary-card" id="summaryView" style="display: none;">
+      <button type="button" class="month-strip" id="monthStrip" style="display: none;" onclick="openMonth()"></button>
       <div class="summary-header">
         <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Perfect Day</div>
         <div class="sum-title-row">
@@ -1087,6 +1132,14 @@
       <button type="button" class="picker-close" onclick="closeUpcoming()">Back</button>
     </div>
     <div class="picker-list" id="upList"></div>
+  </div>
+
+  <div class="picker" id="monthView">
+    <div class="picker-head">
+      <span class="picker-title">Your month</span>
+      <button type="button" class="picker-close" onclick="closeMonth()">Back</button>
+    </div>
+    <div class="picker-body" id="monthBody"></div>
   </div>
 
   <nav class="tabbar" id="tabbar">
@@ -1477,6 +1530,7 @@
     // ── Bottom tabs ──
     function goTab(t) {
       closeUpcoming();
+      closeMonth();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       if (t === "verses") {
         if (!listOpen) openVerseList();
@@ -1939,7 +1993,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-156';
+    const CLIENT_BUILD = 'sync-157';
 
     let queue = [];
     let currentIndex = 0;
@@ -2666,6 +2720,169 @@
         .undoLast(id);
     }
 
+    // ── Month stats: the pill on Review Complete and the "Your month" popup ──
+    const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const CAL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
+    let monthCache = {};   // "y-m" -> { at, data }
+    let monthShown = null; // { y, m }
+    let monthInflight = {};
+    function monthKey(y, m) { return y + "-" + m; }
+    function monthPerfect(data) {
+      let n = 0;
+      Object.keys(data.days || {}).forEach(function(k) { const d = data.days[k]; if (d[0] > 0 && d[1] === 0) n++; });
+      return n;
+    }
+    function fetchMonth(y, m, ok, fail, force) {
+      const key = monthKey(y, m);
+      const hit = monthCache[key];
+      if (hit && !force && Date.now() - hit.at < 60000) { ok(hit.data); return; }
+      if (monthInflight[key]) { monthInflight[key].push({ ok: ok, fail: fail }); return; }
+      monthInflight[key] = [{ ok: ok, fail: fail }];
+      const done = function(good, data) {
+        const cbs = monthInflight[key] || [];
+        delete monthInflight[key];
+        if (good) monthCache[key] = { at: Date.now(), data: data };
+        cbs.forEach(function(cb) { if (good) cb.ok(data); else if (cb.fail) cb.fail(); });
+      };
+      try {
+        google.script.run
+          .withSuccessHandler(function(res) { if (res && res.days) done(true, res); else done(false); })
+          .withFailureHandler(function() { done(false); })
+          .getMonthStats(y, m);
+      } catch (e) { done(false); }   // an older Code.gs has no getMonthStats
+    }
+    function nowYM() { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; }
+    function setMonthStrip(text, gold) {
+      const el = document.getElementById("monthStrip");
+      el.innerHTML = CAL_ICON;
+      const t = document.createElement("span");
+      t.textContent = text;
+      el.appendChild(t);
+      el.classList.toggle("gold", !!gold);
+      el.style.display = "inline-flex";
+    }
+    function renderMonthStrip(show) {
+      const el = document.getElementById("monthStrip");
+      if (!el) return;
+      if (!show) { el.style.display = "none"; return; }
+      const now = nowYM();
+      const paint = function(data) {
+        const n = monthPerfect(data);
+        if (n > 0) setMonthStrip("\u2726 " + n + " Perfect Day" + (n === 1 ? "" : "s"), true);
+        else setMonthStrip("No Perfect Days yet", false);
+      };
+      const hit = monthCache[monthKey(now.y, now.m)];
+      if (hit) paint(hit.data); else setMonthStrip("Calendar", false);
+      if (hit && Date.now() - hit.at < 60000) return;
+      fetchMonth(now.y, now.m, paint, function() { if (!hit) setMonthStrip("Calendar", false); }, true);
+    }
+    function openMonth() {
+      const now = nowYM();
+      monthShown = { y: now.y, m: now.m };
+      document.getElementById("monthView").classList.add("open");
+      renderMonth();
+    }
+    function closeMonth() {
+      document.getElementById("monthView").classList.remove("open");
+    }
+    function monthNav(dir) {
+      if (!monthShown) return;
+      let y = monthShown.y, m = monthShown.m + dir;
+      if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
+      monthShown = { y: y, m: m };
+      renderMonth();
+    }
+    function mcEl(tag, cls, text) {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    }
+    function mcTile(box, num, label, gold) {
+      const t = mcEl("div", "mc-tile" + (gold ? " gold" : ""));
+      t.appendChild(mcEl("b", "", String(num)));
+      t.appendChild(mcEl("span", "", label));
+      box.appendChild(t);
+    }
+    function mcLine(box, label, value) {
+      const l = mcEl("div", "mc-line");
+      l.appendChild(mcEl("span", "", label));
+      l.appendChild(mcEl("b", "", value));
+      box.appendChild(l);
+    }
+    function renderMonth() {
+      const body = document.getElementById("monthBody");
+      if (!monthShown) return;
+      const y = monthShown.y, m = monthShown.m;
+      const now = nowYM();
+      body.textContent = "";
+      const nav = mcEl("div", "mc-nav");
+      const prev = mcEl("button", "mc-arrow", "\u2039");
+      prev.type = "button";
+      prev.setAttribute("aria-label", "Previous month");
+      prev.onclick = function() { monthNav(-1); };
+      const next = mcEl("button", "mc-arrow", "\u203A");
+      next.type = "button";
+      next.setAttribute("aria-label", "Next month");
+      next.onclick = function() { monthNav(1); };
+      next.disabled = (y > now.y || (y === now.y && m >= now.m));
+      nav.appendChild(prev);
+      nav.appendChild(mcEl("span", "mc-name", MONTH_NAMES[m - 1] + " " + y));
+      nav.appendChild(next);
+      body.appendChild(nav);
+      const wait = mcEl("div", "mc-note", "Loading\u2026");
+      body.appendChild(wait);
+      prev.disabled = true;
+      const stamp = y + "-" + m;
+      fetchMonth(y, m, function(data) {
+        if (!monthShown || monthShown.y + "-" + monthShown.m !== stamp) return;
+        wait.remove();
+        paintMonth(body, prev, data, y, m, now);
+      }, function() {
+        if (!monthShown || monthShown.y + "-" + monthShown.m !== stamp) return;
+        wait.textContent = "Couldn\u2019t load. Try again.";
+        prev.disabled = false;
+      }, false);
+    }
+    function paintMonth(body, prev, data, y, m, now) {
+      const firstYM = data.first ? { y: Number(data.first.slice(0, 4)), m: Number(data.first.slice(5, 7)) } : now;
+      prev.disabled = (y < firstYM.y || (y === firstYM.y && m <= firstYM.m));
+      const grid = mcEl("div", "mc-grid");
+      ["S","M","T","W","T","F","S"].forEach(function(d) { grid.appendChild(mcEl("div", "mc-dow", d)); });
+      const lead = new Date(y, m - 1, 1).getDay();
+      const len = new Date(y, m, 0).getDate();
+      for (let i = 0; i < lead; i++) grid.appendChild(mcEl("div", ""));
+      let perfect = 0, promos = 0, ups = 0, misses = 0, pts = 0;
+      for (let d = 1; d <= len; d++) {
+        const key = y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        const v = data.days[String(d)];
+        let cls = "mc-day";
+        if (v) { promos += v[3]; ups += v[2]; misses += v[5]; pts += v[4]; }
+        if (key > data.today) cls += " f";
+        else if (v && v[0] > 0) { if (v[1] === 0) { cls += " p"; perfect++; } else cls += " k"; }
+        else if (data.first && key >= data.first && key < data.today) cls += " m";
+        if (key === data.today) cls += " t";
+        grid.appendChild(mcEl("div", cls, String(d)));
+      }
+      body.appendChild(grid);
+      const tiles = mcEl("div", "mc-tiles");
+      mcTile(tiles, perfect, "Perfect Days", true);
+      mcTile(tiles, promos, "New verses");
+      mcTile(tiles, ups, "Level-ups");
+      mcTile(tiles, misses, "Misses");
+      body.appendChild(tiles);
+      mcLine(body, "Treasury", (pts > 0 ? "+" : pts < 0 ? "\u2212" : "") + Math.abs(pts) + " pts this month");
+      if (y === now.y && m === now.m && data.week) {
+        const w = data.week;
+        body.appendChild(mcEl("div", "mc-h", "This week"));
+        mcLine(body, "Perfect Days", String(w.perfect));
+        mcLine(body, "Level-ups", String(w.levelUps));
+        mcLine(body, "New verses", String(w.promos));
+        if (w.bestRef) mcLine(body, "Best level-up", w.bestRef);
+      }
+      if (data.best) mcLine(body, "Best month so far", MONTH_NAMES[data.best.m - 1] + " \u00B7 " + data.best.n + " Perfect Day" + (data.best.n === 1 ? "" : "s"));
+    }
+
     function renderTomorrowNote() {
       const el = document.getElementById("tomorrowNote");
       if (!el) return;
@@ -2673,6 +2890,7 @@
         document.getElementById("btnAddVerse").style.display === "none" &&
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
+      renderMonthStrip(onComplete);
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       el.textContent = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
       el.style.display = "block";
