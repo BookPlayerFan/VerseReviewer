@@ -958,11 +958,13 @@
     .month-strip span + span { border-left: 1px solid var(--border-card); }
     .month-strip b { color: var(--text-primary); font-weight: 800; }
     .month-strip .ms-mon { color: var(--text-primary); font-weight: 800; }
-    .month-strip .ms-star { color: #c98f00; }
-    .month-strip .ms-pts { color: var(--text-accent); }
-    .month-strip .ms-pts b { color: var(--text-primary); }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .month-strip .ms-star { color: #f2c94c; } }
-    :root[data-theme="dark"] .month-strip .ms-star { color: #f2c94c; }
+    .month-strip i { font-style: normal; }
+    .month-strip .ms-gold, .month-strip .ms-gold b { color: #c98f00; }
+    .month-strip .ms-pts { color: var(--text-primary); }
+    .month-strip .ms-pts b { color: var(--text-accent); }
+    .month-strip .ms-pts.neg b { color: var(--badge-fail); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .month-strip .ms-gold, :root:not([data-theme="light"]) .month-strip .ms-gold b { color: #f2c94c; } }
+    :root[data-theme="dark"] .month-strip .ms-gold, :root[data-theme="dark"] .month-strip .ms-gold b { color: #f2c94c; }
 
     /* Simple "pick a verse" sheet */
     .picker {
@@ -1963,7 +1965,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-159';
+    const CLIENT_BUILD = 'sync-160';
 
     let queue = [];
     let currentIndex = 0;
@@ -2704,9 +2706,9 @@
       const seg = function(cls, html) { const e = document.createElement("span"); if (cls) e.className = cls; e.innerHTML = html; el.appendChild(e); };
       el.textContent = "";
       seg("ms-mon", ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][data.m - 1]);
-      if (t.perfect > 0) seg("", '<i class="ms-star" style="font-style:normal">\u2726</i> <b>' + t.perfect + "</b> Perfect Day" + (t.perfect === 1 ? "" : "s"));
+      if (t.perfect > 0) seg("", '<i class="ms-gold">\u2726 <b>' + t.perfect + "</b></i> Perfect Day" + (t.perfect === 1 ? "" : "s"));
       else seg("", "No Perfect Days yet");
-      if (t.pts !== 0) seg("ms-pts", "<b>" + (t.pts > 0 ? "+" : "\u2212") + Math.abs(t.pts) + "</b> pts");
+      if (t.pts !== 0) seg("ms-pts" + (t.pts < 0 ? " neg" : ""), "<b>" + (t.pts > 0 ? "+" : "\u2212") + Math.abs(t.pts) + "</b> pts");
       el.style.display = "inline-flex";
     }
     function renderMonthStrip(show) {
