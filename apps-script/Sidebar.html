@@ -558,6 +558,7 @@
       color: var(--btn-pass-text); 
       font-size: 16px; 
     }
+    .btn-pass.clear { background: var(--btn-restart-bg); color: var(--btn-restart-text); }   /* repeat cards: blue, like the New tab's Review button */
 
     .shortcut-hint { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 2px; }
     @media (max-width: 480px) {
@@ -1735,7 +1736,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-134';
+    const CLIENT_BUILD = 'sync-135';
 
     let queue = [];
     let currentIndex = 0;
@@ -2589,6 +2590,7 @@
       }
 
       document.getElementById("btnPassText").textContent = "Level Up";
+      document.getElementById("btnPass").classList.remove("clear");
       document.getElementById("btnFailText").textContent = doneLabel;
       document.getElementById("btnFail").style.display = "flex";
       document.getElementById("btnFail").classList.add("review");
@@ -2617,6 +2619,7 @@
       const versionBadge = document.getElementById("cardVersion");
       const btnFail = document.getElementById("btnFail");
       btnFail.classList.remove("seen", "only", "review");
+      document.getElementById("btnPass").classList.remove("clear");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
 
@@ -2665,6 +2668,7 @@
         // Repeat cards (practice rounds and the evening card) only have Clear: a Repeat button would just put the card
         // back at the end, so you simply keep looking at it until you know it, then tap Clear.
         btnPassText.textContent = "Clear";
+        document.getElementById("btnPass").classList.add("clear");
         btnFail.style.display = "none";
       } else if (fastTrackTarget) {
         // ⚡ Fast-Track Recovery Mode
