@@ -412,6 +412,7 @@
       line-height: 15px;
     }
     .hint-flag { display: inline-flex; align-items: center; color: var(--text-accent); pointer-events: none; }
+    .hint-flag.off { visibility: hidden; }                  /* keeps its place so "Verse x of y" never shifts */
     .hint-flag svg { width: 15px; height: 15px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     .btn-reveal-all {
@@ -1808,7 +1809,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-147';
+    const CLIENT_BUILD = 'sync-148';
 
     let queue = [];
     let currentIndex = 0;
@@ -2943,8 +2944,8 @@
       const isNew = mode === 'learning';
 
       // A small bulb at the end of the status line while hint mode is on (New tab only). It is not a button.
-      const flag = (isNew && hintMode)
-        ? '<span class="hint-flag" aria-label="Hints on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z"/></svg></span>'
+      const flag = isNew
+        ? '<span class="hint-flag' + (hintMode ? '' : ' off') + '" aria-label="Hints on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z"/></svg></span>'
         : '';
       const status = parsedSegments.length > 1
         ? `${revealedCount} of ${parsedSegments.length} revealed`
@@ -3197,8 +3198,37 @@
           render();
         }, LEVELUP_MS);
       } else {
-        paintLearningButton(card); // dims while the server answers
+        applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
       }
+    }
+
+    // The same stage rules the server uses, so a press shows its result straight away instead of waiting for the round trip.
+    const L_SLOTS = [240, 480, 600, 720, 840, 960, 1080];
+    function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
+    function lNextSlot(ms) { for (let i = 0; i < L_SLOTS.length; i++) { const t = lAt(ms, 0, L_SLOTS[i]); if (t > ms) return t; } return lAt(ms, 1, L_SLOTS[0]); }
+    function lDayStart(ms) { const t = lAt(ms, 0, 240); return t > ms ? t : lAt(ms, 1, 240); }
+    function lInfo(rep, n) {
+      const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
+      if (rep <= total) {
+        o.verseIndex = Math.ceil(rep / 7); o.dot = ((rep - 1) % 7) + 1;
+        if (o.dot === 7) o.label = o.verseIndex < n ? 'Next Verse' : 'Learned';
+      } else {
+        o.stage = 'lock'; o.verseIndex = n; o.dot = 0;
+        if (rep === total + 1) { o.lockPart = 'am'; } else { o.lockPart = 'pm'; o.label = 'Promote'; }
+      }
+      return o;
+    }
+    function predictLearn(card, kind) {
+      const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n);
+      let nr, unlock;
+      if (kind === 'skip') {
+        if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nr = 7 * n + 1; unlock = lDayStart(now); }
+      } else if (info.stage === 'learn') {
+        nr = rep + 1; unlock = info.dot < 7 ? lNextSlot(now) : lDayStart(now);
+      } else {
+        const pm = lAt(now, 0, 1080); nr = rep + 1; unlock = pm > now ? pm : 0;
+      }
+      return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock });
     }
 
     function scoreCard(action) {

@@ -233,11 +233,14 @@ function startUnlock_(ms) {
 
 // Number of verses in a reference, from the [n] markers in its text (minimum 1).
 function verseCount_(text) {
-  const m = String(text === null || text === undefined ? '' : text).match(/\[(\d+)\]/g);
+  const t = String(text === null || text === undefined ? '' : text);
+  const m = t.match(/\[(\d+)\]/g);
   if (!m) return 1;
   const seen = {};
   let n = 0;
   m.forEach(function(x) { if (!seen[x]) { seen[x] = 1; n++; } });
+  // The first verse of a passage has no [n] marker of its own: any text before the first marker is that verse.
+  if (t.substring(0, t.search(/\[\d+\]/)).trim()) n++;
   return Math.max(1, n);
 }
 
