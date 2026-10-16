@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-66'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-67'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -454,9 +454,8 @@ function learnAction(reference, action, expectedRep) {
     const s = readState_();
     if (s && s.date === todayKey_()) { s.version++; writeState_(s); }
 
-    // The morning job has already scheduled the day's pushes, so a press only cancels what is left when the day's work for this verse is over.
-    if (promoted || action === 'skip' || (info.stage === 'learn' && info.dot >= REPS_PER_VERSE)) cancelSnoozePush_(ref);
-    if (card) scheduleLearnPush_(ref, card);
+    // The day's Learn / Lock pushes are kept in line with the new state: the last rep of the day, Skip and Promote drop what is left.
+    try { syncSlotPushes_(); } catch (e) { pushLog_('slot sync ERROR', ref, 0, false, String(e)); }
 
     const result = { ok: true, promoted: promoted, card: card, version: s && s.date === todayKey_() ? s.version : undefined };
     result.tomorrow = dueTomorrowCount_(readSheetData_());
@@ -1065,7 +1064,6 @@ function submitReview(expectedVersion, review, next) {
     }
 
     writeState_(s);
-    if (review && written) cancelSnoozePush_(written.f); // the new verse was done, so its reminder isn't needed
     const result = { ok: true, version: s.version, undoId: undoId };
     if (review) result.tomorrow = dueTomorrowCount_(readSheetData_());
     return result;
@@ -1604,19 +1602,18 @@ function getMonthStats(year, month) {
 // ─────────────────────────── Push reminders (OneSignal) ───────────────────────────
 //
 // Setup, once:  1) Script Property ONESIGNAL_KEY = your OneSignal REST API key.
-//               2) Run installDailyPush() from the editor (creates the ~5:30 AM trigger; approve the permissions).
+//               2) Run installDailyPush() from the editor (creates the ~5:00 AM trigger; approve the permissions).
 //               3) Run testPush() to send yourself a test.
 // Two kinds of reminder:
-//   - Daily: at 6:00 AM (scheduled by a trigger that runs at about 5:30), one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
-//   - Learn / Lock unlocks: the 5:30 job (dailyPush) schedules the whole day's slot pushes up front (scheduleDayPushes_): 8, 10, 12, 2, 4 PM,
-//     and 8 PM for the 6 PM unlock, so a skipped press never leaves a gap. After each press the server also schedules the next unlock
-//     (scheduleLearnPush_) if it is not already scheduled. The 4 AM unlocks are covered by the daily push. The last rep of the day, Skip and
-//     Promote cancel what is left for that verse.
+//   - Daily: at 6:00 AM (scheduled by a trigger that runs at about 5:00), one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
+//   - Learn / Lock unlocks: the 5 AM job (dailyPush) schedules the whole day's slot pushes up front (syncSlotPushes_): 8, 10, 12, 2, 4 PM,
+//     and 8 PM for the 6 PM unlock. There is one push per time, naming every verse waiting then ("Learn A and 1 more", "Learn A, lock B"), so a rep
+//     you forgot to press never leaves a gap. After each press the same sync runs again: it cancels what is no longer needed (the last rep of the
+//     day, Skip, Promote) and adds anything missing. The 4 AM unlocks are covered by the daily push.
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
-const PUSH_PENDING_KEY = 'VR_PUSH_PENDING'; // { reference: [ { id: notificationId, at: send time in ms } ] }
-const PUSH_SLOTS_KEY = 'VR_PUSH_SLOTS';     // date key of the day whose slot pushes were scheduled
+const PUSH_SLOTMAP_KEY = 'VR_PUSH_SLOTMAP'; // { send time in ms: { id: notificationId, learn: [references], lock: [references] } }
 const DAILY_PUSH_MIN = 6 * 60;               // the morning push arrives at 6:00 AM
 const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
@@ -1702,40 +1699,12 @@ function osSend_(heading, message, whenMs, topic, go) {
   return res;
 }
 
-function pendingPush_() {
-  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(PUSH_PENDING_KEY) || '{}') || {}; }
+function slotMap_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(PUSH_SLOTMAP_KEY) || '{}') || {}; }
   catch (e) { return {}; }
 }
-function setPendingPush_(map) {
-  PropertiesService.getScriptProperties().setProperty(PUSH_PENDING_KEY, JSON.stringify(map));
-}
-
-// The pending list for a reference, as [{ id, at }]. (An older version stored a single id; it counts as pending with an unknown time.)
-function pendingList_(map, ref) {
-  const v = map[ref];
-  if (!v) return [];
-  if (Array.isArray(v)) return v.filter(function(e) { return e && e.id; });
-  return [{ id: String(v), at: 0 }];
-}
-function hasPendingAt_(list, at) {
-  return list.some(function(e) { return e.at && Math.abs(e.at - at) < 90000; });
-}
-
-// Cancels what is still waiting for a reference (pushes whose time has already passed are just forgotten).
-function cancelSnoozePush_(ref) {
-  try {
-    const map = pendingPush_();
-    const list = pendingList_(map, ref);
-    if (!list.length) { if (map[ref]) { delete map[ref]; setPendingPush_(map); } return; }
-    delete map[ref];
-    setPendingPush_(map);
-    const now = Date.now();
-    list.forEach(function(e) {
-      if (e.at && e.at <= now + 5000) return;
-      const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
-      pushLog_('cancel', ref, e.at || 0, !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
-    });
-  } catch (e) { console.error('cancelSnoozePush_ failed: ' + e); }
+function setSlotMap_(map) {
+  PropertiesService.getScriptProperties().setProperty(PUSH_SLOTMAP_KEY, JSON.stringify(map));
 }
 
 // "Romans 8:35-37", or "Romans 8:35-37 and 1 more" when several verses are waiting.
@@ -1759,13 +1728,13 @@ function pushWords_(due, learnRefs, lockRefs) {
   return { title: titles.join(', '), text: text };
 }
 
-// Runs from the daily trigger (installDailyPush), at about 5:30 AM (Apps Script starts it somewhere in 5:30 to 5:45). It works out what is
+// Runs from the daily trigger (installDailyPush), at about 5:00 AM (Apps Script starts it somewhere in 5:00 to 5:15). It works out what is
 // waiting then, and schedules the push for exactly 6:00 AM: due reviews, a Learn card and a Lock AM card (both unlock at 4 AM).
 // If it happens to run after 6:00 the push goes out right away. Sent once a day, and only if something is waiting.
 function dailyPush() {
   const props = PropertiesService.getScriptProperties();
   const today = todayKey_();
-  try { scheduleDayPushes_(false); } catch (e) { pushLog_('slot schedule ERROR', '', 0, false, String(e)); }
+  try { syncSlotPushes_(); } catch (e) { pushLog_('slot schedule ERROR', '', 0, false, String(e)); }
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;
   const nc = newCardCounts_(readSheetData_(), nowMs_());
@@ -1784,13 +1753,12 @@ function pushStatus() {
   const props = PropertiesService.getScriptProperties();
   const trig = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; });
   pushLog_('status: trigger', 'dailyPush', 0, trig.length === 1, trig.length + ' daily trigger(s)' + (trig.length ? ' (' + trig[0].getEventType() + ')' : ' - run installDailyPush()'));
-  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 5:30 and 5:45 in THIS zone and schedules the push for 6:00.');
+  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 5:00 and 5:15 in THIS zone and schedules the push for 6:00.');
   pushLog_('status: today', '', 0, null, 'last daily push marked ' + (props.getProperty(PUSH_DAILY_KEY) || 'never') + ', today is ' + todayKey_());
   pushLog_('status: key', 'ONESIGNAL_KEY', 0, !!props.getProperty('ONESIGNAL_KEY'), props.getProperty('ONESIGNAL_KEY') ? 'set' : 'NOT set');
-  const pend = pendingPush_();
-  let waiting = 0;
-  Object.keys(pend).forEach(function(k) { waiting += pendingList_(pend, k).filter(function(e) { return !e.at || e.at > Date.now(); }).length; });
-  pushLog_('status: slots', '', 0, null, waiting + ' Learn / Lock push(es) waiting to go out; slot pushes last scheduled for ' + (props.getProperty(PUSH_SLOTS_KEY) || 'never') + ', today is ' + todayKey_());
+  const slots = slotMap_();
+  const waiting = Object.keys(slots).filter(function(k) { return Number(k) > Date.now(); }).length;
+  pushLog_('status: slots', '', 0, null, waiting + ' Learn / Lock push(es) waiting to go out today');
   const due = getDueCards(false).length;
   const nc = newCardCounts_(readSheetData_(), nowMs_());
   pushLog_('status: waiting', '', 0, null, due + ' due, ' + nc.learnRefs.length + ' learn, ' + nc.lockRefs.length + ' lock' + (pushWords_(due, nc.learnRefs, nc.lockRefs) ? '' : ' (nothing waiting, so no push is sent)'));
@@ -1801,8 +1769,8 @@ function installDailyPush() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'dailyPush') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('dailyPush').timeBased().atHour(5).nearMinute(30).everyDays(1).create();
-  console.log('Daily push trigger created for about 5:30 AM; it schedules the push for 6:00 AM.');
+  ScriptApp.newTrigger('dailyPush').timeBased().atHour(5).nearMinute(0).everyDays(1).create();
+  console.log('Daily push trigger created for about 5:00 AM; it schedules the push for 6:00 AM.');
 }
 
 // Run from the editor to check the connection. View -> Logs shows the answer.
@@ -1832,27 +1800,6 @@ function learnPushTime_(unlockMs) {
   return unlockMs;
 }
 
-// Sends one Learn / Lock push for a reference at `at` and remembers it so it can be cancelled. Skipped if one is already scheduled for that time.
-function sendSlotPush_(map, ref, lockCard, at) {
-  const list = pendingList_(map, ref).filter(function(e) { return !e.at || e.at > Date.now() - 60000; });
-  map[ref] = list;
-  if (hasPendingAt_(list, at)) return false;
-  const r = osSend_(lockCard ? 'Lock' : 'Learn', 'Time to ' + (lockCard ? 'lock ' : 'learn ') + ref + '.', at, 'vr-new-' + ref.replace(/[^A-Za-z0-9]/g, ''), 'new');
-  if (r.ok && r.json && r.json.id) { list.push({ id: r.json.id, at: at }); return true; }
-  return false;
-}
-
-// Schedules the push for a New card's next unlock (called after a press), unless the morning job already scheduled it.
-function scheduleLearnPush_(ref, card) {
-  try {
-    const at = learnPushTime_(card.unlockAt);
-    if (!at || at <= Date.now() + 30000) return;
-    const map = pendingPush_();
-    sendSlotPush_(map, ref, card.stage === 'lock', at);
-    setPendingPush_(map);
-  } catch (e) { console.error('scheduleLearnPush_ failed: ' + e); pushLog_('learn schedule ERROR', ref, 0, false, String(e)); }
-}
-
 // The times of today's remaining slot pushes for a New card, from `now` on. A Learn card gets the slots from its current rep onward
 // (8, 10, 12, 2, 4 PM, and 8 PM for the 6 PM one); a Lock card gets the 8 PM one for the 6 PM unlock. A card that is waiting for tomorrow gets none.
 function daySlotTimes_(card, now) {
@@ -1864,39 +1811,64 @@ function daySlotTimes_(card, now) {
   } else {
     for (let i = 1; i < LEARN_SLOTS.length; i++) {
       if (card.dot > i + 1) continue; // that rep is already done
-      const t = atClock_(now, 0, LEARN_SLOTS[i]) + (i === LEARN_SLOTS.length - 1 ? 2 * 60 * 60 * 1000 : 0);
-      out.push(t);
+      out.push(atClock_(now, 0, LEARN_SLOTS[i]) + (i === LEARN_SLOTS.length - 1 ? 2 * 60 * 60 * 1000 : 0));
     }
   }
   return out.filter(function(t) { return t > now + 30000; });
 }
 
-// Schedules every remaining slot push of the day for each Learn / Lock verse, so a rep you forgot to press never leaves a gap.
-// Called by the 5:30 job once a day (force = true from the editor, any time). Safe to repeat: a time that is already scheduled is skipped.
-function scheduleDayPushes_(force) {
-  const props = PropertiesService.getScriptProperties();
-  const today = todayKey_();
-  if (!force && props.getProperty(PUSH_SLOTS_KEY) === today) return 0;
-  const now = nowMs_();
-  const data = readSheetData_();
-  const map = pendingPush_();
-  let sent = 0;
+// For each remaining slot time today, the Learn and Lock verses that will be waiting then: { time ms: { learn: [refs], lock: [refs] } }.
+function wantedSlots_(data, now) {
+  const want = {};
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5]) || !isLevelZero_(data[i][4])) continue;
     const card = learningCard_(data[i], i, now);
     daySlotTimes_(card, now).forEach(function(t) {
-      if (sendSlotPush_(map, card.reference, card.stage === 'lock', t)) sent++;
+      const w = want[t] || (want[t] = { learn: [], lock: [] });
+      (card.stage === 'lock' ? w.lock : w.learn).push(card.reference);
     });
   }
-  setPendingPush_(map);
-  props.setProperty(PUSH_SLOTS_KEY, today);
-  return sent;
+  return want;
+}
+
+function sameRefs_(a, b) {
+  return JSON.stringify((a || []).slice().sort()) === JSON.stringify((b || []).slice().sort());
+}
+
+// Brings the scheduled Learn / Lock pushes in line with what is true right now: one push per remaining slot time, naming every verse
+// waiting then. Pushes that are no longer right (a verse finished its last rep, was skipped or promoted) are cancelled or re-sent with the
+// updated names, and missing ones are added. Safe to repeat; a push that is about to go out (within 2 minutes) is left alone.
+function syncSlotPushes_() {
+  const now = nowMs_();
+  const want = wantedSlots_(readSheetData_(), now);
+  const map = slotMap_();
+  const out = { sent: 0, cancelled: 0 };
+  Object.keys(map).forEach(function(k) {
+    const e = map[k];
+    if (Number(k) <= now + 120000) { if (Number(k) <= now - 60000) delete map[k]; return; } // gone out (or about to)
+    const w = want[k];
+    if (w && sameRefs_(e.learn, w.learn) && sameRefs_(e.lock, w.lock)) return;
+    delete map[k];
+    const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
+    pushLog_('cancel', (e.learn || []).concat(e.lock || []).join(', '), Number(k), !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
+    out.cancelled++;
+  });
+  Object.keys(want).sort().forEach(function(k) {
+    if (map[k]) return;
+    const w = want[k];
+    const words = pushWords_(0, w.learn, w.lock);
+    if (!words) return;
+    const r = osSend_(words.title, words.text, Number(k), 'vr-new', 'new');
+    if (r.ok && r.json && r.json.id) { map[k] = { id: r.json.id, learn: w.learn, lock: w.lock }; out.sent++; }
+  });
+  setSlotMap_(map);
+  return out;
 }
 
 // Run from the editor to schedule the rest of today's slot pushes right now (for example after updating mid-day). Results show on the Push Log tab.
 function scheduleTodayPushes() {
-  const n = scheduleDayPushes_(true);
-  pushLog_('status: slots', '', 0, null, n + ' slot push(es) scheduled for the rest of today');
+  const r = syncSlotPushes_();
+  pushLog_('status: slots', '', 0, null, r.sent + ' slot push(es) scheduled, ' + r.cancelled + ' cancelled, for the rest of today');
 }
 
 // ───────────── One-time migration: Bronze goes from 4 reps to 3 ─────────────
