@@ -341,6 +341,7 @@
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
+    .vl-tip.on-row { top: 50%; transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; }
     .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
       background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
       padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
@@ -962,8 +963,9 @@
     .ctx-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--border-card); border-top-color: var(--text-accent); border-radius: 50%;
       animation: ctxspin .9s linear infinite; vertical-align: -3px; margin-right: 8px; }
     @keyframes ctxspin { to { transform: rotate(360deg); } }
-    .sync-warning { position: fixed; top: max(env(safe-area-inset-top, 0px), 8px); left: 50%; transform: translateX(-50%);
-      z-index: 60; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .sync-warning { position: fixed; bottom: calc(var(--tab-h) + 14px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+      z-index: 60; white-space: normal; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.22); } /* same spot on every screen, centered just above the tab bar */
+    .sync-warning.is-saving { pointer-events: none; }
     /* Status readout (tap "Verse List" to show it) */
     .diag-test { display: block; margin: 8px 0 0; padding: 7px 12px; min-height: 0; width: auto; font-size: 13px; font-weight: 600;
       border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); }
@@ -1025,14 +1027,14 @@
 
     .notice.is-error { color: var(--badge-fail); }
 
-    .sync-warning.is-update { padding: 5px 13px; border-radius: 999px; font-size: 12px; background: var(--text-accent); color: var(--bg-card);
+    .sync-warning.is-update { padding: 10px 20px; border-radius: 999px; font-size: 16px; background: var(--text-accent); color: var(--bg-card);
       box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
     .sync-warning {
       flex-direction: row;
       min-height: 0;
-      padding: 2px 8px;
-      border-radius: 8px;
-      font-size: 11px;
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 16px;
       font-weight: 700;
       background: var(--badge-repeat-bg);
       color: var(--text-repeat);
@@ -1841,7 +1843,19 @@
       tip.className = "vl-tip";
       tip.textContent = words ? words : "(no text)";
       item.appendChild(tip);
-      vlTipTimer = setTimeout(hideVerseTip, 1200);
+      // In a book's list the peek pops up on the row itself, just right of the reference (it may cover the version tag but never the rank pill).
+      const nameEl = item.classList.contains("vl-verse") && !item.classList.contains("hit") ? item.querySelector(".vl-ref > span") : null;
+      if (nameEl) {
+        const left = nameEl.offsetLeft + nameEl.offsetWidth + 10;
+        const pill = item.querySelector(".rank-badge");
+        const room = (pill ? pill.offsetLeft : item.clientWidth - 8) - left - 8;
+        if (room >= 80) {
+          tip.classList.add("on-row");
+          tip.style.left = left + "px";
+          tip.style.maxWidth = room + "px";
+        } // a very long reference leaves no room beside it, so the peek stays below the row
+      }
+      vlTipTimer = setTimeout(hideVerseTip, 1000);
     }
 
     // ── Verse List search ──
@@ -2074,7 +2088,7 @@
       nm.textContent = g.name;
       const meta = document.createElement("span");
       meta.className = "vm-meta";
-      meta.textContent = g.n + (g.n === 1 ? " verse" : " verses");
+      meta.textContent = g.verses.length + (g.verses.length === 1 ? " reference" : " references");
       head.appendChild(nm);
       head.appendChild(meta);
             box.appendChild(head);
@@ -2123,7 +2137,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-171';
+    const CLIENT_BUILD = 'sync-172';
 
     let queue = [];
     let currentIndex = 0;
@@ -2646,6 +2660,7 @@
         el.style.display = "none";
       }
       if (!((updateReady || reloadingNow) && pendingCount() === 0 && !savingShown && !submitFailed && problemCount === 0)) el.classList.remove("is-update");
+      el.classList.toggle("is-saving", el.style.display !== "none" && el.textContent === "Saving\u2026");
       if (updateReady) autoReloadIfIdle();
     }
 
