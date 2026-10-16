@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-60'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-61'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -151,6 +151,7 @@ function onOpen() {
     .addItem('Preview rebalance', 'rebalancePreview')
     .addItem('Apply rebalance', 'rebalanceApply')
     .addItem('Verse length report', 'verseLengthReport')
+    .addItem('Phrase preview', 'phrasePreview')
     .addToUi();
 }
 
@@ -1606,6 +1607,109 @@ function verseLengths() {
   console.log(n + ' cards. Longest: ' + (top ? top.ref + ' (' + top.words + ' words)' : 'none') + '. See the "Verse lengths" tab.');
   try { SpreadsheetApp.getUi().alert(top ? 'Longest verse: ' + top.ref + ' (' + top.words + ' words). See the "Verse lengths" tab.' : 'No verses found.'); } catch (e) {}
   return { n: n, median: median, longest: top || null, over5: over(5), over6: over(6), over8: over(8) };
+}
+
+// ─────────────────────────── Phrase preview ───────────────────────────
+// Run phrasePreview() from the editor. It writes a "Phrase preview" tab (changes nothing else) showing how verses would be cut
+// into phrases on the New tab, today (about 20 words) and at the suggested smaller size (about 12). Edit PREVIEW_REFS to pick verses.
+// This is a copy of the page's splitter, so the cuts match what the app would show.
+const PREVIEW_REFS = ['Job 19:25-27'];
+const PHRASE_CONJ_ = /^(and|but|for|so|yet|or|nor|that|because|who|whom|whose|which|when|while|if|though|although|since|until|unless|whether|as|then|therefore|thus|lest|where|whoever|whatever|whenever|wherever)$/;
+function splitPhrases_(text, target, cap, minLen) {
+  const whole = String(text || "").trim();
+  // words; an em dash with no spaces ("authorities\u2014all") is a possible break, so it is cut there and glued back after
+  const words = [], glue = [];
+  whole.split(/\s+/).filter(Boolean).forEach(function(tok) {
+    const parts = tok.match(/[^\u2014]+\u2014?|\u2014/g) || [tok];
+    parts.forEach(function(p, k) { words.push(p); glue.push(k > 0); });
+  });
+  const n = words.length;
+  if (n <= cap) return [whole];
+
+  const core = function(w) { return w.replace(/[”"’')\]]+$/, ""); };           // word without closing quotes
+  const bare = function(w) { return w.replace(/^[“"‘'(\[]+/, "").replace(/[^A-Za-z']+$/, "").toLowerCase(); };
+  const punct = words.map(function(w) { return /[,;:.!?—–]$/.test(core(w)); });
+  const itemLen = new Array(n).fill(0);   // words since the previous punctuation (for spotting lists)
+  let last = -1;
+  for (let i = 0; i < n; i++) { if (punct[i]) { itemLen[i] = i - last; last = i; } }
+
+  function isListComma(i) {
+    if (itemLen[i] > 3) return false;
+    const p = i - itemLen[i];
+    if (p >= 0 && /,$/.test(core(words[p])) && itemLen[p] <= 3) return true;   // second short item in a row
+    let j = i + 1; while (j < n && !punct[j]) j++;
+    return j < n && (j - i) <= 3 && /,$/.test(core(words[j]));                  // next item is short and a comma item too
+  }
+  function firmAfter(i) { return i < 0 || i >= n - 1 || /[.!?;]$/.test(core(words[i])); }
+  // cost of ending a phrase after word i
+  function breakCost(i) {
+    const w = core(words[i]), next = bare(words[i + 1]);
+    if (/[.!?;]$/.test(w)) return 0;
+    if (/[:—–]$/.test(w)) return 0.5;
+    if (/,$/.test(w)) return isListComma(i) ? 4 : (PHRASE_CONJ_.test(next) ? 0.3 : 1);
+    return PHRASE_CONJ_.test(next) ? 3 : 5;                                          // no pause here: last resort
+  }
+  const sentEnd = words.map(function(w) { return /[.!?]$/.test(core(w)) ? 1 : 0; });
+  const sentSum = [0]; for (let i = 0; i < n; i++) sentSum.push(sentSum[i] + sentEnd[i]);
+  function pieceCost(from, to) {   // words from..to-1
+    const L = to - from;
+    let c = 1;                                                                       // each extra phrase costs a little
+    c += sentSum[to - 1] - sentSum[from];                                            // a phrase running across a sentence end
+    if (L > target) c += (L - target) * 0.2;
+    if (L < 8) c += (8 - L) * 0.5;
+    if (L < minLen && !(firmAfter(from - 1) && firmAfter(to - 1))) c += 3;       // very short bit that isn't a whole sentence
+    c += Math.pow((L - 16) / 16, 2) * 0.6;                                           // gentle pull toward even sizes
+    return c;
+  }
+
+  const best = new Array(n + 1).fill(Infinity), from = new Array(n + 1).fill(0);
+  best[0] = 0;
+  for (let j = 1; j <= n; j++) {
+    for (let i = Math.max(0, j - cap); i < j; i++) {
+      if (best[i] === Infinity) continue;
+      const c = best[i] + pieceCost(i, j) + (j < n ? breakCost(j - 1) : 0);
+      if (c < best[j]) { best[j] = c; from[j] = i; }
+    }
+  }
+  const cuts = [];
+  for (let j = n; j > 0; j = from[j]) cuts.unshift([from[j], j]);
+  return cuts.map(function(c) {
+    let t = "";
+    for (let i = c[0]; i < c[1]; i++) t += (i > c[0] && !glue[i] ? " " : "") + words[i];
+    return t;
+  });
+}
+
+function phrasePreview(refs) {
+  const list = (refs && refs.length ? refs : PREVIEW_REFS).map(function(r) { return String(r).trim(); });
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const data = readSheetData_();
+  const settings = [['Now (about 20 words, cap 24)', 20, 24, 5], ['Suggested (about 12 words, cap 16)', 12, 16, 5]];
+  const rows = [['Verse', 'Setting', 'Verse no.', 'Phrase', 'Letter', 'Words']];
+  list.forEach(function(ref) {
+    let hit = null;
+    for (let i = 1; i < data.length; i++) { if (cleanRef_(data[i][5]).toLowerCase() === ref.toLowerCase()) { hit = data[i]; break; } }
+    if (!hit) { rows.push([ref, 'not found in the Verses tab', '', '', '', '']); return; }
+    const segs = String(hit[7] || '').split(/(?=\[\d+\])/).map(function(t) { return t.trim(); }).filter(Boolean);
+    settings.forEach(function(st) {
+      segs.forEach(function(seg) {
+        const m = /^\[(\d+)\]\s*/.exec(seg);
+        const text = seg.replace(/^\[\d+\]\s*/, '');
+        const parts = splitPhrases_(text, st[1], st[2], st[3]);
+        parts.forEach(function(p, k) {
+          rows.push([ref, st[0], m ? Number(m[1]) : '', p, parts.length > 1 ? 'abcdefghijklmnop'.charAt(k) : '', p.split(/\s+/).filter(Boolean).length]);
+        });
+      });
+    });
+  });
+  let tab = ss.getSheetByName('Phrase preview');
+  if (!tab) tab = ss.insertSheet('Phrase preview');
+  tab.clear();
+  tab.getRange(1, 1, rows.length, 6).setValues(rows);
+  try { tab.setFrozenRows(1); tab.getRange(1, 1, 1, 6).setFontWeight('bold'); tab.setColumnWidth(4, 520); } catch (e) {}
+  console.log('Phrase preview written: ' + (rows.length - 1) + ' rows.');
+  try { SpreadsheetApp.getUi().alert('Phrase preview written. See the "Phrase preview" tab.'); } catch (e) {}
+  return { rows: rows.length - 1 };
 }
 
 // ─────────────────────────── Verse length report ───────────────────────────
