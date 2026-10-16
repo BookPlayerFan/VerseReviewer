@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-64'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-65'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1603,16 +1603,17 @@ function getMonthStats(year, month) {
 // ─────────────────────────── Push reminders (OneSignal) ───────────────────────────
 //
 // Setup, once:  1) Script Property ONESIGNAL_KEY = your OneSignal REST API key.
-//               2) Run installDailyPush() from the editor (creates the ~6:30 AM trigger; approve the permissions).
+//               2) Run installDailyPush() from the editor (creates the ~5:30 AM trigger; approve the permissions).
 //               3) Run testPush() to send yourself a test.
 // Two kinds of reminder:
-//   - Daily: around 6:00 AM, one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
+//   - Daily: at 6:00 AM (scheduled by a trigger that runs at about 5:30), one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
 //   - Learn / Lock unlocks: after each press the server schedules a push for the next unlock (scheduleLearnPush_): 8, 10, 12, 2, 4 PM,
 //     and 8 PM for the 6 PM unlock. The 4 AM unlocks are covered by the daily push. The next press cancels a pending one.
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
 const PUSH_PENDING_KEY = 'VR_PUSH_PENDING'; // { reference: notificationId }
+const DAILY_PUSH_MIN = 6 * 60;               // the morning push arrives at 6:00 AM
 const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
 
@@ -1738,8 +1739,9 @@ function pushWords_(due, learnRefs, lockRefs) {
   return { title: titles.join(', '), text: text };
 }
 
-// Runs from the daily trigger (installDailyPush), around 6 AM. One push for everything waiting at that point:
-// due reviews, a Learn card and a Lock AM card (both unlock at 4 AM). Sent once a day, and only if something is waiting.
+// Runs from the daily trigger (installDailyPush), at about 5:30 AM (Apps Script starts it somewhere in 5:30 to 5:45). It works out what is
+// waiting then, and schedules the push for exactly 6:00 AM: due reviews, a Learn card and a Lock AM card (both unlock at 4 AM).
+// If it happens to run after 6:00 the push goes out right away. Sent once a day, and only if something is waiting.
 function dailyPush() {
   const props = PropertiesService.getScriptProperties();
   const today = todayKey_();
@@ -1749,7 +1751,9 @@ function dailyPush() {
   const words = pushWords_(due, nc.learnRefs, nc.lockRefs);
   if (!words) return;
   const go = due > 0 ? 'review' : 'new';
-  const r = osSend_(words.title, words.text, 0, 'vr-daily', go);
+  const now = nowMs_();
+  const at = atClock_(now, 0, DAILY_PUSH_MIN);
+  const r = osSend_(words.title, words.text, at > now + 30000 ? at : 0, 'vr-daily', go);
   if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
 }
 
@@ -1759,7 +1763,7 @@ function pushStatus() {
   const props = PropertiesService.getScriptProperties();
   const trig = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; });
   pushLog_('status: trigger', 'dailyPush', 0, trig.length === 1, trig.length + ' daily trigger(s)' + (trig.length ? ' (' + trig[0].getEventType() + ')' : ' - run installDailyPush()'));
-  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The 6 AM trigger fires between 6:00 and 6:15 in THIS zone.');
+  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 5:30 and 5:45 in THIS zone and schedules the push for 6:00.');
   pushLog_('status: today', '', 0, null, 'last daily push marked ' + (props.getProperty(PUSH_DAILY_KEY) || 'never') + ', today is ' + todayKey_());
   pushLog_('status: key', 'ONESIGNAL_KEY', 0, !!props.getProperty('ONESIGNAL_KEY'), props.getProperty('ONESIGNAL_KEY') ? 'set' : 'NOT set');
   const due = getDueCards(false).length;
@@ -1772,8 +1776,8 @@ function installDailyPush() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'dailyPush') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('dailyPush').timeBased().atHour(6).nearMinute(0).everyDays(1).create();
-  console.log('Daily push trigger created for about 6:00 AM.');
+  ScriptApp.newTrigger('dailyPush').timeBased().atHour(5).nearMinute(30).everyDays(1).create();
+  console.log('Daily push trigger created for about 5:30 AM; it schedules the push for 6:00 AM.');
 }
 
 // Run from the editor to check the connection. View -> Logs shows the answer.
