@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-68'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-69'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1757,8 +1757,13 @@ function pushStatus() {
   pushLog_('status: today', '', 0, null, 'last daily push marked ' + (props.getProperty(PUSH_DAILY_KEY) || 'never') + ', today is ' + todayKey_());
   pushLog_('status: key', 'ONESIGNAL_KEY', 0, !!props.getProperty('ONESIGNAL_KEY'), props.getProperty('ONESIGNAL_KEY') ? 'set' : 'NOT set');
   const slots = slotMap_();
-  const waiting = Object.keys(slots).filter(function(k) { return Number(k) > Date.now(); }).length;
-  pushLog_('status: slots', '', 0, null, waiting + ' Learn / Lock push(es) waiting to go out today');
+  const times = Object.keys(slots).map(Number).filter(function(k) { return k > Date.now(); }).sort(function(x, y) { return x - y; });
+  pushLog_('status: slots', '', 0, null, times.length + ' Learn / Lock push(es) waiting to go out today' + (times.length ? ' (listed below, one row each)' : ''));
+  times.forEach(function(k) {
+    const e = slots[k] || {};
+    const w = pushWords_(0, e.learn || [], e.lock || []);
+    pushLog_('status: slot', w ? w.title : '', k, null, Utilities.formatDate(new Date(k), Session.getScriptTimeZone(), 'h:mm a') + '  ' + (w ? w.text : ''));
+  });
   const due = getDueCards(false).length;
   const nc = newCardCounts_(readSheetData_(), nowMs_());
   pushLog_('status: waiting', '', 0, null, due + ' due, ' + nc.learnRefs.length + ' learn, ' + nc.lockRefs.length + ' lock' + (pushWords_(due, nc.learnRefs, nc.lockRefs) ? '' : ' (nothing waiting, so no push is sent)'));
