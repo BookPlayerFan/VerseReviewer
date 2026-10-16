@@ -342,6 +342,9 @@
     .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
     .vl-tip.on-row { top: 50%; transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; }
+    .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.18); } /* an even glow, so it doesn't look lower than the row */
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.5); } }
+    :root[data-theme="dark"] .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.5); }
     .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
       background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
       padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
@@ -2139,7 +2142,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-173';
+    const CLIENT_BUILD = 'sync-174';
 
     let queue = [];
     let currentIndex = 0;
@@ -2617,7 +2620,7 @@
       if (Number(n) > mine && !updateReady) { updateReady = true; updateSyncWarning(); autoReloadIfIdle(); }
     }
     // As soon as a newer page is known and nothing is waiting to save, the app reloads itself, on any screen. The pill
-    // shows "Reloading\u2026" meanwhile. The home-screen page allows this at most once per 10 minutes, so it can never loop.
+    // shows "Reloading\u2026" meanwhile. The home-screen page allows this at most once per minute, so it can never loop.
     let autoTried = false, autoQueued = false, reloadingNow = false;
     function autoReloadIfIdle() {
       if (!updateReady || reloadFailed || autoTried || autoQueued || reloadingNow || pendingCount() > 0 || document.hidden) return;
