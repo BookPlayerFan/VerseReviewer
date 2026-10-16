@@ -769,7 +769,8 @@
     .fail-list .fail-note { padding: 8px 6px; font-size: 12px; color: var(--text-muted); text-align: center; }
     .fail-list .fail-row + .fail-note { border-top: 1px solid var(--border-body); }
     .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
-    .fail-list .fail-head .pts-sum { margin-left: 12px; display: inline-flex; gap: 12px; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; }
+    .fail-list .fail-head .pts-sum { margin-left: 12px; display: inline-flex; align-items: center; gap: 12px; line-height: 1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .fail-list .fail-head .fail-title { line-height: 1; }
     .fail-list .fail-head .pts-sum .up { color: var(--text-accent); }
     .fail-list .fail-head .pts-sum .down { color: var(--btn-fail-text); }
     .pts-badge { min-width: 34px; text-align: right; font-weight: 800; font-size: 14px; }
@@ -2160,7 +2161,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-183';
+    const CLIENT_BUILD = 'sync-184';
 
     let queue = [];
     let currentIndex = 0;
