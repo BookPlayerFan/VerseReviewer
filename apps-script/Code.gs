@@ -57,14 +57,14 @@ function clientExpected_() {
 // interval can't be stretched without hurting recall). Platinum and above may move a few days to a quieter day:
 //   early / late = the most days the date may move earlier / later than the exact interval (the hard cap)
 //   costEarly / costLate = the price, in "reviews", of each day moved. A day is chosen by (reviews already due that day) + price,
-//   lowest wins, so a card only moves when another day is clearly quieter. Platinum is pickier (higher price) because 1 day is
+//   lowest wins, so a card only moves when another day is clearly quieter. Platinum is twice as picky (double price) because 1 day is
 //   about 8% of its 12-day interval. Later costs more than earlier because a late review risks forgetting.
 const GROUP_CONFIG = {
   0: { name: "New",               interval: 0,   repsNeeded: 1, early: 0,  late: 0 },
   1: { name: "Bronze",             interval: 1,   repsNeeded: 3, early: 0,  late: 0 },
   2: { name: "Silver",             interval: 2,   repsNeeded: 3, early: 0,  late: 0 },
   3: { name: "Gold",             interval: 5,   repsNeeded: 2, early: 0,  late: 0 },
-  4: { name: "Platinum",            interval: 12,  repsNeeded: 2, early: 1,  late: 1,  costEarly: 1,    costLate: 2 },
+  4: { name: "Platinum",            interval: 12,  repsNeeded: 2, early: 1,  late: 1,  costEarly: 0.5,  costLate: 1 },
   5: { name: "Sapphire",           interval: 30,  repsNeeded: 2, early: 2,  late: 1,  costEarly: 0.25, costLate: 0.5 },
   6: { name: "Emerald",         interval: 75,  repsNeeded: 1, early: 3,  late: 2,  costEarly: 0.25, costLate: 0.5 },
   7: { name: "Ruby",         interval: 180, repsNeeded: 1, early: 5,  late: 3,  costEarly: 0.25, costLate: 0.5 },
