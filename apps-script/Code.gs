@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-69'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-70'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -262,6 +262,13 @@ const REPS_PER_VERSE = 7;
 const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM
 const LOCK_PM_MIN = 18 * 60;        // Lock PM unlocks at 6 PM
 const START_LIVE_BEFORE_MIN = 12 * 60; // a verse added before noon starts today; later it waits for 4 AM tomorrow
+// A rep is "late" an hour after it opens (the 4 AM rep: after 7 AM; the 6 PM rep and Lock PM: after 8:30 PM; Lock AM: after noon). The dots turn amber (one late rep
+// today) or red (two or more). Late reps are not made up, so the mark stays on a verse until 4 AM the next day. Kept per reference in VR_LATE_MAP.
+const LATE_GRACE_MIN = 60;
+const LATE_FIRST_SLOT_MIN = 7 * 60;
+const LATE_LOCK_AM_MIN = 12 * 60;
+const LATE_LOCK_PM_MIN = 20 * 60 + 30;
+const LATE_MAP_KEY = 'VR_LATE_MAP';
 
 // The time (ms) of a clock time (minutes after midnight), dayOffset days from the day of `ms`.
 function atClock_(ms, dayOffset, mins) {
@@ -283,6 +290,66 @@ function nextSlotAfter_(ms) {
     if (t > ms) return t;
   }
   return atClock_(ms, 1, LEARN_SLOTS[0]);
+}
+
+// The time a rep that opened at `slotMs` counts as late.
+function lateDeadline_(slotMs, stage, lockPart) {
+  const m = minsOfDay_(slotMs);
+  if (stage === 'lock') {
+    const lim = lockPart === 'pm' ? LATE_LOCK_PM_MIN : LATE_LOCK_AM_MIN;
+    return m < lim ? atClock_(slotMs, 0, lim) : slotMs + LATE_GRACE_MIN * 60000;
+  }
+  if (m === LEARN_SLOTS[0]) return atClock_(slotMs, 0, LATE_FIRST_SLOT_MIN);
+  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return atClock_(slotMs, 0, LATE_LOCK_PM_MIN); // the 6 PM rep: its reminder goes out at 8 PM, so it is late after 8:30
+  return slotMs + LATE_GRACE_MIN * 60000;
+}
+
+// For a card that opens (or opened) at readyMs: { late: reps already late, next: the next time a rep will count as late (0 = none) }.
+// A Learn card has one rep per slot from readyMs on, and each slot whose deadline has gone by without a press is one late rep.
+function lateInfo_(stage, lockPart, readyMs, now) {
+  const out = { late: 0, next: 0 };
+  if (!readyMs) return out;
+  if (stage === 'lock') {
+    const dl = lateDeadline_(readyMs, stage, lockPart);
+    if (dl <= now) out.late = 1; else out.next = dl;
+    return out;
+  }
+  for (let d = 0; d < 21; d++) {
+    for (let i = 0; i < LEARN_SLOTS.length; i++) {
+      const t = atClock_(readyMs, d, LEARN_SLOTS[i]);
+      if (t < readyMs) continue;
+      const dl = lateDeadline_(t, stage, lockPart);
+      if (dl <= now) out.late++;
+      else if (!out.next) { out.next = dl; return out; }
+    }
+    if (atClock_(readyMs, d + 1, LEARN_SLOTS[0]) > now + 86400000) break;
+  }
+  return out;
+}
+
+// The day for "missed today" starts at 4 AM, like the Learn day.
+function lateDayKey_(ms) {
+  return Utilities.formatDate(new Date(ms - DAY_START_MIN * 60000), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+function lateMap_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(LATE_MAP_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+// Reps missed today for one reference (from presses that came late).
+function missedToday_(ref, now) {
+  const e = lateMap_()[ref];
+  return e && e.d === lateDayKey_(now) ? (Number(e.n) || 0) : 0;
+}
+function addMissed_(ref, n, now) {
+  const map = lateMap_(), day = lateDayKey_(now), out = {};
+  Object.keys(map).forEach(function(k) { if (map[k] && map[k].d === day) out[k] = map[k]; });
+  if (n > 0) out[ref] = { d: day, n: (out[ref] ? Number(out[ref].n) || 0 : 0) + n };
+  PropertiesService.getScriptProperties().setProperty(LATE_MAP_KEY, JSON.stringify(out));
+}
+function clearMissed_(ref, now) {
+  const map = lateMap_();
+  if (!map[ref]) return;
+  delete map[ref];
+  PropertiesService.getScriptProperties().setProperty(LATE_MAP_KEY, JSON.stringify(map));
 }
 
 // The next 4 AM after `ms`.
@@ -316,12 +383,12 @@ function verseCount_(text) {
 function stageInfo_(rep, n, bRaw, now) {
   const r = Math.max(1, Math.floor(Number(rep) || 1));
   const total = REPS_PER_VERSE * n;
-  let unlockAt = 0;
+  let unlockAt = 0, readyAt = 0;
   if (bRaw instanceof Date) {
     const t = bRaw.getTime();
-    if (!isNaN(t) && t > now) unlockAt = t;
+    if (!isNaN(t)) { readyAt = t; if (t > now) unlockAt = t; }
   }
-  const out = { stage: 'learn', verseIndex: 1, verseCount: n, dot: 1, lockPart: '', label: 'Review', unlockAt: unlockAt };
+  const out = { stage: 'learn', verseIndex: 1, verseCount: n, dot: 1, lockPart: '', label: 'Review', unlockAt: unlockAt, readyAt: readyAt };
   if (r <= total) {
     out.verseIndex = Math.ceil(r / REPS_PER_VERSE);
     out.dot = ((r - 1) % REPS_PER_VERSE) + 1;
@@ -374,6 +441,10 @@ function learningCard_(row, i, now) {
   };
   const info = stageInfo_(rep, n, row[1], now);
   Object.keys(info).forEach(function(k) { card[k] = info[k]; });
+  const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now);
+  card.late = li.late;            // reps already late right now (the open rep and any slots that went by)
+  card.lateAt = li.next;          // when the next one will count as late (the screen repaints then)
+  card.missed = missedToday_(ref, now); // reps that were pressed late earlier today
   return card;
 }
 
@@ -433,6 +504,15 @@ function learnAction(reference, action, expectedRep) {
       }
       step = nextStep_(info, rep, now);
     }
+
+    // A rep pressed after its grace time is remembered for the rest of the day (the dots stay amber / red).
+    try {
+      if (action !== 'skip') {
+        const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now);
+        if (li.late > 0 && !step.promote) addMissed_(ref, li.late, now);
+      }
+      if (step.promote) clearMissed_(ref, now);
+    } catch (e) { console.error('late record failed: ' + e); }
 
     let promoted = false;
     let card = null;

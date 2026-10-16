@@ -427,6 +427,14 @@
       box-shadow: 0 0 5px rgba(26, 115, 232, 0.4);
     }
 
+    /* A New card that is behind: the filled dots turn amber (one late rep today) or red (two or more) */
+    .pips-container.late-1 .pip.filled { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245, 158, 11, 0.45); }
+    .pips-container.late-2 .pip.filled { background: #e5484d; border-color: #e5484d; box-shadow: 0 0 5px rgba(229, 72, 77, 0.45); }
+    .lock-chips.late-1 .lock-chip.on { background: #f59e0b; border-color: #f59e0b; }
+    .lock-chips.late-2 .lock-chip.on { background: #e5484d; border-color: #e5484d; }
+    .lm-st.late-1 { color: #d98200; font-weight: 700; }
+    .lm-st.late-2 { color: #e5484d; font-weight: 700; }
+
     /* Fast-Track Glowing Pip */
     .fast-track-pip {
       font-size: 15px;
@@ -1608,7 +1616,13 @@
       learningCards.forEach(function(c) { if (c.unlockAt > now && c.unlockAt < next) next = c.unlockAt; });
       if (next < Infinity) badgeTimer = setTimeout(function() { sortLearning(); updateTabs(); }, Math.min(next - now + 500, 2147483000));
     }
-    document.addEventListener("visibilitychange", function() { if (!document.hidden) { updateTabs(); autoReloadIfIdle(); } });
+    document.addEventListener("visibilitychange", function() {
+      if (!document.hidden) {
+        updateTabs(); autoReloadIfIdle();
+        const c = learningCards[learningIndex];
+        if (mode === 'learning' && c) { paintLateState(c); scheduleLate(c); }
+      }
+    });
 
     // Fetches the verse list and keeps it in vlVerses (sorted in Bible order); the Verses tab and the Upcoming sheet both use it.
     function loadVlVerses(done, failed) {
@@ -2140,7 +2154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-179';
+    const CLIENT_BUILD = 'sync-180';
 
     let queue = [];
     let currentIndex = 0;
@@ -3258,6 +3272,8 @@
           pips.appendChild(pip);
         }
       }
+      paintLateState(card);
+      scheduleLate(card);
       paintLearningButton(card);
     }
 
@@ -3329,7 +3345,14 @@
       }
       if (!list.children.length) return;
       document.getElementById("lmTitle").textContent = card.reference;
-      document.getElementById("lmNote").textContent = isLocked(card) ? lockedText(card) : "";
+      const note = document.getElementById("lmNote"), st = repStatus(card);
+      note.className = "lm-note";
+      note.textContent = "";
+      const stLine = document.createElement("div");
+      stLine.className = st.level ? "lm-st late-" + st.level : "lm-st";
+      stLine.textContent = st.text;
+      note.appendChild(stLine);
+      if (isLocked(card)) { const lk = document.createElement("div"); lk.textContent = lockedText(card); note.appendChild(lk); }
       document.getElementById("learnMenu").classList.add("open");
     }
     function closeLearnMenu() { document.getElementById("learnMenu").classList.remove("open"); }
@@ -3353,7 +3376,7 @@
       const btnFail = document.getElementById("btnFail");
       btnFail.classList.remove("seen", "only", "review");
       document.getElementById("btnPass").classList.remove("clear", "locked");
-      pipsContainer.classList.remove("lock-chips");
+      pipsContainer.classList.remove("lock-chips", "late-1", "late-2");
       const btnFailText = document.getElementById("btnFailText");
       const btnPassText = document.getElementById("btnPassText");
 
@@ -3722,6 +3745,72 @@
       }
       return o;
     }
+    // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (4 AM rep: 7 AM; 6 PM rep and Lock PM: 8:30 PM;
+    // Lock AM: noon). Late reps are not made up, so a late press leaves card.missed raised until 4 AM the next day.
+    function lLateDeadline(slotMs, stage, lockPart) {
+      const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
+      if (stage === 'lock') { const lim = lockPart === 'pm' ? 1230 : 720; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
+      if (m === L_SLOTS[0]) return lAt(slotMs, 0, 420);
+      if (m === L_SLOTS[L_SLOTS.length - 1]) return lAt(slotMs, 0, 1230);
+      return slotMs + 3600000;
+    }
+    function lateNow(card) {
+      const out = { late: 0, next: 0 }, now = nowSrv(), ready = card && card.readyAt;
+      if (!ready) return out;
+      if (card.stage === 'lock') {
+        const dl = lLateDeadline(ready, 'lock', card.lockPart);
+        if (dl <= now) out.late = 1; else out.next = dl;
+        return out;
+      }
+      for (let d = 0; d < 21; d++) {
+        for (let i = 0; i < L_SLOTS.length; i++) {
+          const t = lAt(ready, d, L_SLOTS[i]);
+          if (t < ready) continue;
+          const dl = lLateDeadline(t, 'learn', '');
+          if (dl <= now) out.late++; else { out.next = dl; return out; }
+        }
+        if (lAt(ready, d + 1, L_SLOTS[0]) > now + 86400000) break;
+      }
+      return out;
+    }
+    function lateLevel(card) {
+      const n = lateNow(card).late + ((card && card.missed) || 0);
+      return n >= 2 ? 2 : n;
+    }
+    let lateTimer = null;
+    function paintLateState(card) {
+      const lv = card ? lateLevel(card) : 0;
+      const pips = document.getElementById("cardPips");
+      pips.classList.toggle("late-1", lv === 1);
+      pips.classList.toggle("late-2", lv >= 2);
+    }
+    function scheduleLate(card) {
+      if (lateTimer) { clearTimeout(lateTimer); lateTimer = null; }
+      const next = card ? lateNow(card).next : 0;
+      if (!next) return;
+      lateTimer = setTimeout(function() {
+        lateTimer = null;
+        const c = learningCards[learningIndex];
+        if (mode === 'learning' && c) { paintLateState(c); scheduleLate(c); }
+      }, Math.min(Math.max(next - nowSrv(), 0) + 500, 2147483000));
+    }
+    // The line in the hold menu: where this card stands against the day's schedule.
+    function repStatus(card) {
+      const part = card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7";
+      const late = lateNow(card).late, missed = card.missed || 0;
+      let text, lv;
+      if (!late && !missed) { text = "on schedule"; lv = 0; }
+      else {
+        const bits = [];
+        if (late === 1 && !missed) bits.push("the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is late");
+        else {
+          if (late) bits.push(late + (late === 1 ? " rep late" : " reps late"));
+          if (missed) bits.push(missed + (missed === 1 ? " rep" : " reps") + " missed earlier today");
+        }
+        text = bits.join(" \u00b7 "); lv = (late + missed) >= 2 ? 2 : 1;
+      }
+      return { text: part + " \u00b7 " + text, level: lv };
+    }
     function predictLearn(card, kind) {
       const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n);
       let nr, unlock;
@@ -3732,7 +3821,8 @@
       } else {
         const pm = lAt(now, 0, 1080); nr = rep + 1; unlock = pm > now ? pm : 0;
       }
-      return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock });
+      const missed = (card.missed || 0) + (kind === 'skip' ? 0 : lateNow(card).late);
+      return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock, readyAt: unlock, late: 0, lateAt: 0, missed: missed });
     }
 
     function scoreCard(action) {
