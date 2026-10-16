@@ -257,6 +257,34 @@
       } catch (e) {}
     }
 
+    // Keep the screen awake on the New tab (the saved early view, or the app on its New tab). The lock lives here in the top page,
+    // because the app sits inside Google's sandboxed frames. It is let go after 10 minutes with no touches, and asked for again on the next one.
+    var wakeApp = false, wakeLock = null, wakePending = false, wakeIdleAt = 0, wakeTimer = null;
+    var WAKE_IDLE_MS = 10 * 60 * 1000;
+    function wakeWanted() { return (earlyActive || wakeApp) && !document.hidden && Date.now() - wakeIdleAt < WAKE_IDLE_MS; }
+    function wakeRelease() {
+      var l = wakeLock; wakeLock = null;
+      if (l) { try { l.release(); } catch (e) {} }
+    }
+    function wakeSync() {
+      if (!wakeWanted()) { wakeRelease(); return; }
+      if (wakeLock || wakePending || !navigator.wakeLock || !navigator.wakeLock.request) return;
+      wakePending = true;
+      navigator.wakeLock.request("screen").then(function(l) {
+        wakePending = false;
+        wakeLock = l;
+        try { l.addEventListener("release", function() { if (wakeLock === l) wakeLock = null; }); } catch (e) {}
+        if (!wakeWanted()) wakeRelease();
+      }, function() { wakePending = false; });
+    }
+    function wakeTouch() {
+      wakeIdleAt = Date.now();
+      clearTimeout(wakeTimer);
+      wakeTimer = setTimeout(wakeSync, WAKE_IDLE_MS + 1000);
+      wakeSync();
+    }
+    document.addEventListener("visibilitychange", wakeSync);
+
     function showEarly() {
       var c = loadEarlyCache();
       if (!c || !EARLY_DOC) return false;
@@ -265,6 +293,7 @@
       earlyFrame.srcdoc = EARLY_DOC.replace("/*__DATA__*/null", function() { return dataJs; });
       earlyFrame.style.display = "block";
       earlyActive = true;
+      wakeTouch();
       var splash = document.getElementById("splashScreen");
       if (splash) splash.style.display = "none";
       failTimer = setTimeout(function() {
@@ -280,6 +309,7 @@
       earlyActive = false;
       earlyFrame.style.display = "none";
       earlyFrame.srcdoc = "";
+      wakeSync();
     }
 
     function dismissSplash() {
@@ -324,7 +354,7 @@
       if (!d || typeof d !== 'object') return;
 
       if (earlyActive && e.source === earlyFrame.contentWindow) {
-        if (d.type === 'EV_STATE') { earlyState = d; if (typeof d.hint === 'boolean') saveHint(d.hint); }
+        if (d.type === 'EV_STATE') { wakeTouch(); earlyState = d; if (typeof d.hint === 'boolean') saveHint(d.hint); }
         else if (d.type === 'EV_RETRY') {
           try { earlyFrame.contentWindow.postMessage({ type: "EV_WAIT" }, "*"); } catch (err) {}
           loadApp();
@@ -338,6 +368,11 @@
 
       if (!isAppOrigin(e.origin)) return;
 
+      if (d.type === 'VR_WAKE') {
+        wakeApp = d.on === true;
+        if (wakeApp) wakeTouch(); else wakeSync();
+        return;
+      }
       if (d.type === 'VR_PUSH_ENABLE') {
         pushSource = e.source;
         enablePush();
