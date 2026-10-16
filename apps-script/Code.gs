@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-79'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-80'; // shown in the app's status readout (two-finger tap)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1977,7 +1977,7 @@ function scheduleReport() {
   try { out.setFrozenRows(1); } catch (e) {}
 }
 
-// Called by the app (Verse List title -> "Send test notification").
+// Called by the app (two-finger tap panel -> "Send test notification").
 function sendTestPush() {
   const r = osSend_('Test Notification', 'Push is working.', 0, 'vr-test');
   let msg = '';
