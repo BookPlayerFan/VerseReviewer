@@ -1843,16 +1843,18 @@
       tip.className = "vl-tip";
       tip.textContent = words ? words : "(no text)";
       item.appendChild(tip);
-      // In a book's list the peek pops up on the row itself, just right of the reference (it may cover the version tag but never the rank pill).
+      // In a book's list the peek pops up on the row itself, just right of the reference, centered on the row's height.
+      // It may cover the version tag and the rank pill.
       const nameEl = item.classList.contains("vl-verse") && !item.classList.contains("hit") ? item.querySelector(".vl-ref > span") : null;
       if (nameEl) {
-        const left = nameEl.offsetLeft + nameEl.offsetWidth + 10;
-        const pill = item.querySelector(".rank-badge");
-        const room = (pill ? pill.offsetLeft : item.clientWidth - 8) - left - 8;
+        const left = nameEl.offsetLeft + nameEl.offsetWidth + 4;
+        const room = item.clientWidth - left - 8;
         if (room >= 80) {
+          const ver = item.querySelector(".version-badge");
           tip.classList.add("on-row");
           tip.style.left = left + "px";
           tip.style.maxWidth = room + "px";
+          if (ver) tip.style.minWidth = Math.min(room, ver.offsetLeft + ver.offsetWidth - left + 8) + "px"; // wide enough to hide the version tag
         } // a very long reference leaves no room beside it, so the peek stays below the row
       }
       vlTipTimer = setTimeout(hideVerseTip, 1000);
@@ -2137,7 +2139,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-172';
+    const CLIENT_BUILD = 'sync-173';
 
     let queue = [];
     let currentIndex = 0;
