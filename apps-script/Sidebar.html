@@ -286,10 +286,13 @@
     .vm-tile:active { transform: none; filter: none; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile { --rc: var(--rd); } }
     :root[data-theme="dark"] .vm-tile { --rc: var(--rd); }
-    .vm-sum { padding: 14px 4px; }
+    .vm-sum { padding: 14px 0; }
     .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 14px; }
     .vm-stats { display: flex; gap: 8px; }
-    .tr-stats { margin: 0 0 8px; }
+    .tr-mini { display: flex; gap: 8px; margin-top: 12px; }
+    .tr-mini > div { flex: 1; text-align: center; padding: 6px 4px 7px; border: 1px solid var(--border-card); border-radius: 10px; line-height: 1.15; }
+    .tr-mini b { display: block; font-size: 16px; font-weight: 800; color: var(--text-primary); }
+    .tr-mini span { font-size: 10.5px; color: var(--text-meta); }
     .vm-stat { flex: 1; text-align: center; padding: 10px 4px; border: 1px solid var(--border-card); border-radius: 12px; }
     .vm-stat b { display: block; font-size: 22px; font-weight: 800; color: var(--text-primary); }
     .vm-stat span { font-size: 11px; color: var(--text-meta); }
@@ -1820,20 +1823,19 @@
       let bar = "";
       for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
       head.innerHTML = '<div class="tr-top"><div class="tr-pts">' + pts + '<small>pts</small></div></div><div class="tr-bar">' + bar + '</div>';
-      box.appendChild(head);
       const books = {};
       vlVerses.forEach(function(v) { books[vlBookKey(v)] = true; });
       const stats = document.createElement("div");
-      stats.className = "vm-stats tr-stats";
+      stats.className = "tr-mini";
       [[verses, verses === 1 ? "verse" : "verses"], [total, total === 1 ? "reference" : "references"], [Object.keys(books).length, "of 66 books"]].forEach(function(p) {
         const c = document.createElement("div");
-        c.className = "vm-stat";
         const n = document.createElement("b"); n.textContent = p[0];
         const l = document.createElement("span"); l.textContent = p[1];
         c.appendChild(n); c.appendChild(l);
         stats.appendChild(c);
       });
-      box.appendChild(stats);
+      head.appendChild(stats);
+      box.appendChild(head);
       const bodies = [], rows = [], grps = [];
       for (let g = 8; g >= 1; g--) {
         const vs = vlVerses.filter(function(v) { return v.g === g; });
@@ -2321,7 +2323,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-193';
+    const CLIENT_BUILD = 'sync-194';
 
     let queue = [];
     let currentIndex = 0;
