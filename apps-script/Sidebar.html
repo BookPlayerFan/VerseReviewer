@@ -768,7 +768,11 @@
     .fail-list .fail-row + .fail-row { border-top: 1px solid var(--border-body); }
     .fail-list .fail-note { padding: 8px 6px; font-size: 12px; color: var(--text-muted); text-align: center; }
     .fail-list .fail-row + .fail-note { border-top: 1px solid var(--border-body); }
-    .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; }
+    .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
+    .fail-list .fail-head .pts-sum { margin-left: 10px; text-transform: none; letter-spacing: 0; font-size: 12px; }
+    .pts-badge { min-width: 34px; text-align: right; font-weight: 800; font-size: 14px; }
+    .pts-badge.up { color: var(--text-accent); }
+    .pts-badge.down { color: var(--btn-fail-text); }
 
     .summary-btn-stack {
       display: flex;
@@ -2154,7 +2158,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-181';
+    const CLIENT_BUILD = 'sync-182';
 
     let queue = [];
     let currentIndex = 0;
@@ -2184,7 +2188,7 @@
     let revealCursor = -1;  // the piece revealed most recently; a tap reveals the next hidden piece after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
-    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
+    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [] };
     let sessionVersion = 0;
     let sessionDate = "";
     // Which screen you are on: 'review' (the daily deck) or 'learning' (Level 0 verses).
@@ -2370,6 +2374,7 @@
       currentIndex = session.currentIndex || 0;
       sessionStats = session.stats || { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
       if (!Number.isInteger(sessionStats.pts)) sessionStats.pts = 0;
+      if (!Array.isArray(sessionStats.ptsRefs)) sessionStats.ptsRefs = [];
       if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
       if (!Array.isArray(sessionStats.gradRefs)) sessionStats.gradRefs = [];
       if (!Array.isArray(sessionStats.clearedRefs)) sessionStats.clearedRefs = [];
@@ -3714,8 +3719,7 @@
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && kind !== 'skip';
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
       if (promote) {
-        sessionStats.pts = (sessionStats.pts || 0) + 1;      // a new verse in Bronze is one more Treasury point
-        recordStatRef('gradRefs', card.reference, 1);
+        notePts(card.reference, 1, 1);      // a new verse in Bronze is one more Treasury point
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
         isScoring = true;
         playLevelUp(1, 1, "Promoted \u2713");
@@ -3943,7 +3947,7 @@
         }
       }
 
-      if (card.group > 0) sessionStats.pts = (sessionStats.pts || 0) + (newGroup - card.group);   // Treasury points: the net change in level
+      if (card.group > 0 && newGroup !== card.group) notePts(card.reference, newGroup - card.group, newGroup);   // Treasury points: the net change in level
       if (graduated && card.group > 0) {
         sessionStats.graduated++;
         recordStatRef('gradRefs', card.reference, newGroup);
@@ -4025,13 +4029,13 @@
       if (animate) { void el.offsetWidth; el.classList.add("pop"); }
     }
 
-    // The Treasury box: points added today (+3, 0, or \u22122 after misses). Gold from +7.
+    // The Treasury box: points added today (+3, 0, or \u22122 after misses). Gold above +5.
     function fmtPts(v) { return v > 0 ? "+" + v : (v < 0 ? "\u2212" + (-v) : "0"); }
     function paintPts(v) {
       const el = document.getElementById("statGraduated");
       el.textContent = fmtPts(v);
       el.classList.toggle("neg", v < 0);
-      document.getElementById("statGradBox").classList.toggle("gold", v >= 7);
+      document.getElementById("statGradBox").classList.toggle("gold", v > 5);
     }
     function runCountUp() {
       const items = [
@@ -4057,7 +4061,7 @@
       flawlessEl.style.display = "none";
       function finish() {
         plan.forEach(function(p) { show(p.id, p.v); });
-        gold.classList.toggle("gold", (sessionStats.pts || 0) >= 7);
+        gold.classList.toggle("gold", (sessionStats.pts || 0) > 5);
         if (token === countUpToken) showFlawlessBadge(false);
       }
       (function tick() {
@@ -4072,7 +4076,7 @@
           else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); done = false; }
           show(p.id, v);
         });
-        gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 7);
+        gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) > 5);
         if (!done) setTimeout(tick, 33);
         else showFlawlessBadge(true);
       })();
@@ -4099,6 +4103,17 @@
       return failed.every(function(r) { return cleared.indexOf(typeof r === "string" ? r : r.f) >= 0; });
     }
 
+    // Treasury points: the total, and what each verse gave or took today (a verse that nets to 0 drops out of the list).
+    function notePts(ref, delta, g) {
+      sessionStats.pts = (sessionStats.pts || 0) + delta;
+      if (!Array.isArray(sessionStats.ptsRefs)) sessionStats.ptsRefs = [];
+      const list = sessionStats.ptsRefs;
+      const at = list.findIndex(function(x) { return x.f === ref; });
+      if (at < 0) { list.push({ f: ref, g: g, d: delta }); return; }
+      list[at].d += delta; list[at].g = g;
+      if (list[at].d === 0) list.splice(at, 1);
+    }
+
     function recordStatRef(key, ref, g) {
       if (!Array.isArray(sessionStats[key])) sessionStats[key] = [];
       const list = sessionStats[key];
@@ -4111,7 +4126,7 @@
 
     const STAT_LISTS = {
       fail: { key: "failedRefs", box: "statFailBox", title: "Missed", count: "failed" },
-      grad: { key: "gradRefs", box: "statGradBox", title: "Leveled Up", count: "graduated" }
+      grad: { key: "ptsRefs", box: "statGradBox", title: "Treasury", count: "pts" }
     };
     let openStatList = null;
 
@@ -4137,9 +4152,11 @@
       const items = raw.map(function(r) {
         const f = typeof r === "string" ? r : String((r && r.f) || "");
         const g = (r && typeof r === "object" && Number.isInteger(r.g)) ? Math.max(0, Math.min(8, r.g)) : null;
-        return { f: f, g: g, p: parseRef(f) };
+        return { f: f, g: g, p: parseRef(f), d: (r && typeof r === "object" && Number.isInteger(r.d)) ? r.d : 0 };
       }).filter(function(it) { return it.f; });
       items.sort(function(a, b) {
+        if (kind === "grad" && (a.d < 0) !== (b.d < 0)) return a.d < 0 ? -1 : 1;   // lost points first so they are not hidden below the scroll, then the biggest gains
+        if (kind === "grad" && a.d !== b.d) return Math.abs(b.d) - Math.abs(a.d);
         const ga = a.g === null ? -1 : a.g, gb = b.g === null ? -1 : b.g;
         return (gb - ga) || (a.p.book - b.p.book) || (a.p.chapter - b.p.chapter) || (a.p.verse - b.p.verse);
       });
@@ -4150,7 +4167,7 @@
     function updateStatLists() {
       Object.keys(STAT_LISTS).forEach(function(k) {
         const box = document.getElementById(STAT_LISTS[k].box);
-        box.classList.toggle("tappable", (sessionStats[STAT_LISTS[k].count] || 0) > 0 || statItems(k).length > 0);
+        box.classList.toggle("tappable", (k === "fail" && (sessionStats[STAT_LISTS[k].count] || 0) > 0) || statItems(k).length > 0);
         box.classList.remove("open");
       });
       document.getElementById("statFailBox").classList.toggle("cleared", allRepeatsCleared());
@@ -4201,7 +4218,7 @@
       const cfg = STAT_LISTS[kind];
       const items = statItems(kind);
       const list = document.getElementById("failList");
-      const missing = Math.max(0, (sessionStats[cfg.count] || 0) - items.length);
+      const missing = kind === "fail" ? Math.max(0, (sessionStats[cfg.count] || 0) - items.length) : 0;
       if (!items.length && !missing) return;
       Object.keys(STAT_LISTS).forEach(function(k) { document.getElementById(STAT_LISTS[k].box).classList.remove("open"); });
       if (openStatList === kind) {
@@ -4232,6 +4249,13 @@
         title.className = "fail-title";
         title.textContent = cfg.title;
         head.appendChild(title);
+        if (kind === "grad") {
+          const gain = items.reduce(function(a, it) { return a + (it.d > 0 ? it.d : 0); }, 0), loss = items.reduce(function(a, it) { return a + (it.d < 0 ? -it.d : 0); }, 0);
+          const sum = document.createElement("span");
+          sum.className = "fail-title pts-sum";
+          sum.textContent = (gain ? "+" + gain + " gained" : "") + (gain && loss ? " \u00b7 " : "") + (loss ? "\u2212" + loss + " lost" : "");
+          head.appendChild(sum);
+        }
       }
       const inner = document.createElement("div");
       inner.className = "fail-inner";
@@ -4243,6 +4267,12 @@
         name.textContent = it.f;
         row.appendChild(name);
         if (it.g !== null) row.appendChild(makePill(it.g));
+        if (kind === "grad" && it.d) {
+          const bd = document.createElement("span");
+          bd.className = "pts-badge " + (it.d > 0 ? "up" : "down");
+          bd.textContent = fmtPts(it.d);
+          row.appendChild(bd);
+        }
         // tap: quick three-word peek; hold: the full verse (same as the Verses list)
         const heldStat = attachLongPress(row, function() {
           hideVerseTip();

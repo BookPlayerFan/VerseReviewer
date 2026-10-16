@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-71'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-72'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -533,7 +533,12 @@ function learnAction(reference, action, expectedRep) {
     // Other phones notice the change through the session version, like any other review.
     const s = readState_();
     if (s && s.date === todayKey_()) {
-      if (promoted) { s.stats = sanitizeStats_(s.stats); s.stats.pts += 1; }  // a new verse in Bronze is one more Treasury point
+      if (promoted) {  // a new verse in Bronze is one more Treasury point
+        s.stats = sanitizeStats_(s.stats); s.stats.pts += 1;
+        const mine = s.stats.ptsRefs.filter(function(x) { return x.f === ref; })[0];
+        if (mine) { mine.d += 1; mine.g = 1; if (mine.d === 0) s.stats.ptsRefs.splice(s.stats.ptsRefs.indexOf(mine), 1); }
+        else s.stats.ptsRefs.push({ f: ref, g: 1, d: 1 });
+      }
       s.version++; writeState_(s);
     }
 
@@ -703,7 +708,7 @@ function activeEnd_(s) {
 }
 
 function emptyStats_() {
-  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
+  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [] };
 }
 
 function createState_(dateKey) {
@@ -993,9 +998,20 @@ function sanitizeStats_(st) {
     });
     return out;
   };
+  // ptsRefs: what the Treasury points came from, { f: reference, g: level it now sits at, d: net points from it today (never 0) }.
+  const cleanPts = function(list) {
+    const out = [], seen = Object.create(null);
+    (Array.isArray(list) ? list : []).forEach(function(r) {
+      const f = String((r && r.f) || '').slice(0, 120), d = Number(r && r.d), g = Number(r && r.g);
+      if (!f || seen[f] || out.length >= 100 || !Number.isInteger(d) || d === 0 || d < -8 || d > 8) return;
+      seen[f] = true;
+      out.push({ f: f, g: (Number.isInteger(g) && g >= 0 && g <= 8) ? g : 0, d: d });
+    });
+    return out;
+  };
   // pts: Treasury points added today (can be negative after misses): the net change in levels, +1 for each new verse promoted to Bronze.
   const pts = Number.isInteger(Number(st.pts)) ? Math.max(-999, Math.min(999, Number(st.pts))) : 0;
-  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), pts: pts, failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
+  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), pts: pts, ptsRefs: cleanPts(st.ptsRefs), failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
 }
 
 /**
