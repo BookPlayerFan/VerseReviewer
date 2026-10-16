@@ -2546,7 +2546,7 @@
       renderVlSummary(box, byKey);
     }
 
-    // One book's references as a nearly full-screen card over the map: fades in, swipe right (or Close, or tap outside it) to fade back to the map.
+    // One book's references as a nearly full-screen card over the map: fades in, swipe left (or Close, or tap outside it) to fade back to the map.
     function openBook(key) {
       hideVerseTip(); closePeek();
       const vs = vlVerses.filter(function(v) { return vlBookKey(v) === key; });
@@ -2647,7 +2647,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-206';
+    const CLIENT_BUILD = 'sync-207';
 
     let queue = [];
     let currentIndex = 0;
@@ -2727,7 +2727,7 @@
 
     window.onload = function() {
       attachSwipeBack("treasuryView", backTreasury, "left");
-      attachSwipeBack("bookView", backBook);
+      attachSwipeBack("bookView", backBook, "left");
       attachSwipeBack("upcomingView", backUpcoming, "left");
       attachSwipeBack("searchView", backSearch, "left");
       attachRevealHold();
