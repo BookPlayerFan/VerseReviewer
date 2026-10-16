@@ -341,7 +341,7 @@
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
-    .vl-tip.on-row { top: 50%; transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; }
+    .vl-tip.on-row { top: 50%; transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; padding: 3px 11px; font-size: 13px; line-height: 1.25; }
     .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.18); } /* an even glow, so it doesn't look lower than the row */
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.5); } }
     :root[data-theme="dark"] .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.5); }
@@ -1855,6 +1855,8 @@
         if (room >= 80) {
           const ver = item.querySelector(".version-badge");
           tip.classList.add("on-row");
+          // the list has a little extra room under its last row and above its first, so nudge the popup to sit evenly between the lines
+          if (!item.nextElementSibling) tip.style.top = "calc(50% + 3px)"; else if (!item.previousElementSibling) tip.style.top = "calc(50% - 1px)";
           tip.style.left = left + "px";
           tip.style.maxWidth = room + "px";
           if (ver) tip.style.minWidth = Math.min(room, ver.offsetLeft + ver.offsetWidth - left + 8) + "px"; // wide enough to hide the version tag
@@ -2142,7 +2144,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-174';
+    const CLIENT_BUILD = 'sync-175';
 
     let queue = [];
     let currentIndex = 0;
