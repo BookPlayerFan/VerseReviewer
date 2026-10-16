@@ -277,6 +277,7 @@
     .vm-tile.dim { opacity: 0.35; }
     .vm-tile.rank-0 { --rl: #8a8f94; --rd: #9aa0a6; }
     .vm-tile.empty { background: rgba(128, 128, 128, 0.1); border: 1px dashed var(--border-card); color: var(--text-meta); font-size: 10px; font-weight: 600; pointer-events: none; }
+    .vm-tile.empty.nr { pointer-events: auto; cursor: pointer; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .vm-key { --rc: var(--rd); } }
@@ -1979,7 +1980,7 @@
       if (vlRankHi !== null && !perRank[vlRankHi]) vlRankHi = null;
       const legend = document.createElement("div");
       legend.className = "vm-keys";
-      for (let g = perRank[0] ? 0 : 1; g <= 8; g++) {
+      for (let g = 1; g <= 8; g++) {
         const k = document.createElement("button");
         k.type = "button";
         k.className = "vm-key rank-" + g + (perRank[g] ? "" : " none") + (vlRankHi === g ? " on" : "");
@@ -2042,10 +2043,12 @@
             // with a rank picked in the key, books that have it light up in that rank's color and show how many verses they have at it
             const at = hi === null ? 0 : g.verses.filter(function(v) { return v.g === hi; }).reduce(function(a, v) { return a + v.n; }, 0);
             const lit = hi !== null && at > 0;
-            t.className = "vm-tile rank-" + Math.min(8, lit ? hi : g.top) + (hi !== null && !lit ? " dim" : "") + (g.key === sel ? " on" : "");
+            // a book that only has brand-new (unranked) verses gets the plain dashed look, but can still be tapped
+            t.className = g.top ? "vm-tile rank-" + Math.min(8, lit ? hi : g.top) + (hi !== null && !lit ? " dim" : "") + (g.key === sel ? " on" : "")
+              : "vm-tile empty nr" + (g.key === sel ? " on" : "");
             const ab = document.createElement("span"); ab.className = "vm-ab"; ab.textContent = b.abbr;
             const ct = document.createElement("span"); ct.className = "vm-ct"; ct.textContent = lit ? at : g.n;
-            t.appendChild(ab); t.appendChild(ct);
+            t.appendChild(ab); if (g.top) t.appendChild(ct);
             t.setAttribute("aria-label", g.name + ", " + g.n + (g.n === 1 ? " verse, highest rank " : " verses, highest rank ") + rankName(g.top));
             t.onclick = function() { vlBook = (vlBook === g.key) ? null : g.key; vlRankHi = null; hideVerseTip(); renderVerseList(); };
           } else t.textContent = b.abbr;
@@ -2119,7 +2122,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-170';
+    const CLIENT_BUILD = 'sync-171';
 
     let queue = [];
     let currentIndex = 0;
