@@ -284,24 +284,15 @@
     .vm-tile.empty .vm-ab { font-size: 10px; font-weight: 600; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .vm-key { --rc: var(--rd); } }
-    :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .vm-key { --rc: var(--rd); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile { --rc: var(--rd); } }
+    :root[data-theme="dark"] .vm-tile { --rc: var(--rd); }
     .vm-sum { padding: 14px 4px; }
     .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 14px; }
     .vm-stats { display: flex; gap: 8px; }
+    .tr-stats { margin: 0 0 8px; }
     .vm-stat { flex: 1; text-align: center; padding: 10px 4px; border: 1px solid var(--border-card); border-radius: 12px; }
     .vm-stat b { display: block; font-size: 22px; font-weight: 800; color: var(--text-primary); }
     .vm-stat span { font-size: 11px; color: var(--text-meta); }
-    .vm-keys { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 2px 0 14px; }
-    .vm-key { --rc: var(--rl); display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px 3px 5px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-      color: var(--rc); background: color-mix(in srgb, var(--rc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
-    .vm-key.rank-0 { --rl: #8a8f94; --rd: #9aa0a6; }
-    .vm-key { cursor: pointer; font-family: inherit; flex-direction: row; width: auto; min-height: 0; margin: 0; box-shadow: none; }
-    .vm-key.none { opacity: 0.4; cursor: default; }
-    .vm-key.on { background: color-mix(in srgb, var(--rc) 30%, transparent); border-color: var(--rc); box-shadow: 0 0 0 1px var(--rc); }
-    .vm-key:active { transform: none; filter: none; }
-    .vm-key .vm-ic { display: block; width: 15px; height: 15px; }
-    .vm-key .vm-ic svg { display: block; width: 100%; height: 100%; }
     .vm-head { display: flex; align-items: center; gap: 10px; padding: 12px 4px 8px; border-bottom: 1px solid var(--border-card); }
     .vm-head .vm-name { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; }
     .vm-head .vm-meta { font-size: 12px; color: var(--text-meta); }
@@ -1828,8 +1819,21 @@
       head.className = "tr-head";
       let bar = "";
       for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
-      head.innerHTML = '<div class="tr-top"><div class="tr-pts">' + pts + '<small>pts</small></div><div class="tr-counts">' + total + (total === 1 ? " reference" : " references") + '<br>' + verses + (verses === 1 ? " verse" : " verses") + '</div></div><div class="tr-bar">' + bar + '</div>';
+      head.innerHTML = '<div class="tr-top"><div class="tr-pts">' + pts + '<small>pts</small></div></div><div class="tr-bar">' + bar + '</div>';
       box.appendChild(head);
+      const books = {};
+      vlVerses.forEach(function(v) { books[vlBookKey(v)] = true; });
+      const stats = document.createElement("div");
+      stats.className = "vm-stats tr-stats";
+      [[verses, verses === 1 ? "verse" : "verses"], [total, total === 1 ? "reference" : "references"], [Object.keys(books).length, "of 66 books"]].forEach(function(p) {
+        const c = document.createElement("div");
+        c.className = "vm-stat";
+        const n = document.createElement("b"); n.textContent = p[0];
+        const l = document.createElement("span"); l.textContent = p[1];
+        c.appendChild(n); c.appendChild(l);
+        stats.appendChild(c);
+      });
+      box.appendChild(stats);
       const bodies = [], rows = [], grps = [];
       for (let g = 8; g >= 1; g--) {
         const vs = vlVerses.filter(function(v) { return v.g === g; });
@@ -1881,6 +1885,46 @@
       view.classList.remove("closing");
       view.classList.add("open");
       document.getElementById("trList").scrollTop = 0;
+    }
+    // Swipe right from the left edge to go back, like on a phone: the screen follows your finger and slides off.
+    function attachEdgeBack(id, close) {
+      const view = document.getElementById(id);
+      let x0 = 0, y0 = 0, dx = 0, on = false, locked = false;
+      view.addEventListener("touchstart", function(e) {
+        on = false; locked = false; dx = 0;
+        if (e.touches.length !== 1 || e.touches[0].clientX > 44) return;
+        x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; on = true;
+      }, { passive: true });
+      view.addEventListener("touchmove", function(e) {
+        if (!on || e.touches.length !== 1) return;
+        const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+        if (!locked) {
+          if (Math.abs(my) > 14 && Math.abs(my) > Math.abs(mx)) { on = false; return; }   // it is a scroll
+          if (mx < 10) return;
+          locked = true;
+        }
+        dx = Math.max(0, mx);
+        view.style.transition = "none";
+        view.style.transform = "translateX(" + dx + "px)";
+        if (e.cancelable) e.preventDefault();
+      }, { passive: false });
+      const end = function() {
+        if (!on) return;
+        on = false;
+        if (!locked) return;
+        locked = false;
+        const w = view.offsetWidth || 390;
+        view.style.transition = "transform 0.2s ease-out";
+        if (dx > Math.min(110, w * 0.3)) {
+          view.style.transform = "translateX(" + w + "px)";
+          setTimeout(function() { close(); view.style.transition = ""; view.style.transform = ""; }, 200);
+        } else {
+          view.style.transform = "";
+          setTimeout(function() { view.style.transition = ""; }, 200);
+        }
+      };
+      view.addEventListener("touchend", end, { passive: true });
+      view.addEventListener("touchcancel", end, { passive: true });
     }
     let trCloseTimer = null;
     // Back button: slide out, then close. Anything else (changing tab, closing the Verses tab) closes at once.
@@ -2175,42 +2219,10 @@
       i.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (clear ? '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" fill="none"/>' : (RANK_ICON[Math.min(8, g)] || "")) + "</svg>";
       return i;
     }
-    // What shows under the map before a book is tapped: the rank color key, then a few numbers about everything you have.
+    // What shows under the map before a book is tapped: the Treasury button.
     function renderVlSummary(box, byKey) {
       const wrap = document.createElement("div");
       wrap.className = "vm-sum";
-      const keys = Object.keys(byKey);
-      const perRank = {};
-      vlVerses.forEach(function(v) { const o = perRank[v.g] || (perRank[v.g] = { n: 0, books: {} }); o.n += v.n; o.books[vlBookKey(v)] = true; });
-      if (vlRankHi !== null && !perRank[vlRankHi]) vlRankHi = null;
-      const legend = document.createElement("div");
-      legend.className = "vm-keys";
-      for (let g = 1; g <= 8; g++) {
-        const k = document.createElement("button");
-        k.type = "button";
-        k.className = "vm-key rank-" + g + (perRank[g] ? "" : " none") + (vlRankHi === g ? " on" : "");
-        k.appendChild(rankIcon(g, vlRankHi === g));
-        k.appendChild(document.createTextNode(rankName(g)));
-        if (perRank[g]) k.onclick = function() { vlRankHi = (vlRankHi === g) ? null : g; renderVerseList(); };
-        legend.appendChild(k);
-      }
-      wrap.appendChild(legend);
-      // the three numbers follow the rank picked in the key (all of your verses when none is picked)
-      const pool = vlRankHi === null ? vlVerses : vlVerses.filter(function(v) { return v.g === vlRankHi; });
-      const verses = pool.reduce(function(a, v) { return a + v.n; }, 0);
-      const refs = pool.length;
-      const nBooks = vlRankHi === null ? keys.length : Object.keys(perRank[vlRankHi].books).length;
-      const stats = document.createElement("div");
-      stats.className = "vm-stats";
-      [[verses, verses === 1 ? "verse" : "verses"], [refs, refs === 1 ? "reference" : "references"], [nBooks, "of 66 books"]].forEach(function(p) {
-        const c = document.createElement("div");
-        c.className = "vm-stat";
-        const n = document.createElement("b"); n.textContent = p[0];
-        const l = document.createElement("span"); l.textContent = p[1];
-        c.appendChild(n); c.appendChild(l);
-        stats.appendChild(c);
-      });
-      wrap.appendChild(stats);
       wrap.appendChild(treasuryButton());
       box.appendChild(wrap);
     }
@@ -2309,7 +2321,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-192';
+    const CLIENT_BUILD = 'sync-193';
 
     let queue = [];
     let currentIndex = 0;
@@ -2388,6 +2400,9 @@
     });
 
     window.onload = function() {
+      attachEdgeBack("treasuryView", closeTreasury);
+      attachEdgeBack("searchView", closeSearch);
+      attachEdgeBack("upcomingView", closeUpcoming);
       attachRevealHold();
       attachSwipe();
       attachRefHold();
