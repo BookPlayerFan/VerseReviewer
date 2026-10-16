@@ -260,16 +260,37 @@
     }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
-    .vl-row:active, .vl-pill:active, .vl-strip:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
-    .vl-row, .vl-pill, .vl-strip, .picker-close { transition: none; }
+    .vl-row:active, .vl-strip:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
+    .vl-row, .vl-strip, .picker-close { transition: none; }
     .vl-row .chev { transition: transform 0.15s ease; }
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
-    /* Old / New Testament filter buttons in the header: tap one to show only that testament, tap again for everything. */
-    .vl-pills { display: inline-flex; gap: 6px; }
-    .vl-pills.off { opacity: 0.35; pointer-events: none; }
-    .vl-pill { background: transparent; border: 1px solid var(--border-card); box-shadow: none; min-height: 0; width: auto;
-      padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text-muted); flex-direction: row; }
-    .vl-pill.on { background: var(--badge-pass-bg, rgba(26,115,232,0.12)); border-color: var(--text-accent, #1a73e8); color: var(--text-accent, #1a73e8); }
+    /* Book map on the Verse List: a tile for each book, colored by the highest rank in it; tap one to list its verses below. */
+    .vl-map { flex: none; margin: 4px 0 2px; }
+    .vm-sect { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 7px 2px 4px; }
+    .vm-sect:first-child { margin-top: 2px; }
+    .vm-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+    .vm-tile { aspect-ratio: 1; min-height: 0; width: auto; padding: 0; border-radius: 7px; border: 0; box-shadow: none; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; font-size: 9px; font-weight: 700; line-height: 1.05; color: #fff; background: var(--rl); letter-spacing: 0; }
+    .vm-tile small { font-size: 8px; font-weight: 600; opacity: 0.9; }
+    .vm-tile.rank-0 { --rl: #8a8f94; --rd: #9aa0a6; }
+    .vm-tile.empty { background: rgba(128, 128, 128, 0.1); border: 1px dashed var(--border-card); color: var(--text-meta); font-weight: 600; pointer-events: none; }
+    .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
+    .vm-tile:active { transform: none; filter: none; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile:not(.empty) { background: var(--rd); color: #11151a; } }
+    :root[data-theme="dark"] .vm-tile:not(.empty) { background: var(--rd); color: #11151a; }
+    .vm-sum { padding: 14px 4px; }
+    .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .vm-stats { display: flex; gap: 8px; }
+    .vm-stat { flex: 1; text-align: center; padding: 10px 4px; border: 1px solid var(--border-card); border-radius: 12px; }
+    .vm-stat b { display: block; font-size: 22px; font-weight: 800; color: var(--text-primary); }
+    .vm-stat span { font-size: 11px; color: var(--text-meta); }
+    .vm-most { text-align: center; font-size: 13px; color: var(--text-muted); margin: 12px 0 4px; }
+    .vm-ranks { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: center; margin-top: 12px; }
+    .vm-rank { display: inline-flex; align-items: center; gap: 6px; }
+    .vm-rank b { font-size: 14px; color: var(--text-primary); }
+    .vm-head { display: flex; align-items: center; gap: 10px; padding: 12px 4px 8px; border-bottom: 1px solid var(--border-card); }
+    .vm-head .vm-name { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; }
+    .vm-head .vm-meta { font-size: 12px; color: var(--text-meta); }
     /* The Treasury strip: total points and a bar of how many verses sit at each rank. Tapping it switches the list to the rank view. */
     .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 4px; padding: 10px 14px; border-radius: 12px; min-height: 0;
       flex-direction: row; box-shadow: none; text-align: left; color: var(--text-primary); border: 1px solid var(--border-card); background: var(--bg-card); }
@@ -1092,15 +1113,12 @@
         <span class="picker-title" id="vlTitle">Verse List</span>
         <span class="vl-total" id="vlTotal"></span>
       </div>
-      <span class="vl-pills" id="vlPills">
-        <button type="button" class="vl-pill" id="vlPillOld" onclick="setVlTest('old')">OT</button>
-        <button type="button" class="vl-pill" id="vlPillNew" onclick="setVlTest('new')">NT</button>
-      </span>
       <button type="button" class="vl-iconbtn" id="vlSearchBtn" onclick="toggleVlSearch()" aria-label="Search verses"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
     <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
     <button type="button" class="vl-strip" id="vlStrip" style="display:none" onclick="toggleVlRank()"></button>
+    <div class="vl-map" id="vlMap" style="display:none"></div>
     <div class="picker-list" id="vlList"></div>
   </div>
 
@@ -1493,7 +1511,7 @@
 
     let vlVerses = [];
     let vlSort = "book";
-    let vlTest = "all"; // Book view filter: all, old (Genesis to Malachi) or new (Matthew to Revelation); always starts at all
+    let vlBook = null;  // the book showing under the map: its index in the Bible, or "x:Name" for a custom name
     let vlOpen = {};
 
 
@@ -1599,7 +1617,7 @@
       document.getElementById("vlTotal").textContent = "";
       vlListNote("Loading…");
       vlSort = "book";
-      vlTest = "all";
+      vlBook = null;
       vlOpen = {};
       updateVlControls();
       loadVlVerses(renderVerseList, function() { vlListNote("Couldn't load."); });
@@ -1617,7 +1635,6 @@
 
     function closeVerseList() {
       hideVerseTip();
-      vlTest = "all";
       resetVlSearch();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
@@ -1631,19 +1648,7 @@
       renderVerseList();
     }
 
-    // OT / NT buttons: tap one to show only that testament, tap it again to show everything (Book list only).
-    function setVlTest(t) {
-      vlTest = vlTest === t ? "all" : t;
-      vlOpen = {};
-      updateVlControls();
-      renderVerseList();
-    }
-
     function updateVlControls() {
-      const searching = vlQuery.trim() !== "";
-      document.getElementById("vlPillOld").classList.toggle("on", vlTest === "old");
-      document.getElementById("vlPillNew").classList.toggle("on", vlTest === "new");
-      document.getElementById("vlPills").classList.toggle("off", vlSort !== "book" || searching);
       const strip = document.getElementById("vlStrip");
       strip.classList.toggle("on", vlSort === "rank");
       strip.setAttribute("aria-pressed", vlSort === "rank" ? "true" : "false");
@@ -1703,6 +1708,36 @@
       document.getElementById("upcomingView").classList.remove("open");
     }
 
+    // One verse row (reference, version badge if not ESV, rank pill): tap for its first words, hold for the whole verse.
+    function vlItem(v, showPills) {
+      const item = document.createElement("div");
+      item.className = "vl-verse";
+      const left = document.createElement("span");
+      left.className = "vl-ref";
+      const t = document.createElement("span");
+      t.textContent = v.f;
+      left.appendChild(t);
+      const ver = (v.v || "").trim();
+      if (ver && ver.toUpperCase() !== "ESV") {
+        const vb = document.createElement("span");
+        vb.className = "version-badge";
+        vb.textContent = ver;
+        left.appendChild(vb);
+      }
+      item.appendChild(left);
+      if (showPills) item.appendChild(makePill(v.g));
+      const heldRow = attachLongPress(item, function() {
+        hideVerseTip();
+        showPreview({ f: v.f, v: v.v, t: v.t || v.x }, true);
+      });
+      item.onclick = function(ev) {
+        ev.stopPropagation();
+        if (heldRow()) return; // the hold already opened the full verse
+        showVerseTip(item, v.w);
+      };
+      return item;
+    }
+
     function vlGroup(key, label, count, verses, showPills, into, bar) {
       const box = into || document.getElementById("vlList");
       const row = document.createElement("button");
@@ -1737,34 +1772,7 @@
       const list = document.createElement("div");
       list.className = "vl-verses";
       list.style.display = vlOpen[key] ? "block" : "none";
-      verses.forEach(function(v) {
-        const item = document.createElement("div");
-        item.className = "vl-verse";
-        const left = document.createElement("span");
-        left.className = "vl-ref";
-        const t = document.createElement("span");
-        t.textContent = v.f;
-        left.appendChild(t);
-        const ver = (v.v || "").trim();
-        if (ver && ver.toUpperCase() !== "ESV") {
-          const vb = document.createElement("span");
-          vb.className = "version-badge";
-          vb.textContent = ver;
-          left.appendChild(vb);
-        }
-        item.appendChild(left);
-        if (showPills) item.appendChild(makePill(v.g));
-        const heldRow = attachLongPress(item, function() {
-          hideVerseTip();
-          showPreview({ f: v.f, v: v.v, t: v.t || v.x }, true);
-        });
-        item.onclick = function(ev) {
-          ev.stopPropagation();
-          if (heldRow()) return; // the hold already opened the full verse
-          showVerseTip(item, v.w);
-        };
-        list.appendChild(item);
-      });
+      verses.forEach(function(v) { list.appendChild(vlItem(v, showPills)); });
       if (count) box.appendChild(list);
       row.onclick = function() {
         if (!count) return;
@@ -1851,7 +1859,7 @@
       if (row) row.style.display = "none";
       const btn = document.getElementById("vlSearchBtn");
       if (btn) btn.classList.remove("on");
-      if (document.getElementById("vlPills")) { updateVlControls(); renderVlStrip(); }
+      if (document.getElementById("vlStrip")) { updateVlControls(); renderVlStrip(); }
     }
     function onVlSearch() {
       vlQuery = document.getElementById("vlSearch").value;
@@ -1937,24 +1945,137 @@
       return true;
     }
 
+    // Short names for the book tiles, in the same order as BIBLE_BOOKS.
+    const BOOK_ABBR = ("Gen Exo Lev Num Deu Jos Jdg Rut 1Sa 2Sa 1Ki 2Ki 1Ch 2Ch Ezr Neh Est Job Psa Pro Ecc Sng Isa Jer Lam Eze Dan Hos Joe Amo Oba Jon Mic Nah Hab Zep Hag Zec Mal " +
+      "Mat Mrk Luk Joh Act Rom 1Co 2Co Gal Eph Php Col 1Th 2Th 1Ti 2Ti Tit Phm Heb Jas 1Pe 2Pe 1Jn 2Jn 3Jn Jud Rev").split(" ");
+    function vlBookKey(v) { return v.p.book === 999 ? "x:" + v.p.name : v.p.book; }
+    // What shows under the map before a book is tapped: a few numbers about everything you have, and how the verses sit across the ranks.
+    function renderVlSummary(box, byKey) {
+      const wrap = document.createElement("div");
+      wrap.className = "vm-sum";
+      const hint = document.createElement("div");
+      hint.className = "vm-hint";
+      hint.textContent = "Tap a book to see its verses";
+      wrap.appendChild(hint);
+      const keys = Object.keys(byKey);
+      const verses = vlVerses.reduce(function(a, v) { return a + v.n; }, 0);
+      const dueToday = vlVerses.filter(function(v) { return v.g > 0 && v.d === 0; }).length;
+      let big = null;
+      keys.forEach(function(k) { if (!big || byKey[k].n > big.n) big = byKey[k]; });
+      const stats = document.createElement("div");
+      stats.className = "vm-stats";
+      [[verses, verses === 1 ? "verse" : "verses"], [keys.length, "of 66 books"], [dueToday, "due today"]].forEach(function(p) {
+        const c = document.createElement("div");
+        c.className = "vm-stat";
+        const n = document.createElement("b"); n.textContent = p[0];
+        const l = document.createElement("span"); l.textContent = p[1];
+        c.appendChild(n); c.appendChild(l);
+        stats.appendChild(c);
+      });
+      wrap.appendChild(stats);
+      if (big) {
+        const m = document.createElement("div");
+        m.className = "vm-most";
+        m.textContent = "Most verses: " + big.name + " (" + big.n + ")";
+        wrap.appendChild(m);
+      }
+      const ranks = document.createElement("div");
+      ranks.className = "vm-ranks";
+      for (let g = 8; g >= 0; g--) {
+        const c = vlVerses.filter(function(v) { return v.g === g; }).length;
+        if (!c) continue;
+        const r = document.createElement("span");
+        r.className = "vm-rank";
+        r.appendChild(makePill(g));
+        const n = document.createElement("b"); n.textContent = c;
+        r.appendChild(n);
+        ranks.appendChild(r);
+      }
+      wrap.appendChild(ranks);
+      box.appendChild(wrap);
+    }
+
+    // The book map and, under it, the verses of the selected book.
+    function renderVlBooks(map, box) {
+      const byKey = {};
+      vlVerses.forEach(function(v) {
+        const k = vlBookKey(v);
+        const g = byKey[k] || (byKey[k] = { key: k, name: v.p.name, verses: [], top: 0, n: 0 });
+        g.verses.push(v);
+        g.n += v.n;
+        if (v.g > g.top) g.top = v.g;
+      });
+      // nothing is selected when the list opens; tap a book to see its verses, tap it again to go back to the summary
+      let sel = vlBook;
+      if (sel === null || !byKey[sel]) sel = vlBook = null;
+      map.textContent = "";
+      const section = function(title, books) {
+        const h = document.createElement("div");
+        h.className = "vm-sect";
+        h.textContent = title;
+        map.appendChild(h);
+        const grid = document.createElement("div");
+        grid.className = "vm-grid";
+        books.forEach(function(b) {
+          const g = byKey[b.key];
+          const t = document.createElement(g ? "button" : "div");
+          if (g) t.type = "button";
+          t.className = "vm-tile" + (g ? " rank-" + Math.min(8, g.top) : " empty") + (g && g.key === sel ? " on" : "");
+          t.textContent = b.abbr;
+          if (g) {
+            const c = document.createElement("small");
+            c.textContent = g.n;
+            t.appendChild(c);
+            t.setAttribute("aria-label", g.name + ", " + g.n + (g.n === 1 ? " verse, highest rank " : " verses, highest rank ") + rankName(g.top));
+            t.onclick = function() { vlBook = (vlBook === g.key) ? null : g.key; hideVerseTip(); renderVerseList(); };
+          }
+          grid.appendChild(t);
+        });
+        map.appendChild(grid);
+      };
+      const ot = [], nt = [], other = [];
+      BIBLE_BOOKS.forEach(function(b, i) { (i < 39 ? ot : nt).push({ key: i, abbr: BOOK_ABBR[i] }); });
+      Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3) }); });
+      section("Old Testament", ot);
+      section("New Testament", nt);
+      if (other.length) section("Other", other);
+
+      box.textContent = "";
+      const g = sel === null ? null : byKey[sel];
+      if (!g) { renderVlSummary(box, byKey); return; }
+      const head = document.createElement("div");
+      head.className = "vm-head";
+      const nm = document.createElement("span");
+      nm.className = "vm-name";
+      nm.textContent = g.name;
+      const meta = document.createElement("span");
+      meta.className = "vm-meta";
+      meta.textContent = g.n + (g.n === 1 ? " verse" : " verses");
+      head.appendChild(nm);
+      head.appendChild(meta);
+      head.appendChild(makePill(g.top));
+      box.appendChild(head);
+      const list = document.createElement("div");
+      list.className = "vl-verses";
+      g.verses.forEach(function(v) { list.appendChild(vlItem(v, true)); });
+      box.appendChild(list);
+      box.scrollTop = 0;
+    }
+
     function renderVerseList() {
       hideVerseTip();
       const box = document.getElementById("vlList");
+      const map = document.getElementById("vlMap");
       box.textContent = "";
+      map.style.display = "none";
       updateVlControls();
       renderVlStrip();
       if (vlQuery.trim() && renderVlSearch(box)) return;
       document.getElementById("vlTotal").textContent = "";
-      // The OT / NT buttons filter the Book list only (the Rank list always covers everything).
-      const shown = (vlSort === "book" && vlTest !== "all")
-        ? vlVerses.filter(function(v) { return vlTest === "old" ? (v.p.book < 39) : (v.p.book >= 39 && v.p.book < 999); })
-        : vlVerses;
-      const refCount = shown.length;
-      const verseTotal = shown.reduce(function(sum, v) { return sum + v.n; }, 0);
-      if (refCount === 0) {
+      if (vlVerses.length === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
-        e.textContent = vlTest === "old" && vlSort === "book" ? "No Old Testament verses yet" : vlTest === "new" && vlSort === "book" ? "No New Testament verses yet" : "No verses yet";
+        e.textContent = "No verses yet";
         box.appendChild(e);
         return;
       }
@@ -1964,43 +2085,22 @@
           if (g === 0 && vs.length === 0) continue;
           vlGroup("g" + g, makePill(g), vs.length, vs, false);
         }
-      } else {
-        // Books in Bible order under an Old Testament / New Testament heading (anything else, such as a custom name, goes last).
-        const sections = [["Old Testament", []], ["New Testament", []], ["Other", []]];
-        const byKey = {};
-        shown.forEach(function(v) {
-          const k = v.p.book === 999 ? "x:" + v.p.name : "b:" + v.p.book;
-          if (!byKey[k]) {
-            byKey[k] = { name: v.p.name, verses: [] };
-            sections[v.p.book < 39 ? 0 : v.p.book < 999 ? 1 : 2][1].push(byKey[k]);
-          }
-          byKey[k].verses.push(v);
-        });
-        let first = true;
-        sections.forEach(function(sec) {
-          if (!sec[1].length) return;
-          const total = sec[1].reduce(function(sum, gr) { return sum + gr.verses.reduce(function(s2, v) { return s2 + v.n; }, 0); }, 0);
-          const head = document.createElement("div");
-          head.className = "vl-sect" + (first ? " first" : "");
-          first = false;
-          const t = document.createElement("b"); t.textContent = sec[0];
-          const n = document.createElement("span"); n.textContent = total + (total === 1 ? " verse" : " verses");
-          head.appendChild(t); head.appendChild(n);
-          box.appendChild(head);
-          sec[1].forEach(function(gr) { vlGroup("k" + gr.name, gr.name, gr.verses.length, gr.verses, true); });
-        });
+        const verseTotal = vlVerses.reduce(function(sum, v) { return sum + v.n; }, 0);
+        const foot = document.createElement("div");
+        foot.className = "vl-foot";
+        foot.textContent = verseTotal + (verseTotal === 1 ? " verse" : " verses") + " · " + vlVerses.length + (vlVerses.length === 1 ? " reference" : " references");
+        box.appendChild(foot);
+        return;
       }
-      const foot = document.createElement("div");
-      foot.className = "vl-foot";
-      foot.textContent = verseTotal + (verseTotal === 1 ? " verse" : " verses") + " · " + refCount + (refCount === 1 ? " reference" : " references");
-      box.appendChild(foot);
+      map.style.display = "";
+      renderVlBooks(map, box);
     }
 
     const RESTART_LABEL = "Try again";
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-167';
+    const CLIENT_BUILD = 'sync-168';
 
     let queue = [];
     let currentIndex = 0;
