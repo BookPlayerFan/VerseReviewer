@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-72'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-73'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1883,6 +1883,49 @@ function installDailyPush() {
 function testPush() {
   const r = osSend_('Test Notification', 'Push is working.', 0, 'vr-test');
   console.log('ok=' + r.ok + ' code=' + r.code + ' ' + r.text);
+}
+
+// Run from the editor: writes a "Schedule" tab showing, for each of the next 60 days, how many verses are due (and how many of each rank),
+// plus their load (word count based, the number the balancing uses). Read-only: it changes nothing in the Verses tab.
+function scheduleReport() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Verses');
+  if (!sheet) return;
+  const today = today_();
+  const last = sheet.getLastRow();
+  const vals = last >= 2 ? sheet.getRange(2, 2, last - 1, 7).getValues() : []; // B..H
+  const days = {}, later = { n: 0, load: 0 };
+  const HORIZON = 60;
+  const names = [];
+  for (let g = 1; g <= MAX_GROUP; g++) names.push(GROUP_CONFIG[g].name);
+  let overdue = 0;
+  vals.forEach(function(r) {
+    const g = Number(r[3]);
+    if (!(g >= 1 && g <= MAX_GROUP)) return;
+    const d = toMidnight_(r[0]);
+    if (!d) return;
+    const k = Math.round((d.getTime() - today.getTime()) / 86400000);
+    if (k < 0) { overdue++; return; }
+    const ld = verseLoad_(r[6]);
+    if (k > HORIZON) { later.n++; later.load += ld; return; }
+    const e = days[k] || (days[k] = { n: 0, load: 0, by: {} });
+    e.n++; e.load += ld; e.by[g] = (e.by[g] || 0) + 1;
+  });
+  let out = ss.getSheetByName('Schedule');
+  if (!out) out = ss.insertSheet('Schedule'); else out.clear();
+  const rows = [['Date', 'Day', 'Due', 'Load'].concat(names)];
+  const tz = Session.getScriptTimeZone();
+  for (let k = 0; k <= HORIZON; k++) {
+    const e = days[k] || { n: 0, load: 0, by: {} };
+    const dt = new Date(today.getTime()); dt.setDate(dt.getDate() + k);
+    const row = [Utilities.formatDate(dt, tz, 'yyyy-MM-dd'), Utilities.formatDate(dt, tz, 'EEE'), e.n, Math.round(e.load * 10) / 10];
+    for (let g = 1; g <= MAX_GROUP; g++) row.push(e.by[g] || '');
+    rows.push(row);
+  }
+  rows.push(['Later than ' + HORIZON + ' days', '', later.n, Math.round(later.load * 10) / 10].concat(names.map(function() { return ''; })));
+  if (overdue) rows.push(['Overdue (already past due)', '', overdue, ''].concat(names.map(function() { return ''; })));
+  out.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+  try { out.setFrozenRows(1); } catch (e) {}
 }
 
 // Called by the app (Verse List title -> "Send test notification").
