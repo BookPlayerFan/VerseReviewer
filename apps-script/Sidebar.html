@@ -372,8 +372,11 @@
     #treasuryView.open { animation: trIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
     #treasuryView.closing { animation: trOut 0.2s ease-in forwards; }
     /* a book opens as a nearly full-screen card that fades in right over the map, and fades back out to it */
-    #bookView.open { animation: bkIn 0.2s ease-out; }
-    #bookView.closing { animation: bkOut 0.16s ease-in forwards; }
+    #bookView.open, #upcomingView.open { animation: bkIn 0.2s ease-out; }
+    #bookView.closing, #upcomingView.closing { animation: bkOut 0.16s ease-in forwards; }
+    #searchView.open { animation: pkFade 0.18s ease-out; }
+    #searchView.closing { animation: skOut 0.15s ease-in forwards; }
+    @keyframes skOut { from { opacity: 1; } to { opacity: 0; } }
     @keyframes bkIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
     @keyframes bkOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.97); } }
     .bk-dim { position: fixed; left: 0; right: 0; top: 0; bottom: var(--tab-h); z-index: 41; background: rgba(0, 0, 0, 0.34); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
@@ -396,6 +399,10 @@
     .vl-row .load-bar { width: 74px; height: 8px; border-radius: 4px; background: rgba(128, 128, 128, 0.16); overflow: hidden; flex: none; }
     .vl-row .load-bar i { display: block; height: 100%; border-radius: 4px; background: var(--text-accent); opacity: 0.55; }
     .vl-row .load-bar.busy i { background: var(--text-repeat); opacity: 0.9; }
+    .vl-row .sk-bar, .vl-row .sk-n { display: block; flex: none; border-radius: 4px; background: rgba(128, 128, 128, 0.16); animation: skPulse 1.1s ease-in-out infinite; }
+    .vl-row .sk-bar { width: 74px; height: 8px; }
+    .vl-row .sk-n { width: 16px; height: 12px; }
+    @keyframes skPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
     .vl-row.zero .vl-count { color: var(--text-meta); font-weight: 500; }
     .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
     .vl-row.open .chev { transform: rotate(90deg); }
@@ -964,7 +971,7 @@
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
     #upcomingView, #treasuryView, #bookView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
-    #bookView { inset: calc(max(14px, env(safe-area-inset-top)) + 22px) 10px calc(var(--tab-h) + 10px) 10px; padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
+    #bookView, #upcomingView { inset: calc(max(14px, env(safe-area-inset-top)) + 22px) 10px calc(var(--tab-h) + 10px) 10px; padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
     #bookView .vl-titleblock { flex: 1; min-width: 0; }
     #bookView .vl-total { display: block; margin: 1px 0 0; }
     #searchView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; overflow-x: hidden; }
@@ -1222,7 +1229,7 @@
   </div>
 
   <div class="picker" id="searchView">
-    <div class="vl-searchbar"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="onVlSearch()"><button type="button" class="vl-cancel" onclick="closeSearch()">Cancel</button></div>
+    <div class="vl-searchbar"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="onVlSearch()"><button type="button" class="vl-cancel" onclick="backSearch()">Cancel</button></div>
     <span class="vl-total" id="vlTotal"></span>
     <div class="picker-list" id="svList"></div>
   </div>
@@ -1230,7 +1237,7 @@
   <div class="picker" id="upcomingView">
     <div class="picker-head">
       <span class="picker-title">Upcoming reviews</span>
-      <button type="button" class="picker-close" onclick="closeUpcoming()">Back</button>
+      <button type="button" class="picker-close" onclick="backUpcoming()">Close</button>
     </div>
     <div class="picker-list" id="upList"></div>
   </div>
@@ -1243,7 +1250,7 @@
     <div class="picker-list" id="trList"></div>
   </div>
 
-  <div class="bk-dim" id="bookDim" onclick="backBook()"></div>
+  <div class="bk-dim" id="bookDim" onclick="tapCardDim()"></div>
   <div class="picker" id="bookView">
     <div class="picker-head">
       <div class="vl-titleblock">
@@ -1810,8 +1817,9 @@
     }
 
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
-    function renderUpcoming() {
+    function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
+      const keepTop = box.scrollTop;
       box.textContent = "";
       const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -1828,24 +1836,61 @@
         dt.setDate(dt.getDate() + d);
         let label = DOW[dt.getDay()] + ", " + MON[dt.getMonth()] + " " + dt.getDate();
         if (d === 0) label = "Today · " + label; else if (d === 1) label = "Tomorrow · " + label;
+        if (placeholder) {
+          vlGroup("d" + d, label, 0, [], true, box, null);
+          const row = box.lastChild;
+          row.classList.remove("zero");
+          const right = row.querySelector(".vl-right");
+          row.querySelector(".vl-count").remove();
+          const bar = document.createElement("span"); bar.className = "sk-bar"; bar.setAttribute("aria-hidden", "true");
+          const n = document.createElement("span"); n.className = "sk-n"; n.setAttribute("aria-hidden", "true");
+          right.insertBefore(n, right.firstChild); right.insertBefore(bar, right.firstChild);
+          continue;
+        }
         const vs = vlVerses.filter(function(v) { return v.d === d; });
         vlGroup("d" + d, label, vs.length, vs, true, box, { load: loads[d], max: maxLoad, busy: busy[d] });
       }
+      box.scrollTop = keepTop;
     }
+    // The days and their dates show at once; the counts and bars fill in when the numbers arrive (shown straight away if they were loaded already).
     function openUpcoming() {
       hideVerseTip();
-      const box = document.getElementById("upList");
-      box.textContent = "";
-      const e = document.createElement("div");
-      e.className = "picker-empty";
-      e.textContent = "Loading…";
-      box.appendChild(e);
-      document.getElementById("upcomingView").classList.add("open");
-      loadVlVerses(renderUpcoming, function() { e.textContent = "Couldn't load."; });
+      const view = document.getElementById("upcomingView");
+      clearTimeout(upCloseTimer);
+      view.classList.remove("closing");
+      view.classList.add("open");
+      document.getElementById("bookDim").classList.add("on");
+      const have = vlVerses.length > 0;
+      renderUpcoming(!have);
+      loadVlVerses(function() { renderUpcoming(false); }, function() {
+        if (have) return;
+        const box = document.getElementById("upList");
+        box.textContent = "";
+        const e = document.createElement("div");
+        e.className = "picker-empty";
+        e.textContent = "Couldn't load.";
+        box.appendChild(e);
+      });
+    }
+    let upCloseTimer = null;
+    function backUpcoming() {
+      const view = document.getElementById("upcomingView");
+      if (!view.classList.contains("open") || view.classList.contains("closing")) return;
+      view.classList.add("closing");
+      document.getElementById("bookDim").classList.remove("on");
+      upCloseTimer = setTimeout(closeUpcoming, 170);
     }
     function closeUpcoming() {
       hideVerseTip();
-      document.getElementById("upcomingView").classList.remove("open");
+      clearTimeout(upCloseTimer);
+      const view = document.getElementById("upcomingView");
+      view.classList.remove("closing");
+      view.classList.remove("open");
+      document.getElementById("bookDim").classList.remove("on");
+    }
+    // Tapping the dimmed area behind a card closes whichever card is open.
+    function tapCardDim() {
+      if (document.getElementById("upcomingView").classList.contains("open")) backUpcoming(); else backBook();
     }
 
     // ── Treasury: every rank with its references; a rank opens in place on this screen ──
@@ -2142,10 +2187,20 @@
         setTimeout(function() { ["touchend", "pointerup", "click"].forEach(function(t) { document.removeEventListener(t, again, true); }); }, 4000);
       }
     }
+    // Cancel: a quick fade back to the Verses page.
+    let skCloseTimer = null;
+    function backSearch() {
+      const view = document.getElementById("searchView");
+      if (!view.classList.contains("open") || view.classList.contains("closing")) return;
+      view.classList.add("closing");
+      document.getElementById("vlSearch").blur();
+      skCloseTimer = setTimeout(closeSearch, 150);
+    }
     function closeSearch() {
+      clearTimeout(skCloseTimer);
       const view = document.getElementById("searchView");
       if (!view.classList.contains("open")) return;
-      view.classList.remove("open");
+      view.classList.remove("open"); view.classList.remove("closing");
       const input = document.getElementById("vlSearch");
       input.blur(); input.value = ""; vlQuery = "";
     }
@@ -2452,7 +2507,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-200';
+    const CLIENT_BUILD = 'sync-201';
 
     let queue = [];
     let currentIndex = 0;
@@ -2533,8 +2588,7 @@
     window.onload = function() {
       attachSwipeBack("treasuryView", backTreasury);
       attachSwipeBack("bookView", backBook);
-      attachSwipeBack("searchView", closeSearch);
-      attachSwipeBack("upcomingView", closeUpcoming);
+      attachSwipeBack("upcomingView", backUpcoming);
       attachRevealHold();
       attachSwipe();
       attachRefHold();
