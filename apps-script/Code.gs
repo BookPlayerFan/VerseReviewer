@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-63'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-64'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1751,6 +1751,20 @@ function dailyPush() {
   const go = due > 0 ? 'review' : 'new';
   const r = osSend_(words.title, words.text, 0, 'vr-daily', go);
   if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
+}
+
+// Run from the editor when a morning notification did not arrive. It adds a few "status" rows to the Push Log tab: whether the daily
+// trigger exists, the time zone it follows, whether today's push was already sent, and whether anything was waiting to send.
+function pushStatus() {
+  const props = PropertiesService.getScriptProperties();
+  const trig = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; });
+  pushLog_('status: trigger', 'dailyPush', 0, trig.length === 1, trig.length + ' daily trigger(s)' + (trig.length ? ' (' + trig[0].getEventType() + ')' : ' - run installDailyPush()'));
+  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The 6 AM trigger fires between 6:00 and 6:15 in THIS zone.');
+  pushLog_('status: today', '', 0, null, 'last daily push marked ' + (props.getProperty(PUSH_DAILY_KEY) || 'never') + ', today is ' + todayKey_());
+  pushLog_('status: key', 'ONESIGNAL_KEY', 0, !!props.getProperty('ONESIGNAL_KEY'), props.getProperty('ONESIGNAL_KEY') ? 'set' : 'NOT set');
+  const due = getDueCards(false).length;
+  const nc = newCardCounts_(readSheetData_(), nowMs_());
+  pushLog_('status: waiting', '', 0, null, due + ' due, ' + nc.learnRefs.length + ' learn, ' + nc.lockRefs.length + ' lock' + (pushWords_(due, nc.learnRefs, nc.lockRefs) ? '' : ' (nothing waiting, so no push is sent)'));
 }
 
 // Run once from the editor (run it again after updating to this version so the trigger moves to about 6:00 AM).
