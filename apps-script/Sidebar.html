@@ -938,13 +938,14 @@
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
     #upcomingView, #treasuryView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
-    .vl-search { margin: 0 0 2px; }
+    #searchView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; overflow-x: hidden; }
     .vl-searchbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .vl-searchbar .picker-search { flex: 1; min-width: 0; margin-bottom: 0; }
     .vl-cancel { flex: none; min-height: 0; width: auto; margin: 0; padding: 6px 2px; background: none; border: 0; box-shadow: none; font-size: 15px; font-weight: 600; color: var(--text-accent, #1a73e8); }
     .vl-cancel:active { transform: none; filter: none; }
-    .vl-search .vl-total { display: block; margin: 0 2px 8px; }
-    .vl-search .vl-total:empty { display: none; }
+    #searchView .vl-total { display: block; margin: 0 2px 8px; }
+    #searchView .vl-total:empty { display: none; }
+    #searchView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.hit { flex-wrap: wrap; }
     .vl-snip { flex-basis: 100%; margin-top: 3px; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
     .vl-snip.full { color: var(--text-primary); }
@@ -1185,12 +1186,14 @@
   </div>
 
   <div class="picker" id="verseListView">
-    <div class="vl-search" id="vlSearchRow" style="display:none">
-      <div class="vl-searchbar"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"><button type="button" class="vl-cancel" onclick="toggleVlSearch()">Cancel</button></div>
-      <span class="vl-total" id="vlTotal"></span>
-    </div>
     <div class="vl-map" id="vlMap" style="display:none"></div>
     <div class="picker-list" id="vlList"></div>
+  </div>
+
+  <div class="picker" id="searchView">
+    <div class="vl-searchbar"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="onVlSearch()"><button type="button" class="vl-cancel" onclick="closeSearch()">Cancel</button></div>
+    <span class="vl-total" id="vlTotal"></span>
+    <div class="picker-list" id="svList"></div>
   </div>
 
   <div class="picker" id="upcomingView">
@@ -1618,6 +1621,7 @@
     function goTab(t) {
       closeUpcoming();
       closeTreasury();
+      closeSearch();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       if (t === "verses") {
         if (!listOpen) openVerseList();
@@ -1718,9 +1722,7 @@
 
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
-      resetVlSearch();
       updateTabs();
-      document.getElementById("vlTotal").textContent = "";
       vlListNote("Loading…");
       vlSort = "book";
       vlBook = null; vlRankHi = null;
@@ -1742,7 +1744,6 @@
     function closeVerseList() {
       hideVerseTip();
       closeTreasury();
-      resetVlSearch();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
     }
@@ -2040,36 +2041,45 @@
     // ── Verse List search ──
     let vlQuery = "";
     function vlNorm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
-    // Hold the Verses tab: open the Verses tab if needed and start a search.
-    function openVlSearch() {
-      if (!document.getElementById("verseListView").classList.contains("open")) goTab("verses");
-      const row = document.getElementById("vlSearchRow");
-      if (row.style.display === "none") toggleVlSearch(); else document.getElementById("vlSearch").focus();
-    }
-    function toggleVlSearch() {
-      const row = document.getElementById("vlSearchRow");
-      const input = document.getElementById("vlSearch");
-      const open = row.style.display === "none";
-      if (open) {
-        row.style.display = "";
-        input.focus();
-        updateVlControls();
-      } else {
-        resetVlSearch();
-        renderVerseList();
+    // Search is its own screen. Hold the Verses tab (from any tab) to open it with the keyboard up.
+    function openSearch(fromHold) {
+      hideVerseTip();
+      const view = document.getElementById("searchView"), input = document.getElementById("vlSearch");
+      const was = view.classList.contains("open");
+      view.classList.add("open");
+      if (!was) {
+        vlQuery = ""; input.value = "";
+        renderSearch();
+        loadVlVerses(function() { if (view.classList.contains("open")) renderSearch(); }, function() {});
+      }
+      input.focus();
+      // The hold fires from a timer, which iOS does not count as a tap; focus again on the touch that ends the hold, which it does.
+      if (fromHold) {
+        const again = function() { input.focus(); ["touchend", "pointerup", "click"].forEach(function(t) { document.removeEventListener(t, again, true); }); };
+        ["touchend", "pointerup", "click"].forEach(function(t) { document.addEventListener(t, again, true); });
+        setTimeout(function() { ["touchend", "pointerup", "click"].forEach(function(t) { document.removeEventListener(t, again, true); }); }, 4000);
       }
     }
-    function resetVlSearch() {
-      vlQuery = "";
+    function closeSearch() {
+      const view = document.getElementById("searchView");
+      if (!view.classList.contains("open")) return;
+      view.classList.remove("open");
       const input = document.getElementById("vlSearch");
-      if (input) { input.value = ""; input.blur(); }
-      const row = document.getElementById("vlSearchRow");
-      if (row) row.style.display = "none";
-      updateVlControls();
+      input.blur(); input.value = ""; vlQuery = "";
+    }
+    function renderSearch() {
+      const box = document.getElementById("svList");
+      box.textContent = "";
+      document.getElementById("vlTotal").textContent = "";
+      if (vlQuery.trim() && renderVlSearch(box)) return;
+      const e = document.createElement("div");
+      e.className = "picker-empty";
+      e.textContent = vlVerses.length ? "Type a reference or any words from a verse" : "Loading\u2026";
+      box.appendChild(e);
     }
     function onVlSearch() {
       vlQuery = document.getElementById("vlSearch").value;
-      renderVerseList();
+      renderSearch();
     }
     // Every word typed must appear somewhere in the reference, version or verse text.
     function vlMatches(q) {
@@ -2284,8 +2294,6 @@
       box.textContent = "";
       map.style.display = "none";
       updateVlControls();
-      if (vlQuery.trim() && renderVlSearch(box)) return;
-      document.getElementById("vlTotal").textContent = "";
       if (vlVerses.length === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
@@ -2301,7 +2309,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-191';
+    const CLIENT_BUILD = 'sync-192';
 
     let queue = [];
     let currentIndex = 0;
@@ -4876,7 +4884,7 @@
         return;
       }
       // Not while a popup is open
-      const popupOpen = ["picker", "pickerPreview", "pasteModal", "pastePreview", "undoConfirm"].some(function(id) {
+      const popupOpen = ["picker", "pickerPreview", "pasteModal", "pastePreview", "undoConfirm", "searchView"].some(function(id) {
         return document.getElementById(id).classList.contains("open");
       });
       if (popupOpen) return;
@@ -4946,7 +4954,7 @@
       if (versesTabHeld && versesTabHeld()) return;   // the click that follows a hold is not a tap
       goTab("verses");
     }
-    versesTabHeld = attachLongPress(document.getElementById("tabVerses"), function() { openVlSearch(); });
+    versesTabHeld = attachLongPress(document.getElementById("tabVerses"), function() { openSearch(true); });
     let diagClosedAt = 0;
     function toggleDiag() { toggleHelp(!diagOn); }
 
