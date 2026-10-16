@@ -2507,7 +2507,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-201';
+    const CLIENT_BUILD = 'sync-202';
 
     let queue = [];
     let currentIndex = 0;
@@ -3293,6 +3293,14 @@
       const el = document.getElementById("monthStrip");
       if (!el) return;
       if (!show) { el.style.display = "none"; return; }
+      const now = new Date();
+      // show what was saved last time at once (the numbers rarely change within a day), then refresh quietly
+      if (!monthCache) {
+        try {
+          const sv = JSON.parse(localStorage.getItem("vr_month") || "null");
+          if (sv && sv.data && sv.data.y === now.getFullYear() && sv.data.m === now.getMonth() + 1) monthCache = { at: 0, data: sv.data };
+        } catch (e) {}
+      }
       const fresh = monthCache && Date.now() - monthCache.at < 15000;
       if (monthCache) paintMonthStrip(monthCache.data); else el.style.display = "none";
       if (fresh || monthBusy) return;
@@ -3304,6 +3312,7 @@
             monthBusy = false;
             if (!res || !res.days) return;
             monthCache = { at: Date.now(), data: res };
+            try { localStorage.setItem("vr_month", JSON.stringify({ at: monthCache.at, data: res })); } catch (e) {}
             if (document.getElementById("summaryView").style.display !== "none") paintMonthStrip(res);
           })
           .withFailureHandler(function() { monthBusy = false; })
@@ -4101,7 +4110,7 @@
       return o;
     }
     // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (4 AM rep: 7 AM; 6 PM rep and Lock PM: 8:30 PM;
-    // Lock AM: noon). Late reps are not made up, so a late press leaves card.missed raised until 4 AM the next day.
+    // Lock AM: noon). Late reps are not made up (card.missed still counts them for the day), but the dots only warn while a rep is late right now.
     function lLateDeadline(slotMs, stage, lockPart) {
       const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
       if (stage === 'lock') { const lim = lockPart === 'pm' ? 1230 : 720; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
@@ -4128,8 +4137,9 @@
       }
       return out;
     }
+    // The dots are a warning, not a record: amber (one rep late right now) or red (two or more) only while behind. Once caught up they go back to normal.
     function lateLevel(card) {
-      const n = lateNow(card).late + ((card && card.missed) || 0);
+      const n = lateNow(card).late;
       return n >= 2 ? 2 : n;
     }
     let lateTimer = null;
@@ -4154,16 +4164,9 @@
       const part = card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7";
       const late = lateNow(card).late, missed = card.missed || 0;
       let text, lv;
-      if (!late && !missed) { text = "on schedule"; lv = 0; }
-      else {
-        const bits = [];
-        if (late === 1 && !missed) bits.push("the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is late");
-        else {
-          if (late) bits.push(late + (late === 1 ? " rep late" : " reps late"));
-          if (missed) bits.push(missed + (missed === 1 ? " rep" : " reps") + " missed earlier today");
-        }
-        text = bits.join(" \u00b7 "); lv = (late + missed) >= 2 ? 2 : 1;
-      }
+      if (!late) { text = "on schedule"; lv = 0; }   // caught up: back to normal, whatever was late earlier
+      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is late"; lv = 1; }
+      else { text = late + " reps late"; lv = 2; }
       return { text: part + " \u00b7 " + text, level: lv };
     }
     function predictLearn(card, kind) {
