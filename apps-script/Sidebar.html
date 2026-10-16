@@ -269,19 +269,24 @@
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
     /* Book map on the Verse List: a tile for each book, coloured by its section of the Bible; tap one to open its verses. */
     .vl-map { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 4px 0 2px; }
-    .vm-sect { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 8px 2px 5px; }
-    .vm-sect:first-child { margin-top: 2px; }
-    .vm-lg { display: flex; gap: 8px; font-size: 9px; font-weight: 700; letter-spacing: 0.02em; text-transform: none; color: var(--text-meta); white-space: nowrap; }
-    .vm-lg span { display: inline-flex; align-items: center; gap: 3px; }
-    .vm-lg i { --rc: var(--rl); display: block; width: 7px; height: 7px; border-radius: 2px; background: var(--rc); }
+    .vm-sect { flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; width: auto; min-height: 0; margin: 4px 0 1px; padding: 4px 6px 4px 2px; border: 0; background: none; box-shadow: none; font: inherit; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); }
+    .vm-sect:first-child { margin-top: 0; }
+    .vm-sect:active { transform: none; filter: none; }
+    .vm-sect svg { width: 9px; height: 9px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
+    /* tap a testament's heading: a little key to the colours */
+    .pk-key { top: 0; left: 16px; right: auto; width: min(340px, calc(100% - 32px)); padding: 6px 0 4px; }
+    .pk-k { display: flex; align-items: center; gap: 10px; padding: 7px 16px; font-size: 14px; }
+    .pk-k + .pk-k { border-top: 1px solid var(--border-card); }
+    .pk-k i { --rc: var(--rl); flex: none; width: 12px; height: 12px; border-radius: 4px; background: var(--rc); }
+    .pk-k b { font-weight: 700; color: var(--text-primary); }
+    .pk-k span { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
     .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
     /* a colour for each section of the Bible */
-    .cat-law { --rl: #7b4fd0; --rd: #b49bff; }
-    .cat-hist { --rl: #2563c9; --rd: #7fa8ff; }
-    .cat-poet { --rl: #b88a00; --rd: #f2c94c; }
-    .cat-proph { --rl: #c9374f; --rd: #ff8a9c; }
-    .cat-gosp { --rl: #138a55; --rd: #4fd18e; }
-    .cat-lett { --rl: #d4690c; --rd: #ffa45c; }
+    .cat-1 { --rl: #c9374f; --rd: #ff8a9c; }
+    .cat-2 { --rl: #2563c9; --rd: #7fa8ff; }
+    .cat-3 { --rl: #d4690c; --rd: #ffa45c; }
+    .cat-4 { --rl: #7b4fd0; --rd: #b49bff; }
+    .cat-5 { --rl: #138a55; --rd: #4fd18e; }
     .cat-oth { --rl: #8a8f94; --rd: #9aa0a6; }
     .vm-tile { --rc: var(--rl); position: relative; box-sizing: border-box; min-height: 0; width: auto; padding: 0; border-radius: 8px; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 2px; line-height: 1; letter-spacing: 0; box-shadow: none; color: var(--rc);
@@ -307,8 +312,8 @@
     .pk-open:active { transform: none; filter: none; }
     @keyframes pkFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes pkPop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: none; } }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .vm-lg i { --rc: var(--rd); } }
-    :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .vm-lg i { --rc: var(--rd); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .pk-k i { --rc: var(--rd); } }
+    :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .pk-k i { --rc: var(--rd); }
     .vm-sum { padding: 0; }
     .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 14px; }
     .vm-stats { display: flex; gap: 8px; }
@@ -2254,16 +2259,36 @@
       box.appendChild(wrap);
     }
 
-    // The section of the Bible a book sits in (its index in BIBLE_BOOKS): the Law, history, poetry, prophets, gospels, letters.
+    // The section of the Bible a book sits in (its index in BIBLE_BOOKS). Five colours, repeated across the testaments:
+    // 1 Law / Gospels, 2 History / Acts, 3 Wisdom / Paul's letters to churches, 4 Major Prophets / Paul's letters to individuals, 5 Minor Prophets / General letters and Revelation.
     function bookCat(i) {
-      if (i < 5) return "law";
-      if (i < 17) return "hist";
-      if (i < 22) return "poet";
-      if (i < 39) return "proph";
-      if (i < 43) return "gosp";
-      if (i === 43) return "hist";   // Acts
-      if (i < 65) return "lett";
-      return "proph";                // Revelation
+      if (i < 39) return i < 5 ? 1 : i < 17 ? 2 : i < 22 ? 3 : i < 27 ? 4 : 5;
+      return i < 43 ? 1 : i === 43 ? 2 : i < 53 ? 3 : i < 57 ? 4 : 5;
+    }
+    const MAP_KEY = {
+      ot: [[1, "Law", "Genesis \u2013 Deuteronomy"], [2, "History", "Joshua \u2013 Esther"], [3, "Wisdom & poetry", "Job \u2013 Song of Songs"], [4, "Major Prophets", "Isaiah \u2013 Daniel"], [5, "Minor Prophets", "Hosea \u2013 Malachi"]],
+      nt: [[1, "Gospels", "Matthew \u2013 John"], [2, "History", "Acts"], [3, "Paul to churches", "Romans \u2013 2 Thess."], [4, "Paul to individuals", "1 Timothy \u2013 Philemon"], [5, "General & Revelation", "Hebrews \u2013 Rev."]]
+    };
+    // Tap a testament heading for the colour key.
+    function showMapKey(which, head) {
+      hideVerseTip(); closePeek();
+      const born = Date.now();
+      const dim = document.createElement("div");
+      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.18)";
+      dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
+      document.body.appendChild(dim);
+      const b = document.createElement("div");
+      b.className = "pk-bubble pk-key"; b.id = "pkBubble";
+      MAP_KEY[which].forEach(function(r) {
+        const row = document.createElement("div"); row.className = "pk-k";
+        const dot = document.createElement("i"); dot.className = "cat-" + r[0];
+        const nm = document.createElement("b"); nm.textContent = r[1];
+        const bk = document.createElement("span"); bk.textContent = r[2];
+        row.appendChild(dot); row.appendChild(nm); row.appendChild(bk); b.appendChild(row);
+      });
+      document.body.appendChild(b);
+      const r = head.getBoundingClientRect();
+      b.style.top = (r.bottom + 4) + "px";
     }
     // The book map: a tile for each book, coloured by its section of the Bible. It fills the screen above the Treasury button.
     function renderVlBooks(map, box) {
@@ -2276,14 +2301,15 @@
         if (v.g > g.top) g.top = v.g;
       });
       map.textContent = "";
-      const section = function(title, books, legend) {
-        const h = document.createElement("div");
+      const section = function(title, books, legend) {   // legend: "ot" / "nt" gives the heading a colour key
+        const h = document.createElement(legend ? "button" : "div");
         h.className = "vm-sect";
         const ht = document.createElement("span"); ht.textContent = title; h.appendChild(ht);
         if (legend) {
-          const lg = document.createElement("div"); lg.className = "vm-lg";
-          legend.forEach(function(c) { const sp = document.createElement("span"); const dot = document.createElement("i"); dot.className = "cat-" + c[0]; sp.appendChild(dot); sp.appendChild(document.createTextNode(c[1])); lg.appendChild(sp); });
-          h.appendChild(lg);
+          h.type = "button";
+          h.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5"/></svg>');
+          h.setAttribute("aria-label", title + ", colour key");
+          h.onclick = function() { showMapKey(legend, h); };
         }
         map.appendChild(h);
         const grid = document.createElement("div");
@@ -2313,8 +2339,8 @@
       const ot = [], nt = [], other = [];
       BIBLE_BOOKS.forEach(function(b, i) { (i < 39 ? ot : nt).push({ key: i, abbr: BOOK_ABBR[i] }); });
       Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3) }); });
-      section("Old Testament", ot, [["law", "Law"], ["hist", "History"], ["poet", "Poetry"], ["proph", "Prophets"]]);
-      section("New Testament", nt, [["gosp", "Gospels"], ["hist", "History"], ["lett", "Letters"], ["proph", "Prophecy"]]);
+      section("Old Testament", ot, "ot");
+      section("New Testament", nt, "nt");
       if (other.length) section("Other", other);
 
       box.textContent = "";
@@ -2419,7 +2445,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-196';
+    const CLIENT_BUILD = 'sync-197';
 
     let queue = [];
     let currentIndex = 0;
