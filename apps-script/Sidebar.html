@@ -78,7 +78,10 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
+      scrollbar-width: none;
     }
+    /* No scroll bars anywhere; everything still scrolls. */
+    *::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
     html, body {
       position: fixed;
@@ -2286,7 +2289,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-187';
+    const CLIENT_BUILD = 'sync-188';
 
     let queue = [];
     let currentIndex = 0;
