@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-59'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-60'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -147,8 +147,10 @@ function onOpen() {
     .createMenu('Verse Review')
     .addItem('Open Flashcard Review', 'showFlashcardSidebar')
     .addSeparator()
+    .addItem('Show verse lengths', 'verseLengths')
     .addItem('Preview rebalance', 'rebalancePreview')
     .addItem('Apply rebalance', 'rebalanceApply')
+    .addItem('Verse length report', 'verseLengthReport')
     .addToUi();
 }
 
@@ -1564,6 +1566,95 @@ function getVerseList() {
     verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due, l: Math.round(verseLoad_(data[i][7]) * 10) / 10 });
   }
   return { verses: verses };
+}
+
+// ─────────────────────────── Verse lengths (which cards are longest, and what the load cap would do) ───────────────────────────
+// Run verseLengths() from the editor. It changes nothing: it writes a "Verse lengths" tab with a short summary and your 30 longest cards.
+function verseLengths() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const data = readSheetData_();
+  const list = [];
+  for (let i = 1; i < data.length; i++) {
+    const ref = cleanRef_(data[i][5]);
+    if (!ref) continue;
+    const words = String(data[i][7] || '').replace(/\[\d+\]/g, ' ').split(/\s+/).filter(Boolean).length;
+    const str = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
+    list.push({ ref: ref, words: words, rank: str !== '' && !isNaN(Number(str)) ? (GROUP_CONFIG[Math.min(MAX_GROUP, Math.floor(Number(str)))] || {}).name || '' : 'Unassigned' });
+  }
+  list.sort(function(a, b) { return b.words - a.words; });
+  const n = list.length;
+  const sorted = list.map(function(x) { return x.words; }).sort(function(a, b) { return a - b; });
+  const median = n ? sorted[Math.floor(n / 2)] : 0;
+  const over = function(cap) { return list.filter(function(x) { return x.words / LOAD_WORDS > cap; }).length; };
+  const rows = [
+    ['Verse lengths (words, verse numbers not counted). Nothing has changed.', '', '', ''],
+    ['Cards', n, '', ''],
+    ['Median words', median, '', ''],
+    ['Cards over the current cap (' + LOAD_MAX + ' = ' + LOAD_MAX * LOAD_WORDS + ' words)', over(LOAD_MAX), '', ''],
+    ['Cards over a cap of 6 (' + 6 * LOAD_WORDS + ' words)', over(6), '', ''],
+    ['Cards over a cap of 8 (' + 8 * LOAD_WORDS + ' words)', over(8), '', ''],
+    ['', '', '', ''],
+    ['Verse', 'Rank', 'Words', 'Load before cap']
+  ];
+  list.slice(0, 30).forEach(function(x) { rows.push([x.ref, x.rank, x.words, Math.round(x.words / LOAD_WORDS * 10) / 10]); });
+  let tab = ss.getSheetByName('Verse lengths');
+  if (!tab) tab = ss.insertSheet('Verse lengths');
+  tab.clear();
+  tab.getRange(1, 1, rows.length, 4).setValues(rows);
+  try { tab.getRange(8, 1, 1, 4).setFontWeight('bold'); } catch (e) {}
+  const top = list[0];
+  console.log(n + ' cards. Longest: ' + (top ? top.ref + ' (' + top.words + ' words)' : 'none') + '. See the "Verse lengths" tab.');
+  try { SpreadsheetApp.getUi().alert(top ? 'Longest verse: ' + top.ref + ' (' + top.words + ' words). See the "Verse lengths" tab.' : 'No verses found.'); } catch (e) {}
+  return { n: n, median: median, longest: top || null, over5: over(5), over6: over(6), over8: over(8) };
+}
+
+// ─────────────────────────── Verse length report ───────────────────────────
+// Run verseLengthReport() from the editor. It writes a "Verse lengths" tab (changes nothing else): your verses from longest to
+// shortest with word count and the load each one gets now, then any verses that sit next to each other in the same chapter.
+function verseLengthReport() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const data = readSheetData_();
+  const list = [];
+  for (let i = 1; i < data.length; i++) {
+    const ref = cleanRef_(data[i][5]);
+    if (!ref) continue;
+    const str = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
+    const g = str === '' || isNaN(Number(str)) ? -1 : Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str))));
+    const words = String(data[i][7] || '').replace(/\[\d+\]/g, ' ').split(/\s+/).filter(Boolean).length;
+    list.push({ ref: ref, g: g, words: words, load: Math.round(verseLoad_(data[i][7]) * 10) / 10 });
+  }
+  list.sort(function(a, b) { return b.words - a.words; });
+  const rank = function(g) { return g < 0 ? 'Unassigned' : GROUP_CONFIG[g].name; };
+  const rows = [['Verse', 'Rank', 'Words', 'Load now']];
+  list.forEach(function(v) { rows.push([v.ref, rank(v.g), v.words, v.load]); });
+  const started = list.filter(function(v) { return v.g >= 0; });
+  const atCap = started.filter(function(v) { return v.words / LOAD_WORDS >= LOAD_MAX; }).length;
+  const summary = [['Verses started: ' + started.length + '. Longest: ' + (list.length ? list[0].ref + ' (' + list[0].words + ' words)' : 'none') + '. At the load cap (' + LOAD_MAX + '): ' + atCap + '. Load = words / ' + LOAD_WORDS + ', min 1, max ' + LOAD_MAX + '.', '', '', '']];
+  // neighbours: same book and chapter, one starts right after the other ends
+  const parsed = started.map(function(v) {
+    const m = /^(.+?)\s+(\d+):(\d+)(?:\s*[-\u2013]\s*(\d+))?$/.exec(v.ref);
+    return m ? { v: v, book: m[1], ch: Number(m[2]), a: Number(m[3]), b: Number(m[4] || m[3]) } : null;
+  }).filter(Boolean);
+  const pairs = [];
+  parsed.forEach(function(x) {
+    parsed.forEach(function(y) {
+      if (x !== y && x.book === y.book && x.ch === y.ch && y.a === x.b + 1) pairs.push([x.v.ref, rank(x.v.g), y.v.ref, rank(y.v.g), x.v.words + y.v.words]);
+    });
+  });
+  let tab = ss.getSheetByName('Verse lengths');
+  if (!tab) tab = ss.insertSheet('Verse lengths');
+  tab.clear();
+  const all = summary.concat([['', '', '', '']], rows);
+  tab.getRange(1, 1, all.length, 4).setValues(all);
+  const start = all.length + 2;
+  const head = [['Verses that sit side by side (could be one card)', '', '', ''], ['First', 'Rank', 'Next', 'Rank', 'Words together']];
+  const out = pairs.length ? pairs : [['None found', '', '', '', '']];
+  tab.getRange(start, 1, 1, 4).setValues([head[0]]);
+  tab.getRange(start + 1, 1, 1 + out.length, 5).setValues([head[1]].concat(out));
+  try { tab.setFrozenRows(0); } catch (e) {}
+  console.log(summary[0][0] + ' Side-by-side pairs: ' + pairs.length);
+  try { SpreadsheetApp.getUi().alert(summary[0][0] + '\nSide-by-side pairs: ' + pairs.length + '. See the "Verse lengths" tab.'); } catch (e) {}
+  return { longest: list[0] || null, pairs: pairs.length };
 }
 
 // ─────────────────────────── One-time rebalance of reviews already scheduled ───────────────────────────
