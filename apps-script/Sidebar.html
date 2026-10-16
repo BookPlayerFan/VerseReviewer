@@ -278,6 +278,7 @@
     .vm-tile.rank-0 { --rl: #8a8f94; --rd: #9aa0a6; }
     .vm-tile.empty { background: rgba(128, 128, 128, 0.1); border: 1px dashed var(--border-card); color: var(--text-meta); font-size: 10px; font-weight: 600; pointer-events: none; }
     .vm-tile.empty.nr { pointer-events: auto; cursor: pointer; }
+    .vm-tile.empty .vm-ab { font-size: 10px; font-weight: 600; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .vm-key { --rc: var(--rd); } }
@@ -2007,7 +2008,7 @@
         const o = perRank[vlRankHi];
         const nb = Object.keys(o.books).length;
         hint.textContent = rankName(vlRankHi) + ": " + o.n + (o.n === 1 ? " verse in " : " verses in ") + nb + (nb === 1 ? " book" : " books");
-      } else hint.textContent = "Tap a rank to light up its books, or a book to see its verses";
+      } else hint.textContent = "Tap a rank to light up its books, or a book for its verses";
       wrap.appendChild(hint);
       box.appendChild(wrap);
     }
