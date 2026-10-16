@@ -1990,8 +1990,6 @@
       const wrap = document.createElement("div");
       wrap.className = "vm-sum";
       const keys = Object.keys(byKey);
-      const verses = vlVerses.reduce(function(a, v) { return a + v.n; }, 0);
-      const refs = vlVerses.length;
       const perRank = {};
       vlVerses.forEach(function(v) { const o = perRank[v.g] || (perRank[v.g] = { n: 0, books: {} }); o.n += v.n; o.books[vlBookKey(v)] = true; });
       if (vlRankHi !== null && !perRank[vlRankHi]) vlRankHi = null;
@@ -2007,9 +2005,14 @@
         legend.appendChild(k);
       }
       wrap.appendChild(legend);
+      // the three numbers follow the rank picked in the key (all of your verses when none is picked)
+      const pool = vlRankHi === null ? vlVerses : vlVerses.filter(function(v) { return v.g === vlRankHi; });
+      const verses = pool.reduce(function(a, v) { return a + v.n; }, 0);
+      const refs = pool.length;
+      const nBooks = vlRankHi === null ? keys.length : Object.keys(perRank[vlRankHi].books).length;
       const stats = document.createElement("div");
       stats.className = "vm-stats";
-      [[verses, verses === 1 ? "verse" : "verses"], [refs, refs === 1 ? "reference" : "references"], [keys.length, "of 66 books"]].forEach(function(p) {
+      [[verses, verses === 1 ? "verse" : "verses"], [refs, refs === 1 ? "reference" : "references"], [nBooks, "of 66 books"]].forEach(function(p) {
         const c = document.createElement("div");
         c.className = "vm-stat";
         const n = document.createElement("b"); n.textContent = p[0];
@@ -2021,9 +2024,7 @@
       const hint = document.createElement("div");
       hint.className = "vm-hint";
       if (vlRankHi !== null) {
-        const o = perRank[vlRankHi];
-        const nb = Object.keys(o.books).length;
-        hint.textContent = rankName(vlRankHi) + ": " + o.n + (o.n === 1 ? " verse in " : " verses in ") + nb + (nb === 1 ? " book" : " books");
+        hint.textContent = "Showing " + rankName(vlRankHi) + " only \u00B7 tap it again to clear";
       } else hint.textContent = "Tap a rank to light up its books, or a book for its verses";
       wrap.appendChild(hint);
       box.appendChild(wrap);
@@ -2139,7 +2140,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-178';
+    const CLIENT_BUILD = 'sync-179';
 
     let queue = [];
     let currentIndex = 0;
