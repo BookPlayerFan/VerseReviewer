@@ -403,15 +403,19 @@
     .vl-row .load-bar.busy i { background: var(--text-repeat); opacity: 0.9; }
     /* Upcoming reviews: a calendar. Each day shows how many references are due; the shade is the day's word load. */
     .cal-sum { font-size: 12px; color: var(--text-muted); margin: 0 2px 10px; min-height: 15px; }
-    .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin: 0 0 6px; font-size: 10px; font-weight: 700; color: var(--text-meta); text-align: center; letter-spacing: 0.04em; opacity: 0.8; }
-    .cal-mon { display: flex; align-items: center; gap: 8px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); margin: 14px 2px 6px; }
-    .cal-mon::after { content: ""; flex: 1; height: 1px; background: var(--border-card); }
-    .cal-mon:first-of-type { margin-top: 2px; }
-    .cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
+    .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; margin: 0 0 4px; font-size: 10px; font-weight: 700; color: var(--text-meta); text-align: center; letter-spacing: 0.04em; opacity: 0.8; }
+    .cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; }
+    /* every day sits in a slot; slots on a month's edge draw a faint line, so each month reads as one outlined shape */
+    .cal-s > .cal-d { width: 100%; }
+    .cal-s { --mb: color-mix(in srgb, var(--text-meta) 36%, transparent); padding: 3px; min-width: 0; }
     /* a day with reviews is styled like a map tile: a tint, a soft border, the colour on the number; shade steps by word load, amber is the heaviest */
-    .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 44px; min-height: 0; width: auto; padding: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800; color: var(--rc); box-shadow: none;
+    .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 50px; min-height: 0; width: auto; padding: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: var(--rc); box-shadow: none;
       background: color-mix(in srgb, var(--rc) calc(4% + var(--h) * 7%), transparent); border: 1px solid color-mix(in srgb, var(--rc) 38%, transparent); }
-    .cal-d i { position: absolute; left: 6px; top: 4px; font-style: normal; font-size: 8px; font-weight: 700; color: var(--rc); opacity: 0.6; }
+    .cal-d i { position: absolute; left: 6px; top: 4px; font-style: normal; font-size: 8.5px; font-weight: 700; color: var(--rc); opacity: 0.6; }
+    /* the 1st of a month carries the month's short name */
+    .cal-d.first i { opacity: 1; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+    .cal-d.first.z { flex-direction: column; gap: 0; line-height: 1.05; color: var(--text-meta); }
+    .cal-d.first.z em { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-accent, #1a73e8); }
     .cal-d.hot { --rc: #c47400; background: color-mix(in srgb, var(--rc) 20%, transparent); border-color: color-mix(in srgb, var(--rc) 55%, transparent); }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.hot { --rc: #ffb454; } }
     :root[data-theme="dark"] .cal-d.hot { --rc: #ffb454; }
@@ -1893,7 +1897,10 @@
       const start = -today.getDay();                                  // this week's Sunday, as days from today
       const weeks = placeholder ? 5 : Math.min(104, Math.floor((Math.max(lastOff, 0) - start) / 7) + 1);
       const weekHas = function(w) { for (let i = 0; i < 7; i++) if (byDay[start + w * 7 + i]) return true; return false; };
-      let lastMonth = -1, w = 0;
+      // a week is on screen if it holds a review (or is this week, or while loading); month outlines break where weeks are folded away
+      const isShown = function(k) { return k >= 0 && k < weeks && (placeholder || k === 0 || weekHas(k)); };
+      const mKey = function(off) { const x = dayAt(off); return x.getFullYear() * 12 + x.getMonth(); };
+      let w = 0;
       while (w < weeks) {
         if (!placeholder && w > 0 && !weekHas(w)) {
           // weeks with nothing due fold into one line; tap it to see which weeks they are
@@ -1917,14 +1924,6 @@
           g.onclick = function() { const o = list.hidden; list.hidden = !o; g.classList.toggle("open", o); g.setAttribute("aria-expanded", o ? "true" : "false"); };
           box.appendChild(g); box.appendChild(list); w = e; continue;
         }
-        // a month label above the week that holds the 1st (or the first week shown)
-        let mDay = dayAt(start + w * 7);
-        for (let i = 0; i < 7; i++) { const d = dayAt(start + w * 7 + i); if (d.getDate() === 1) { mDay = d; break; } }
-        if (mDay.getMonth() !== lastMonth) {
-          lastMonth = mDay.getMonth();
-          const l = document.createElement("div"); l.className = "cal-mon"; l.textContent = MON[mDay.getMonth()] + (mDay.getFullYear() !== today.getFullYear() ? " " + mDay.getFullYear() : "");
-          box.appendChild(l);
-        }
         const row = document.createElement("div"); row.className = "cal-wk";
         for (let i = 0; i < 7; i++) {
           const off = start + w * 7 + i, d = dayAt(off), vs = byDay[off] || [];
@@ -1934,15 +1933,31 @@
           if (vs.length) c.type = "button";
           c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (h === 4 ? " h4" : "") + (vs.length && load >= heavy && ratio >= 0.7 ? " hot" : "");
           c.style.setProperty("--h", h);
-          const dl = d.getDate() === 1 ? MS[d.getMonth()] + " 1" : d.getDate();
-          if (!vs.length) c.textContent = dl;
-          else {
-            const n = document.createElement("i"); n.textContent = dl; c.appendChild(n);
+          const first = d.getDate() === 1;
+          const mname = MS[d.getMonth()] + (first && d.getMonth() === 0 ? " \u2019" + String(d.getFullYear()).slice(2) : "");
+          if (first) c.classList.add("first");
+          if (!vs.length) {
+            if (first) { const em = document.createElement("em"); em.textContent = mname; c.appendChild(em); c.appendChild(document.createTextNode(d.getDate())); }
+            else c.textContent = d.getDate();
+          } else {
+            const n = document.createElement("i"); n.textContent = first ? mname + " 1" : d.getDate(); c.appendChild(n);
             c.appendChild(document.createTextNode(vs.length));
             c.setAttribute("aria-label", DOW[d.getDay()] + ", " + short(d) + ", " + vs.length + (vs.length === 1 ? " reference" : " references"));
             c.onclick = function() { peekDay(c, off, vs); };
           }
-          row.appendChild(c);
+          // the slot draws a faint line on each side where the next day (or the edge, or a folded stretch) is another month
+          const mk = mKey(off);
+          const tp = !(isShown(w - 1) && mKey(off - 7) === mk), bt = !(isShown(w + 1) && mKey(off + 7) === mk);
+          const lf = i === 0 || mKey(off - 1) !== mk, rt = i === 6 || mKey(off + 1) !== mk;
+          const sl = document.createElement("div"); sl.className = "cal-s";
+          const sh = [];
+          if (tp) sh.push("inset 0 1px 0 0 var(--mb)"); if (bt) sh.push("inset 0 -1px 0 0 var(--mb)");
+          if (lf) sh.push("inset 1px 0 0 0 var(--mb)"); if (rt) sh.push("inset -1px 0 0 0 var(--mb)");
+          if (sh.length) sl.style.boxShadow = sh.join(", ");
+          const R = "12px";
+          if (tp && lf) sl.style.borderTopLeftRadius = R; if (tp && rt) sl.style.borderTopRightRadius = R;
+          if (bt && lf) sl.style.borderBottomLeftRadius = R; if (bt && rt) sl.style.borderBottomRightRadius = R;
+          sl.appendChild(c); row.appendChild(sl);
         }
         box.appendChild(row);
         w++;
@@ -2670,7 +2685,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-208';
+    const CLIENT_BUILD = 'sync-209';
 
     let queue = [];
     let currentIndex = 0;
