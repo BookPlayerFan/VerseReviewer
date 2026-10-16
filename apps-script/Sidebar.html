@@ -1579,6 +1579,9 @@
       return Math.max(1, total);
     }
 
+    // Treasury points for a verse at each level (0 = New ... 8 = Diamond); the top two ranks are worth more. Same table as the server's PTS_TABLE.
+    const PTS_TABLE = [0, 1, 2, 3, 4, 5, 6, 8, 10];
+    function ptsOf(g) { return PTS_TABLE[Math.max(0, Math.min(8, Math.floor(Number(g) || 0)))]; }
     // Treasury points count verses: a card's verse count comes from the [n] markers in its text, the same way the server counts them.
     function textVerses(text, ref) {
       const t = String(text === null || text === undefined ? "" : text);
@@ -1738,14 +1741,14 @@
 
     function updateVlControls() {}
 
-    // The Treasury button at the bottom of the Verses tab: total points (rank number for each verse) and a bar sized by how many
+    // The Treasury button at the bottom of the Verses tab: total points (the points table, per verse) and a bar sized by how many
     // references sit at each rank. Tapping it slides the Treasury in.
     function treasuryButton() {
       const strip = document.createElement("button");
       strip.type = "button"; strip.className = "vl-strip"; strip.id = "vlStrip";
       const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
       let pts = 0;
-      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += g * (v.pn || 1); });
+      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += ptsOf(g) * (v.pn || 1); });
       let bar = "";
       for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
       strip.innerHTML = '<span class="vs-pts">' + pts + ' <small>pts</small></span><span class="vs-bar">' + bar + '</span><span class="vs-lbl">Treasury \u203A</span>';
@@ -1795,8 +1798,8 @@
 
     // ── Treasury: every rank with its references; a rank opens in place on this screen ──
     let trOpen = null;
-    // What a reference is worth: its rank number for each of its verses.
-    function trPts(v) { return (v.g | 0) * (v.pn || 1); }
+    // What a reference is worth: the points for its level (1, 2, 3, 4, 5, 6, 8, 10), once for each of its verses.
+    function trPts(v) { return ptsOf(v.g) * (v.pn || 1); }
     function trBody(g, vs, body) {
       vs.slice().sort(compareVerses).forEach(function(v) {
         const p = trPts(v), nv = v.pn || 1;
@@ -1810,7 +1813,7 @@
       const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
       let pts = 0, verses = 0;
       const gp = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; gp[g] += g * (v.pn || 1); pts += g * (v.pn || 1); verses += (v.pn || 1); });
+      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; gp[g] += ptsOf(g) * (v.pn || 1); pts += ptsOf(g) * (v.pn || 1); verses += (v.pn || 1); });
       const total = vlVerses.length;
       const head = document.createElement("div");
       head.className = "tr-head";
@@ -2289,7 +2292,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-188';
+    const CLIENT_BUILD = 'sync-189';
 
     let queue = [];
     let currentIndex = 0;
@@ -3850,7 +3853,7 @@
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && kind !== 'skip';
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
       if (promote) {
-        notePts(card.reference, textVerses(card.text, card.reference), 1);      // a new card in Bronze: one Treasury point per verse
+        notePts(card.reference, textVerses(card.text, card.reference) * ptsOf(1), 1);      // a new card in Bronze: one Treasury point per verse
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
         isScoring = true;
         playLevelUp(1, 1, "Promoted \u2713");
@@ -4078,7 +4081,7 @@
         }
       }
 
-      if (card.group > 0 && newGroup !== card.group) notePts(card.reference, (newGroup - card.group) * textVerses(card.text, card.reference), newGroup);   // Treasury points: the net change in level, per verse
+      if (card.group > 0 && newGroup !== card.group) notePts(card.reference, (ptsOf(newGroup) - ptsOf(card.group)) * textVerses(card.text, card.reference), newGroup);   // Treasury points: the net change in level, per verse
       if (graduated && card.group > 0) {
         sessionStats.graduated++;
         recordStatRef('gradRefs', card.reference, newGroup);
@@ -4166,7 +4169,7 @@
       const el = document.getElementById("statGraduated");
       el.textContent = fmtPts(v);
       el.classList.toggle("neg", v < 0);
-      document.getElementById("statGradBox").classList.toggle("gold", v > 5);
+      document.getElementById("statGradBox").classList.toggle("gold", v >= 10);
     }
     function runCountUp() {
       const items = [
@@ -4192,7 +4195,7 @@
       flawlessEl.style.display = "none";
       function finish() {
         plan.forEach(function(p) { show(p.id, p.v); });
-        gold.classList.toggle("gold", (sessionStats.pts || 0) > 5);
+        gold.classList.toggle("gold", (sessionStats.pts || 0) >= 10);
         if (token === countUpToken) showFlawlessBadge(false);
       }
       (function tick() {
@@ -4207,7 +4210,7 @@
           else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); done = false; }
           show(p.id, v);
         });
-        gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) > 5);
+        gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 10);
         if (!done) setTimeout(tick, 33);
         else showFlawlessBadge(true);
       })();

@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-78'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-79'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -379,7 +379,7 @@ function verseCount_(text) {
   return Math.max(1, n);
 }
 
-// Treasury points count verses, not cards: a reference's points are its rank number times its verse count.
+// Treasury points count verses, not cards: a reference's points are its level's value in PTS_TABLE times its verse count.
 // { reference: verse count } for every verse on the sheet (a reference no longer on the sheet counts as 1).
 function verseCountMap_() {
   const map = {};
@@ -545,7 +545,7 @@ function learnAction(reference, action, expectedRep) {
     const s = readState_();
     if (s && s.date === todayKey_()) {
       if (promoted) {  // a new card in Bronze adds one Treasury point for each of its verses
-        const pv = verseCount_(vals[7]);
+        const pv = verseCount_(vals[7]) * ptsOf_(1);
         s.stats = sanitizeStats_(s.stats); s.stats.pts += pv;
         const mine = s.stats.ptsRefs.filter(function(x) { return x.f === ref; })[0];
         if (mine) { mine.d += pv; mine.g = 1; if (mine.d === 0) s.stats.ptsRefs.splice(s.stats.ptsRefs.indexOf(mine), 1); }
@@ -720,7 +720,11 @@ function activeEnd_(s) {
 }
 
 // PTS_VER marks a day's Treasury points as counted per verse. A session without it (counted by card, or before points existed) is recounted from the Log.
-const PTS_VER = 2;
+const PTS_VER = 3;
+// Treasury points for a verse at each level (0 = New ... 8 = Diamond): the top two ranks are worth more. A card's points are this times its verse count,
+// and a level change is the difference between the two levels' values. The app has the same table (PTS_TABLE in Sidebar.html).
+const PTS_TABLE = [0, 1, 2, 3, 4, 5, 6, 8, 10];
+function ptsOf_(g) { return PTS_TABLE[Math.max(0, Math.min(8, Math.floor(Number(g) || 0)))]; }
 function emptyStats_() {
   return { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsV: PTS_VER, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [] };
 }
@@ -850,7 +854,7 @@ function backfillPts_(s) {
         const lb = Number(v[3]), la = Number(v[4]), ref = cleanRef_(v[1]);
         if (!ref || isNaN(lb) || isNaN(la) || lb === la) return;
         const e = per[ref] || (per[ref] = { f: ref, g: la, d: 0 });
-        e.d += (la - lb) * (vc[ref] || 1); e.g = la;
+        e.d += (ptsOf_(la) - ptsOf_(lb)) * (vc[ref] || 1); e.g = la;
       });
     }
   } catch (e) { console.error('backfillPts_ failed: ' + e); }
@@ -1739,7 +1743,7 @@ function getMonthStats(year, month) {
     if (res === 'Fail') { day[1]++; if (!repeat) day[5]++; }
     if (isReview && !repeat && la > lb && lb >= 1) day[2]++;
     if (isPromo) day[3]++;
-    day[4] += (la - lb) * (vc[cleanRef_(v[1])] || 1);
+    day[4] += (ptsOf_(la) - ptsOf_(lb)) * (vc[cleanRef_(v[1])] || 1);
   });
   return out;
 }
