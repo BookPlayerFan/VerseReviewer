@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-67'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-68'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1831,6 +1831,31 @@ function wantedSlots_(data, now) {
   return want;
 }
 
+// One-time tidy-up: an older version scheduled a push per verse and kept their ids under VR_PUSH_PENDING. Those would go out as well as the
+// new combined ones, so any that are still waiting are cancelled, then the old record is deleted.
+function cancelLegacyPushes_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty('VR_PUSH_PENDING');
+  if (!raw) return 0;
+  let n = 0;
+  try {
+    const map = JSON.parse(raw) || {};
+    Object.keys(map).forEach(function(ref) {
+      const v = map[ref];
+      const list = Array.isArray(v) ? v : [{ id: v, at: 0 }];
+      list.forEach(function(e) {
+        if (!e || !e.id) return;
+        if (e.at && e.at <= Date.now() + 5000) return;
+        const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
+        pushLog_('cancel (old schedule)', ref, e.at || 0, !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
+        n++;
+      });
+    });
+  } catch (err) { console.error('cancelLegacyPushes_ failed: ' + err); }
+  props.deleteProperty('VR_PUSH_PENDING');
+  return n;
+}
+
 function sameRefs_(a, b) {
   return JSON.stringify((a || []).slice().sort()) === JSON.stringify((b || []).slice().sort());
 }
@@ -1842,7 +1867,7 @@ function syncSlotPushes_() {
   const now = nowMs_();
   const want = wantedSlots_(readSheetData_(), now);
   const map = slotMap_();
-  const out = { sent: 0, cancelled: 0 };
+  const out = { sent: 0, cancelled: cancelLegacyPushes_() };
   Object.keys(map).forEach(function(k) {
     const e = map[k];
     if (Number(k) <= now + 120000) { if (Number(k) <= now - 60000) delete map[k]; return; } // gone out (or about to)
