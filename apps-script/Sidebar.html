@@ -291,7 +291,10 @@
       border-bottom: 1px solid var(--border-card); flex-direction: row; border-radius: 0; text-align: left; }
     .vl-row .vl-name { font-size: 16px; font-weight: 600; color: var(--text-primary); }
     .vl-row .vl-right { display: inline-flex; align-items: center; gap: 8px; }
-    .vl-row .vl-count { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .vl-row .vl-count { font-size: 15px; font-weight: 700; color: var(--text-primary); min-width: 22px; text-align: right; }
+    .vl-row .load-bar { width: 74px; height: 8px; border-radius: 4px; background: rgba(128, 128, 128, 0.16); overflow: hidden; flex: none; }
+    .vl-row .load-bar i { display: block; height: 100%; border-radius: 4px; background: var(--text-accent); opacity: 0.55; }
+    .vl-row .load-bar.busy i { background: var(--text-repeat); opacity: 0.9; }
     .vl-row.zero .vl-count { color: var(--text-meta); font-weight: 500; }
     .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
     .vl-row.open .chev { transform: rotate(90deg); }
@@ -1567,7 +1570,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { failed(); return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1 }; });
           vlVerses.sort(compareVerses);
           done();
         })
@@ -1653,6 +1656,13 @@
       box.textContent = "";
       const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      // Each day's load (verse words / 30, 1 to 5 per verse) drives the short bar; a day with at least 3 short verses of load and 1.6 times the average busy day turns amber.
+      const loads = [];
+      for (let d = 0; d < 14; d++) loads.push(vlVerses.reduce(function(a, v) { return v.d === d ? a + (v.l || 1) : a; }, 0));
+      const maxLoad = Math.max.apply(null, loads);
+      const filled = loads.filter(function(l) { return l > 0; });
+      const avgLoad = filled.length ? filled.reduce(function(a, b) { return a + b; }, 0) / filled.length : 0;
+      const busy = loads.map(function(l) { return l >= Math.max(3, 1.6 * avgLoad); });
       for (let d = 0; d < 14; d++) {
         const dt = new Date();
         dt.setHours(12, 0, 0, 0);
@@ -1660,7 +1670,7 @@
         let label = DOW[dt.getDay()] + ", " + MON[dt.getMonth()] + " " + dt.getDate();
         if (d === 0) label = "Today · " + label; else if (d === 1) label = "Tomorrow · " + label;
         const vs = vlVerses.filter(function(v) { return v.d === d; });
-        vlGroup("d" + d, label, vs.length, vs, true, box);
+        vlGroup("d" + d, label, vs.length, vs, true, box, { load: loads[d], max: maxLoad, busy: busy[d] });
       }
     }
     function openUpcoming() {
@@ -1679,7 +1689,7 @@
       document.getElementById("upcomingView").classList.remove("open");
     }
 
-    function vlGroup(key, label, count, verses, showPills, into) {
+    function vlGroup(key, label, count, verses, showPills, into, bar) {
       const box = into || document.getElementById("vlList");
       const row = document.createElement("button");
       row.type = "button";
@@ -1689,6 +1699,15 @@
       if (typeof label === "string") left.textContent = label; else left.appendChild(label);
       const right = document.createElement("span");
       right.className = "vl-right";
+      if (bar && bar.max > 0) {
+        const track = document.createElement("span");
+        track.className = "load-bar" + (bar.busy ? " busy" : "");
+        track.setAttribute("aria-hidden", "true");
+        const fill = document.createElement("i");
+        fill.style.width = Math.round(100 * Math.min(1, bar.load / bar.max)) + "%";
+        track.appendChild(fill);
+        right.appendChild(track);
+      }
       const n = document.createElement("span");
       n.className = "vl-count";
       n.textContent = count;
@@ -1967,7 +1986,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-164';
+    const CLIENT_BUILD = 'sync-165';
 
     let queue = [];
     let currentIndex = 0;

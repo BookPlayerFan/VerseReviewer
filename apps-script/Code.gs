@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-58'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-59'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -71,8 +71,17 @@ const GROUP_CONFIG = {
   8: { name: "Diamond",           interval: 360, repsNeeded: 1, early: 7,  late: 4,  costEarly: 0.25, costLate: 0.5 }
 };
 
+// How much a verse counts toward a day's review load: its word count / 30, never less than 1 (opening and scoring a card has a
+// fixed cost) and never more than 5 (one very long passage cannot dominate). Prices below are in "short verses" of this load.
+const LOAD_WORDS = 30;
+const LOAD_MAX = 5;
+function verseLoad_(text) {
+  const n = String(text || '').replace(/\[\d+\]/g, ' ').split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.min(LOAD_MAX, n / LOAD_WORDS));
+}
+
 // The due date for a card moving to `group`. `skipRow` is the card being scheduled, so its own old date is not counted;
-// New cards (level 0) and cards with no date are not counted either. On a tie the exact day wins, then the earlier day.
+// New cards (level 0) and cards with no date are not counted either. A day's load is the sum of verseLoad_ of its verses. On a tie the exact day wins, then the earlier day.
 function balancedDueDate_(sheet, group, today, skipRow) {
   const cfg = GROUP_CONFIG[group];
   const base = new Date(today.getTime());
@@ -82,13 +91,13 @@ function balancedDueDate_(sheet, group, today, skipRow) {
   const last = sheet.getLastRow();
   const counts = {};
   if (last >= 2) {
-    const vals = sheet.getRange(2, 2, last - 1, 4).getValues(); // B..E: next date, last date, rep, level
+    const vals = sheet.getRange(2, 2, last - 1, 7).getValues(); // B..H: next date, last date, rep, level, reference, version, text
     for (let i = 0; i < vals.length; i++) {
       if (i + 2 === skipRow) continue;
       const d = toMidnight_(vals[i][0]);
       if (!d || !(Number(vals[i][3]) > 0)) continue;
       const k = d.getTime();
-      counts[k] = (counts[k] || 0) + 1;
+      counts[k] = (counts[k] || 0) + verseLoad_(vals[i][6]);
     }
   }
   let best = base, bestScore = Infinity;
@@ -137,6 +146,9 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Verse Review')
     .addItem('Open Flashcard Review', 'showFlashcardSidebar')
+    .addSeparator()
+    .addItem('Preview rebalance', 'rebalancePreview')
+    .addItem('Apply rebalance', 'rebalanceApply')
     .addToUi();
 }
 
@@ -1549,9 +1561,163 @@ function getVerseList() {
     // Days from today until the next review (overdue shows as 0); null when there is no review date (Level 0).
     const nd = g > 0 ? toMidnight_(data[i][1]) : null;
     const due = nd ? Math.max(0, Math.round((nd.getTime() - todayMs) / 86400000)) : null;
-    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due });
+    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due, l: Math.round(verseLoad_(data[i][7]) * 10) / 10 });
   }
   return { verses: verses };
+}
+
+// ─────────────────────────── One-time rebalance of reviews already scheduled ───────────────────────────
+//
+// 1) Run rebalancePreview() (Verse Review menu, or the editor). It changes no dates: it writes the proposed moves to a tab
+//    called "Rebalance preview" (verse, rank, current date, new date, and the load on each day).
+// 2) Read the tab. Delete any row you don't want moved.
+// 3) Run rebalanceApply(). It copies the Verses tab to a backup tab ("Verses backup <date time>") first, then moves every row
+//    still listed whose date is unchanged since the preview. The Result column says what happened to each row.
+// Only Platinum and above can move, within the same caps and prices as new reviews, and only off days that are busy: at least 3
+// short verses of load and at least 1.5 times the average busy day. Bronze, Silver and Gold are never moved. Today and overdue
+// reviews are never moved.
+const REBALANCE_TAB = 'Rebalance preview';
+const REBALANCE_HEADERS = ['Verse', 'Rank', 'Due now', 'Move to', 'Days', 'Load on current day', 'Load on new day after', 'Result'];
+
+function rebalancePreview() { return rebalancePreview_(); }
+function rebalanceApply() { return rebalanceApply_(); }
+
+function dayKey_(d) { return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
+function dayFromKey_(k) { return new Date(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1, Number(k.slice(8, 10)), 0, 0, 0, 0); }
+
+// Works out the moves without touching the sheet. Returns { moves: [...], threshold, mean }.
+function planRebalance_() {
+  const today = today_();
+  const data = readSheetData_();
+  const loads = {};
+  const items = [];
+  for (let i = 1; i < data.length; i++) {
+    const ref = cleanRef_(data[i][5]);
+    if (!ref) continue;
+    const str = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
+    const g = Number(str);
+    if (str === '' || isNaN(g) || !(g > 0)) continue;
+    const d = toMidnight_(data[i][1]);
+    if (!d) continue;
+    const l = verseLoad_(data[i][7]);
+    loads[d.getTime()] = (loads[d.getTime()] || 0) + l;
+    if (g >= 4 && d.getTime() > today.getTime()) items.push({ row: i + 1, ref: ref, g: Math.min(Math.floor(g), MAX_GROUP), d: d, l: l });
+  }
+  const days = Object.keys(loads).map(Number).filter(function(ms) { return ms > today.getTime(); });
+  const mean = days.length ? days.reduce(function(a, ms) { return a + loads[ms]; }, 0) / days.length : 0;
+  const threshold = Math.max(3, 1.5 * mean);
+  items.sort(function(a, b) { return (loads[b.d.getTime()] - loads[a.d.getTime()]) || (b.l - a.l) || (a.row - b.row); });
+  const moves = [];
+  items.forEach(function(it) {
+    const cur = it.d.getTime();
+    if (loads[cur] < threshold) return;
+    const cfg = GROUP_CONFIG[it.g];
+    if (!cfg || (!cfg.early && !cfg.late)) return;
+    let best = null, bestScore = loads[cur] - it.l; // staying costs the load of the others on that day
+    const reach = Math.max(cfg.early, cfg.late);
+    for (let step = 1; step <= reach * 2; step++) {
+      const off = step % 2 === 1 ? -Math.ceil(step / 2) : Math.ceil(step / 2);
+      if (off < -cfg.early || off > cfg.late) continue;
+      const c = new Date(cur);
+      c.setDate(c.getDate() + off);
+      c.setHours(0, 0, 0, 0);
+      if (c.getTime() <= today.getTime()) continue;
+      const score = (loads[c.getTime()] || 0) + (off < 0 ? -off * cfg.costEarly : off * cfg.costLate);
+      if (score < bestScore - 1e-9) { best = { d: c, off: off }; bestScore = score; }
+    }
+    if (!best) return;
+    const before = loads[cur];
+    loads[cur] -= it.l;
+    loads[best.d.getTime()] = (loads[best.d.getTime()] || 0) + it.l;
+    moves.push({ row: it.row, ref: it.ref, g: it.g, from: dayKey_(it.d), to: dayKey_(best.d), days: best.off,
+                 loadBefore: Math.round(before * 10) / 10, loadAfter: Math.round(loads[best.d.getTime()] * 10) / 10 });
+  });
+  moves.sort(function(a, b) { return a.from < b.from ? -1 : a.from > b.from ? 1 : a.row - b.row; });
+  return { moves: moves, threshold: threshold, mean: mean };
+}
+
+function rebalanceTell_(msg) {
+  console.log(msg);
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) {}
+}
+
+function rebalancePreview_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss.getSheetByName('Verses')) { rebalanceTell_('Sheet "Verses" not found.'); return { ok: false, reason: 'nosheet' }; }
+    const plan = planRebalance_();
+    let tab = ss.getSheetByName(REBALANCE_TAB);
+    if (!tab) tab = ss.insertSheet(REBALANCE_TAB);
+    tab.clear();
+    const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    const rows = [];
+    rows.push(['Rebalance preview, made ' + stamp + '. Nothing has changed yet. Delete any row you do not want, then run rebalanceApply().'].concat(['', '', '', '', '', '', '']));
+    rows.push(['A day counts as busy at ' + (Math.round(plan.threshold * 10) / 10) + ' short verses of load or more. Load = words / 30 per verse (1 to 5).'].concat(['', '', '', '', '', '', '']));
+    rows.push(REBALANCE_HEADERS);
+    plan.moves.forEach(function(m) {
+      rows.push([m.ref, GROUP_CONFIG[m.g].name, m.from, m.to, m.days, m.loadBefore, m.loadAfter, '']);
+    });
+    if (!plan.moves.length) rows.push(['No moves needed.', '', '', '', '', '', '', '']);
+    try { tab.getRange(4, 3, Math.max(1, rows.length - 3), 2).setNumberFormat('@'); } catch (e) {} // keep the dates as plain text
+    tab.getRange(1, 1, rows.length, REBALANCE_HEADERS.length).setValues(rows);
+    try { tab.setFrozenRows(3); tab.getRange(3, 1, 1, REBALANCE_HEADERS.length).setFontWeight('bold'); } catch (e) {}
+    rebalanceTell_(plan.moves.length ? 'Preview ready: ' + plan.moves.length + ' verse(s) would move. See the "' + REBALANCE_TAB + '" tab. Nothing has changed.' : 'Nothing needs to move. Nothing has changed.');
+    return { ok: true, moves: plan.moves, threshold: plan.threshold };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function rebalanceApply_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Verses');
+    const tab = ss.getSheetByName(REBALANCE_TAB);
+    if (!sheet) { rebalanceTell_('Sheet "Verses" not found.'); return { ok: false, reason: 'nosheet' }; }
+    if (!tab || tab.getLastRow() < 4) { rebalanceTell_('Run rebalancePreview() first.'); return { ok: false, reason: 'nopreview' }; }
+    const rows = tab.getRange(4, 1, tab.getLastRow() - 3, REBALANCE_HEADERS.length).getValues();
+    const keyOf = function(v) { return v instanceof Date ? dayKey_(v) : String(v || '').trim(); };
+    rows.forEach(function(r) { r[2] = keyOf(r[2]); r[3] = keyOf(r[3]); });
+    const todo = rows.filter(function(r) { return String(r[0] || '').trim() && /^\d{4}-\d{2}-\d{2}$/.test(r[2]) && /^\d{4}-\d{2}-\d{2}$/.test(r[3]) && !String(r[7] || '').trim(); });
+    if (!todo.length) { rebalanceTell_('Nothing to apply: no unapplied rows in the preview.'); return { ok: true, applied: 0, backup: '' }; }
+    const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HHmm');
+    let backupName = '';
+    try {
+      const copy = sheet.copyTo(ss);
+      backupName = 'Verses backup ' + stamp;
+      copy.setName(backupName);
+    } catch (e) {
+      rebalanceTell_('Could not make the backup tab, so nothing was changed: ' + e);
+      return { ok: false, reason: 'backup' };
+    }
+    const today = today_();
+    let applied = 0, skipped = 0;
+    rows.forEach(function(r, idx) {
+      if (todo.indexOf(r) < 0) return;
+      let result = '';
+      const row = findRowByRef_(sheet, cleanRef_(r[0]));
+      if (!row) result = 'Skipped: verse not found';
+      else {
+        const cur = toMidnight_(sheet.getRange(row, 2).getValue());
+        const level = Number(sheet.getRange(row, 5).getValue());
+        const target = dayFromKey_(String(r[3]));
+        if (!cur || dayKey_(cur) !== String(r[2])) result = 'Skipped: date changed since the preview';
+        else if (!(level >= 4)) result = 'Skipped: rank changed since the preview';
+        else if (target.getTime() <= today.getTime()) result = 'Skipped: new date is not in the future';
+        else { sheet.getRange(row, 2).setValue(target); result = 'Moved'; applied++; }
+      }
+      if (result !== 'Moved') skipped++;
+      tab.getRange(4 + idx, 8).setValue(result);
+    });
+    rebalanceTell_('Moved ' + applied + ' verse(s)' + (skipped ? ', skipped ' + skipped : '') + '. Backup tab: ' + backupName);
+    return { ok: true, applied: applied, skipped: skipped, backup: backupName };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ─────────────────────────── Month line (Perfect Days and points this month) ───────────────────────────
