@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-76'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-77'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -379,6 +379,17 @@ function verseCount_(text) {
   return Math.max(1, n);
 }
 
+// Treasury points count verses, not cards: a reference's points are its rank number times its verse count.
+// { reference: verse count } for every verse on the sheet (a reference no longer on the sheet counts as 1).
+function verseCountMap_() {
+  const map = {};
+  try {
+    const data = readSheetData_();
+    for (let i = 1; i < data.length; i++) { const ref = cleanRef_(data[i][5]); if (ref) map[ref] = verseCount_(data[i][7]); }
+  } catch (e) { console.error('verseCountMap_ failed: ' + e); }
+  return map;
+}
+
 // Everything the screen needs to know about a New card's position.
 function stageInfo_(rep, n, bRaw, now) {
   const r = Math.max(1, Math.floor(Number(rep) || 1));
@@ -533,11 +544,12 @@ function learnAction(reference, action, expectedRep) {
     // Other phones notice the change through the session version, like any other review.
     const s = readState_();
     if (s && s.date === todayKey_()) {
-      if (promoted) {  // a new verse in Bronze is one more Treasury point
-        s.stats = sanitizeStats_(s.stats); s.stats.pts += 1;
+      if (promoted) {  // a new card in Bronze adds one Treasury point for each of its verses
+        const pv = verseCount_(vals[7]);
+        s.stats = sanitizeStats_(s.stats); s.stats.pts += pv;
         const mine = s.stats.ptsRefs.filter(function(x) { return x.f === ref; })[0];
-        if (mine) { mine.d += 1; mine.g = 1; if (mine.d === 0) s.stats.ptsRefs.splice(s.stats.ptsRefs.indexOf(mine), 1); }
-        else s.stats.ptsRefs.push({ f: ref, g: 1, d: 1 });
+        if (mine) { mine.d += pv; mine.g = 1; if (mine.d === 0) s.stats.ptsRefs.splice(s.stats.ptsRefs.indexOf(mine), 1); }
+        else s.stats.ptsRefs.push({ f: ref, g: 1, d: pv });
       }
       s.version++; writeState_(s);
     }
@@ -819,10 +831,10 @@ function hydrate_(s, preRead) {
  * Returns today's session, creating it the first time any device asks today.
  */
 // A session saved before Treasury points existed has no pts. Work today's out from the Log tab: the net level change per verse
-// (each row's Level After minus Level Before, same-day repeats left out), which also counts a promoted new verse as +1.
+// (each row's Level After minus Level Before, same-day repeats left out, times the verses in the card), which also counts a promoted new card as +1 per verse.
 function backfillPts_(s) {
   if (!s || !s.stats || typeof s.stats.pts === 'number') return false;
-  const per = {};
+  const per = {}, vc = verseCountMap_();
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
     if (sheet && sheet.getLastRow() >= 2) {
@@ -836,7 +848,7 @@ function backfillPts_(s) {
         const lb = Number(v[3]), la = Number(v[4]), ref = cleanRef_(v[1]);
         if (!ref || isNaN(lb) || isNaN(la) || lb === la) return;
         const e = per[ref] || (per[ref] = { f: ref, g: la, d: 0 });
-        e.d += la - lb; e.g = la;
+        e.d += (la - lb) * (vc[ref] || 1); e.g = la;
       });
     }
   } catch (e) { console.error('backfillPts_ failed: ' + e); }
@@ -1705,6 +1717,7 @@ function getMonthStats(year, month) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return out;
   const vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues();
+  const vc = verseCountMap_();
   vals.forEach(function(v) {
     const t = v[0] instanceof Date ? v[0] : new Date(v[0]);
     if (isNaN(t.getTime())) return;
@@ -1723,7 +1736,7 @@ function getMonthStats(year, month) {
     if (res === 'Fail') { day[1]++; if (!repeat) day[5]++; }
     if (isReview && !repeat && la > lb && lb >= 1) day[2]++;
     if (isPromo) day[3]++;
-    day[4] += la - lb;
+    day[4] += (la - lb) * (vc[cleanRef_(v[1])] || 1);
   });
   return out;
 }
