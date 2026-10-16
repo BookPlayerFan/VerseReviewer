@@ -303,7 +303,7 @@
     .vm-head .vm-name { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; }
     .vm-head .vm-meta { font-size: 12px; color: var(--text-meta); }
     /* The Treasury strip: total points and a bar of how many references sit at each rank. Tapping it opens the Treasury. */
-    .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 4px; padding: 10px 14px; border-radius: 12px; min-height: 0;
+    .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 14px 0 4px; padding: 14px 16px; border-radius: 12px; min-height: 0;
       flex-direction: row; box-shadow: none; text-align: left; color: var(--text-primary); border: 1px solid var(--border-card); background: var(--bg-card); }
         .vs-pts { font-weight: 800; font-size: 15px; white-space: nowrap; }
     .vs-pts small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
@@ -343,6 +343,11 @@
     .tr-body { display: none; padding: 0 0 4px; border-bottom: 1px solid var(--border-card); }
     .tr-grp.open > .tr-body { border-bottom: 0; border-top: 1px solid color-mix(in srgb, var(--rc) 25%, var(--border-card)); }
     .tr-body.open { display: block; }
+    /* The Treasury slides in over the Verses tab and slides back out. */
+    #treasuryView.open { animation: trIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    #treasuryView.closing { animation: trOut 0.2s ease-in forwards; }
+    @keyframes trIn { from { transform: translateX(36px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes trOut { from { transform: none; opacity: 1; } to { transform: translateX(36px); opacity: 0; } }
     .vl-due { font-size: 12px; color: var(--text-meta); white-space: nowrap; margin-left: 10px; }
     .vl-due.now { color: var(--text-accent); font-weight: 700; }
     .vl-sect { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px 6px; border-bottom: 1px solid var(--border-card); }
@@ -1177,7 +1182,6 @@
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
     <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
-    <button type="button" class="vl-strip" id="vlStrip" style="display:none" onclick="openTreasury()"></button>
     <div class="vl-map" id="vlMap" style="display:none"></div>
     <div class="picker-list" id="vlList"></div>
   </div>
@@ -1193,7 +1197,7 @@
   <div class="picker" id="treasuryView">
     <div class="picker-head">
       <span class="picker-title">Treasury</span>
-      <button type="button" class="picker-close" onclick="closeTreasury()">Back</button>
+      <button type="button" class="picker-close" onclick="backTreasury()">Back</button>
     </div>
     <div class="picker-list" id="trList"></div>
   </div>
@@ -1690,7 +1694,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { failed(); return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: verseCount(v.f), pn: textVerses(v.t, v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1 }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: textVerses(v.t, v.f), pn: textVerses(v.t, v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1 }; });
           vlVerses.sort(compareVerses);
           done();
         })
@@ -1731,19 +1735,20 @@
 
     function updateVlControls() {}
 
-    // Strip content: total points (Bronze 1 ... Diamond 8 per reference) and a bar sized by how many references sit at each rank. Tapping it opens the Treasury.
-    function renderVlStrip() {
-      const strip = document.getElementById("vlStrip");
-      const searching = document.getElementById("vlSearchRow").style.display !== "none";
-      if (searching || !vlVerses.length) { strip.style.display = "none"; return; }
+    // The Treasury button at the bottom of the Verses tab: total points (rank number for each verse) and a bar sized by how many
+    // references sit at each rank. Tapping it slides the Treasury in.
+    function treasuryButton() {
+      const strip = document.createElement("button");
+      strip.type = "button"; strip.className = "vl-strip"; strip.id = "vlStrip";
       const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
       let pts = 0;
-      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += g; });
+      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += g * (v.pn || 1); });
       let bar = "";
       for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
       strip.innerHTML = '<span class="vs-pts">' + pts + ' <small>pts</small></span><span class="vs-bar">' + bar + '</span><span class="vs-lbl">Treasury \u203A</span>';
       strip.setAttribute("aria-label", "Treasury, " + pts + " points. Open");
-      strip.style.display = "";
+      strip.onclick = function() { openTreasury(); };
+      return strip;
     }
 
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
@@ -1853,12 +1858,26 @@
       if (!vlVerses.length) return;
       trOpen = null;
       renderTreasury();
-      document.getElementById("treasuryView").classList.add("open");
+      const view = document.getElementById("treasuryView");
+      clearTimeout(trCloseTimer);
+      view.classList.remove("closing");
+      view.classList.add("open");
       document.getElementById("trList").scrollTop = 0;
+    }
+    let trCloseTimer = null;
+    // Back button: slide out, then close. Anything else (changing tab, closing the Verses tab) closes at once.
+    function backTreasury() {
+      const view = document.getElementById("treasuryView");
+      if (!view.classList.contains("open") || view.classList.contains("closing")) return;
+      view.classList.add("closing");
+      trCloseTimer = setTimeout(closeTreasury, 210);
     }
     function closeTreasury() {
       hideVerseTip();
-      document.getElementById("treasuryView").classList.remove("open");
+      clearTimeout(trCloseTimer);
+      const view = document.getElementById("treasuryView");
+      view.classList.remove("closing");
+      view.classList.remove("open");
     }
 
     // One verse row (reference, version badge if not ESV, rank pill): tap for its first words, hold for the whole verse.
@@ -2013,7 +2032,6 @@
         document.getElementById("vlSearchBtn").classList.add("on");
         input.focus();
         updateVlControls();
-        renderVlStrip();
       } else {
         resetVlSearch();
         renderVerseList();
@@ -2027,7 +2045,7 @@
       if (row) row.style.display = "none";
       const btn = document.getElementById("vlSearchBtn");
       if (btn) btn.classList.remove("on");
-      if (document.getElementById("vlStrip")) { updateVlControls(); renderVlStrip(); }
+      updateVlControls();
     }
     function onVlSearch() {
       vlQuery = document.getElementById("vlSearch").value;
@@ -2166,8 +2184,9 @@
       hint.className = "vm-hint";
       if (vlRankHi !== null) {
         hint.textContent = "Showing " + rankName(vlRankHi) + " only \u00B7 tap it again to clear";
-      } else hint.textContent = "Tap a rank to light up its books, or a book for its verses";
-      wrap.appendChild(hint);
+        wrap.appendChild(hint);
+      }
+      wrap.appendChild(treasuryButton());
       box.appendChild(wrap);
     }
 
@@ -2250,7 +2269,6 @@
       box.textContent = "";
       map.style.display = "none";
       updateVlControls();
-      renderVlStrip();
       if (vlQuery.trim() && renderVlSearch(box)) return;
       document.getElementById("vlTotal").textContent = "";
       if (vlVerses.length === 0) {
@@ -2268,7 +2286,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-186';
+    const CLIENT_BUILD = 'sync-187';
 
     let queue = [];
     let currentIndex = 0;

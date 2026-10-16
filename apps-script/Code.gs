@@ -719,8 +719,10 @@ function activeEnd_(s) {
   return i < 0 ? s.queue.length : i;
 }
 
+// PTS_VER marks a day's Treasury points as counted per verse. A session without it (counted by card, or before points existed) is recounted from the Log.
+const PTS_VER = 2;
 function emptyStats_() {
-  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [] };
+  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsV: PTS_VER, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [] };
 }
 
 function createState_(dateKey) {
@@ -830,10 +832,10 @@ function hydrate_(s, preRead) {
 /**
  * Returns today's session, creating it the first time any device asks today.
  */
-// A session saved before Treasury points existed has no pts. Work today's out from the Log tab: the net level change per verse
+// A session whose points were not counted per verse (none yet, or counted by card) is recounted once. Work today's out from the Log tab: the net level change per verse
 // (each row's Level After minus Level Before, same-day repeats left out, times the verses in the card), which also counts a promoted new card as +1 per verse.
 function backfillPts_(s) {
-  if (!s || !s.stats || typeof s.stats.pts === 'number') return false;
+  if (!s || !s.stats || s.stats.ptsV === PTS_VER) return false;
   const per = {}, vc = verseCountMap_();
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
@@ -855,6 +857,7 @@ function backfillPts_(s) {
   const refs = Object.keys(per).map(function(k) { return per[k]; }).filter(function(e) { return e.d !== 0; });
   s.stats.ptsRefs = refs;
   s.stats.pts = refs.reduce(function(a, e) { return a + e.d; }, 0);
+  s.stats.ptsV = PTS_VER;
   return true;
 }
 
@@ -1044,7 +1047,7 @@ function sanitizeStats_(st) {
     const out = [], seen = Object.create(null);
     (Array.isArray(list) ? list : []).forEach(function(r) {
       const f = String((r && r.f) || '').slice(0, 120), d = Number(r && r.d), g = Number(r && r.g);
-      if (!f || seen[f] || out.length >= 100 || !Number.isInteger(d) || d === 0 || d < -8 || d > 8) return;
+      if (!f || seen[f] || out.length >= 100 || !Number.isInteger(d) || d === 0 || d < -999 || d > 999) return;
       seen[f] = true;
       out.push({ f: f, g: (Number.isInteger(g) && g >= 0 && g <= 8) ? g : 0, d: d });
     });
@@ -1052,7 +1055,7 @@ function sanitizeStats_(st) {
   };
   // pts: Treasury points added today (can be negative after misses): the net change in levels, +1 for each new verse promoted to Bronze.
   const pts = Number.isInteger(Number(st.pts)) ? Math.max(-999, Math.min(999, Number(st.pts))) : 0;
-  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), pts: pts, ptsRefs: cleanPts(st.ptsRefs), failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
+  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), pts: pts, ptsV: Number(st.ptsV) === PTS_VER ? PTS_VER : 0, ptsRefs: cleanPts(st.ptsRefs), failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
 }
 
 /**
