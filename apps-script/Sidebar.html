@@ -407,23 +407,30 @@
     .cal-mon { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 20px 2px 8px; }
     .cal-mon:first-of-type { margin-top: 6px; }
     .cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 5px; }
-    .cal-d { --h: 0; position: relative; box-sizing: border-box; height: 44px; min-height: 0; width: auto; padding: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: var(--text-primary); box-shadow: none;
-      background: color-mix(in srgb, var(--text-accent) calc(var(--h) * 13%), transparent); border: 1px solid transparent; }
-    .cal-d i { position: absolute; left: 6px; top: 4px; font-style: normal; font-size: 8px; font-weight: 600; color: var(--text-meta); opacity: 0.7; }
-    .cal-d.z { color: transparent; background: none; pointer-events: none; }
-    .cal-d.z i { opacity: 0.4; }
-    .cal-d.past { opacity: 0.25; }
-    .cal-d.h4 { background: color-mix(in srgb, var(--text-accent) 52%, transparent); }
-    .cal-d.hot { color: #fff; background: #d98200; }
-    .cal-d.hot i { color: rgba(255, 255, 255, 0.85); opacity: 1; }
+    /* a day with reviews is styled like a map tile: a tint, a soft border, the colour on the number; shade steps by word load, amber is the heaviest */
+    .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 44px; min-height: 0; width: auto; padding: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800; color: var(--rc); box-shadow: none;
+      background: color-mix(in srgb, var(--rc) calc(4% + var(--h) * 7%), transparent); border: 1px solid color-mix(in srgb, var(--rc) 38%, transparent); }
+    .cal-d i { position: absolute; left: 6px; top: 4px; font-style: normal; font-size: 8px; font-weight: 700; color: var(--rc); opacity: 0.6; }
+    .cal-d.hot { --rc: #c47400; background: color-mix(in srgb, var(--rc) 20%, transparent); border-color: color-mix(in srgb, var(--rc) 55%, transparent); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.hot { --rc: #ffb454; } }
+    :root[data-theme="dark"] .cal-d.hot { --rc: #ffb454; }
+    /* a day with nothing due is just a faint number */
+    .cal-d.z { background: none; border-color: transparent; color: var(--text-meta); font-size: 14px; font-weight: 500; opacity: 0.55; pointer-events: none; }
+    .cal-d.past { opacity: 0.22; }
     .cal-d.today { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3.5px var(--text-accent); }
+    .cal-d.today.z { opacity: 1; color: var(--text-accent); font-weight: 700; }
     .cal-d:active { transform: none; filter: none; }
     .cal-d.sk { animation: skPulse 1.1s ease-in-out infinite; }
-    .cal-d.sk.z i { opacity: 0.7; }
     @keyframes skPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
     .cal-gap { text-align: center; margin: 14px 0 2px; font-size: 11.5px; font-weight: 600; color: var(--text-meta); opacity: 0.85; }
-    .cal-key { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 10px; color: var(--text-meta); margin: 22px 0 10px; opacity: 0.8; }
-    .cal-key b { display: block; width: 13px; height: 13px; border-radius: 4px; }
+    .pk-bubble.pk-explain { top: 60px; left: 20px; right: 20px; padding: 6px 0; }
+    .pk-x { display: flex; align-items: center; gap: 14px; padding: 12px 18px; font-size: 14px; color: var(--text-primary); }
+    .pk-x + .pk-x { border-top: 1px solid var(--border-card); }
+    .pk-x > span { flex: none; width: 74px; display: flex; gap: 4px; justify-content: center; }
+    .pk-x .cal-d { width: 30px; height: 30px; font-size: 13px; border-radius: 8px; pointer-events: none; }
+    .pk-x .cal-d i { display: none; }
+    .pk-x b { font-weight: 700; }
+    .pk-x small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 1px; }
     .pk-bubble.pk-day { left: 14px; right: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 20px; }
     .pk-day .pk-h { padding: 18px 20px 12px; }
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
@@ -1261,7 +1268,7 @@
 
   <div class="picker" id="upcomingView">
     <div class="picker-head">
-      <span class="picker-title">Upcoming reviews</span>
+      <span class="picker-title" onclick="explainUpcoming()">Upcoming reviews</span>
       <button type="button" class="picker-close" onclick="backUpcoming()">Close</button>
     </div>
     <div class="picker-list" id="upList"></div>
@@ -1884,6 +1891,7 @@
           if (e - w >= 2) {
             const g = document.createElement("div"); g.className = "cal-gap";
             g.textContent = "Nothing due · " + short(dayAt(start + w * 7)) + " – " + short(dayAt(start + e * 7 - 1));
+            g.dataset.from = start + w * 7; g.dataset.weeks = e - w;
             box.appendChild(g); w = e; continue;
           }
         }
@@ -1904,8 +1912,9 @@
           if (vs.length) c.type = "button";
           c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (h === 4 ? " h4" : "") + (vs.length && load >= heavy && ratio >= 0.7 ? " hot" : "");
           c.style.setProperty("--h", h);
-          const n = document.createElement("i"); n.textContent = d.getDate(); c.appendChild(n);
-          if (vs.length) {
+          if (!vs.length) c.textContent = d.getDate();
+          else {
+            const n = document.createElement("i"); n.textContent = d.getDate(); c.appendChild(n);
             c.appendChild(document.createTextNode(vs.length));
             c.setAttribute("aria-label", DOW[d.getDay()] + ", " + short(d) + ", " + vs.length + (vs.length === 1 ? " reference" : " references"));
             c.onclick = function() { peekDay(c, off, vs); };
@@ -1916,11 +1925,30 @@
         w++;
       }
       if (!placeholder && total) {
-        const key = document.createElement("div"); key.className = "cal-key";
-        key.innerHTML = 'lighter day <b style="background:color-mix(in srgb,var(--text-accent) 13%,transparent)"></b><b style="background:color-mix(in srgb,var(--text-accent) 26%,transparent)"></b><b style="background:color-mix(in srgb,var(--text-accent) 39%,transparent)"></b><b style="background:color-mix(in srgb,var(--text-accent) 52%,transparent)"></b> busier <b style="background:#d98200;margin-left:8px"></b> heaviest';
-        box.appendChild(key);
       }
       box.scrollTop = keepTop;
+    }
+    // Tap the "Upcoming reviews" title: what the numbers and shades mean.
+    function explainUpcoming() {
+      hideVerseTip(); closePeek();
+      const dim = document.createElement("div");
+      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
+      dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
+      document.body.appendChild(dim);
+      const b = document.createElement("div");
+      b.className = "pk-bubble pk-explain"; b.id = "pkBubble";
+      const row = function(tiles, title, sub) {
+        const r = document.createElement("div"); r.className = "pk-x";
+        const l = document.createElement("span");
+        tiles.forEach(function(t) { const c = document.createElement("div"); c.className = "cal-d" + (t[1] ? " hot" : ""); c.style.setProperty("--h", t[0]); c.textContent = t[2] || ""; l.appendChild(c); });
+        r.appendChild(l);
+        const tx = document.createElement("div"); const bb = document.createElement("b"); bb.textContent = title; const sm = document.createElement("small"); sm.textContent = sub;
+        tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
+      };
+      row([[2, false, "3"]], "The number", "how many references are due that day");
+      row([[1, false], [3, false]], "The shade", "how much there is to learn; darker is a heavier day");
+      row([[0, true]], "Amber", "the heaviest days");
+      document.body.appendChild(b);
     }
     // Tap a day: its tile lifts over a dimmed calendar and a card lists the day's references.
     function peekDay(cell, off, vs) {
@@ -2091,20 +2119,21 @@
       view.classList.add("open");
       document.getElementById("trList").scrollTop = 0;
     }
-    // Swipe right anywhere on a screen to go back (same mechanic as the swipe in the New tab): it fires as soon as the finger has clearly
+    // Swipe anywhere on a screen to close it (right or left, per screen; same mechanic as the swipe in the New tab): it fires as soon as the finger has clearly
     // gone sideways. Mostly-vertical drags are left to scrolling, and the very edge of the screen is left to iOS.
-    function attachSwipeBack(id, back) {
+    function attachSwipeBack(id, back, dir) {
       const view = document.getElementById(id);
+      const sign = dir === "left" ? -1 : 1;
       let tracking = false, sx = 0, sy = 0, fired = false;
       view.addEventListener("pointerdown", function(e) {
         tracking = false; fired = false;
         if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
-        if (e.pointerType === "touch" && e.clientX < 14) return;
+        if (e.pointerType === "touch" && (sign > 0 ? e.clientX < 14 : e.clientX > window.innerWidth - 14)) return;
         tracking = true; sx = e.clientX; sy = e.clientY;
       });
       view.addEventListener("pointermove", function(e) {
         if (!tracking) return;
-        const dx = e.clientX - sx, dy = e.clientY - sy;
+        const dx = (e.clientX - sx) * sign, dy = e.clientY - sy;
         if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }   // a vertical scroll
         if (dx < SWIPE_MIN || dx < Math.abs(dy) * SWIPE_RATIO) return;
         tracking = false; fired = true;
@@ -2618,7 +2647,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-205';
+    const CLIENT_BUILD = 'sync-206';
 
     let queue = [];
     let currentIndex = 0;
@@ -2697,9 +2726,10 @@
     });
 
     window.onload = function() {
-      attachSwipeBack("treasuryView", backTreasury);
+      attachSwipeBack("treasuryView", backTreasury, "left");
       attachSwipeBack("bookView", backBook);
-      attachSwipeBack("upcomingView", backUpcoming);
+      attachSwipeBack("upcomingView", backUpcoming, "left");
+      attachSwipeBack("searchView", backSearch, "left");
       attachRevealHold();
       attachSwipe();
       attachRefHold();
