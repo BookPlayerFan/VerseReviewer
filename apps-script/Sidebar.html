@@ -273,8 +273,8 @@
     .vm-sect:first-child { margin-top: 0; }
     .vm-sect:active { transform: none; filter: none; }
     /* tap a testament's heading: the colour key, as boxes in the same style as the map's tiles */
-    .pk-bubble.pk-key { left: 16px; right: 16px; width: auto; display: flex; flex-direction: column; gap: 4px; padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; animation: pkFade 0.15s ease; }
-    .pk-k { --rc: var(--rl); box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 42px; border-radius: 8px; font-size: 14px; font-weight: 800; color: var(--rc);
+    .pk-bubble.pk-key { left: 16px; right: auto; width: 230px; display: flex; flex-direction: column; gap: 4px; padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; animation: pkFade 0.15s ease; }
+    .pk-k { --rc: var(--rl); box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; font-size: 13px; font-weight: 800; white-space: nowrap; color: var(--rc);
       background-color: var(--bg-card); background-image: linear-gradient(color-mix(in srgb, var(--rc) 14%, transparent), color-mix(in srgb, var(--rc) 14%, transparent)); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
     .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
     /* a colour for each section of the Bible */
@@ -282,7 +282,7 @@
     .cat-2 { --rl: #2563c9; --rd: #7fa8ff; }
     .cat-3 { --rl: #d4690c; --rd: #ffa45c; }
     .cat-4 { --rl: #c9374f; --rd: #ff8a9c; }
-    .cat-5 { --rl: #7b4fd0; --rd: #b49bff; }
+    .cat-5 { --rl: #0b8f9c; --rd: #5fd6e0; }
     .cat-oth { --rl: #8a8f94; --rd: #9aa0a6; }
     .vm-tile { --rc: var(--rl); position: relative; box-sizing: border-box; min-height: 0; width: auto; padding: 0; border-radius: 8px; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 2px; line-height: 1; letter-spacing: 0; box-shadow: none; color: var(--rc);
@@ -2263,7 +2263,7 @@
     }
     const MAP_KEY = {
       ot: [[1, "Law"], [2, "History"], [3, "Wisdom & poetry"], [4, "Major Prophets"], [5, "Minor Prophets"]],
-      nt: [[1, "Gospels"], [2, "Acts"], [3, "Paul to churches"], [4, "Paul to individuals"], [5, "General letters & Revelation"]]
+      nt: [[1, "Gospels"], [2, "Acts"], [3, "Paul to churches"], [4, "Paul to individuals"], [5, "General & Revelation"]]
     };
     // Tap a testament heading for the colour key.
     function showMapKey(which, head) {
@@ -2280,7 +2280,11 @@
       });
       document.body.appendChild(b);
       const r = head.getBoundingClientRect();
-      b.style.top = (r.bottom + 4) + "px";
+      // below the heading, or above it when there is no room
+      const room = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 8;
+      let top = r.bottom + 4;
+      if (top + b.offsetHeight > room) top = r.top - 4 - b.offsetHeight >= 8 ? r.top - 4 - b.offsetHeight : Math.max(8, room - b.offsetHeight);
+      b.style.top = top + "px";
     }
     // The book map: a tile for each book, coloured by its section of the Bible. It fills the screen above the Treasury button.
     function renderVlBooks(map, box) {
@@ -2436,7 +2440,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-198';
+    const CLIENT_BUILD = 'sync-199';
 
     let queue = [];
     let currentIndex = 0;
