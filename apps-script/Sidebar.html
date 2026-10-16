@@ -1986,7 +1986,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-165';
+    const CLIENT_BUILD = 'sync-166';
 
     let queue = [];
     let currentIndex = 0;
@@ -2852,10 +2852,10 @@
 
     // ── Phrase splitting (New tab) ──
     // A numbered verse longer than PHRASE_CAP words is cut into phrases so you can learn it a piece at a time.
-    // Aim is about PHRASE_TARGET words per phrase; up to PHRASE_CAP (20% more) is allowed when it gives a cleaner break.
+    // Aim is about PHRASE_TARGET words per phrase; up to PHRASE_CAP (25% more) is allowed when it gives a cleaner break.
     // Breaks go where the sentence naturally pauses: sentence ends first, then ; : dashes, then a comma before
     // and / but / that / who ..., and plain commas last. Lists ("faith, hope, and love") are kept together.
-    const PHRASE_TARGET = 20, PHRASE_CAP = 24, PHRASE_MIN = 5;
+    const PHRASE_TARGET = 12, PHRASE_CAP = 15, PHRASE_MIN = 5;
     const PHRASE_CONJ = /^(and|but|for|so|yet|or|nor|that|because|who|whom|whose|which|when|while|if|though|although|since|until|unless|whether|as|then|therefore|thus|lest|where|whoever|whatever|whenever|wherever)$/;
 
     function splitPhrases(text) {
