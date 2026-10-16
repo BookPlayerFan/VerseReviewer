@@ -272,21 +272,17 @@
     .vm-sect { flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; width: auto; min-height: 0; margin: 4px 0 1px; padding: 4px 6px 4px 2px; border: 0; background: none; box-shadow: none; font: inherit; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); }
     .vm-sect:first-child { margin-top: 0; }
     .vm-sect:active { transform: none; filter: none; }
-    .vm-sect svg { width: 9px; height: 9px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
-    /* tap a testament's heading: a little key to the colours */
-    .pk-key { top: 0; left: 16px; right: auto; width: min(340px, calc(100% - 32px)); padding: 6px 0 4px; }
-    .pk-k { display: flex; align-items: center; gap: 10px; padding: 7px 16px; font-size: 14px; }
-    .pk-k + .pk-k { border-top: 1px solid var(--border-card); }
-    .pk-k i { --rc: var(--rl); flex: none; width: 12px; height: 12px; border-radius: 4px; background: var(--rc); }
-    .pk-k b { font-weight: 700; color: var(--text-primary); }
-    .pk-k span { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    /* tap a testament's heading: the colour key, as boxes in the same style as the map's tiles */
+    .pk-bubble.pk-key { left: 16px; right: 16px; width: auto; display: flex; flex-direction: column; gap: 4px; padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; animation: pkFade 0.15s ease; }
+    .pk-k { --rc: var(--rl); box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 42px; border-radius: 8px; font-size: 14px; font-weight: 800; color: var(--rc);
+      background-color: var(--bg-card); background-image: linear-gradient(color-mix(in srgb, var(--rc) 14%, transparent), color-mix(in srgb, var(--rc) 14%, transparent)); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
     .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
     /* a colour for each section of the Bible */
-    .cat-1 { --rl: #c9374f; --rd: #ff8a9c; }
+    .cat-1 { --rl: #138a55; --rd: #4fd18e; }
     .cat-2 { --rl: #2563c9; --rd: #7fa8ff; }
     .cat-3 { --rl: #d4690c; --rd: #ffa45c; }
-    .cat-4 { --rl: #7b4fd0; --rd: #b49bff; }
-    .cat-5 { --rl: #138a55; --rd: #4fd18e; }
+    .cat-4 { --rl: #c9374f; --rd: #ff8a9c; }
+    .cat-5 { --rl: #7b4fd0; --rd: #b49bff; }
     .cat-oth { --rl: #8a8f94; --rd: #9aa0a6; }
     .vm-tile { --rc: var(--rl); position: relative; box-sizing: border-box; min-height: 0; width: auto; padding: 0; border-radius: 8px; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 2px; line-height: 1; letter-spacing: 0; box-shadow: none; color: var(--rc);
@@ -312,8 +308,8 @@
     .pk-open:active { transform: none; filter: none; }
     @keyframes pkFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes pkPop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: none; } }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .pk-k i { --rc: var(--rd); } }
-    :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .pk-k i { --rc: var(--rd); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .pk-k { --rc: var(--rd); } }
+    :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .pk-k { --rc: var(--rd); }
     .vm-sum { padding: 0; }
     .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 14px; }
     .vm-stats { display: flex; gap: 8px; }
@@ -2266,13 +2262,12 @@
       return i < 43 ? 1 : i === 43 ? 2 : i < 53 ? 3 : i < 57 ? 4 : 5;
     }
     const MAP_KEY = {
-      ot: [[1, "Law", "Genesis \u2013 Deuteronomy"], [2, "History", "Joshua \u2013 Esther"], [3, "Wisdom & poetry", "Job \u2013 Song of Songs"], [4, "Major Prophets", "Isaiah \u2013 Daniel"], [5, "Minor Prophets", "Hosea \u2013 Malachi"]],
-      nt: [[1, "Gospels", "Matthew \u2013 John"], [2, "History", "Acts"], [3, "Paul to churches", "Romans \u2013 2 Thess."], [4, "Paul to individuals", "1 Timothy \u2013 Philemon"], [5, "General & Revelation", "Hebrews \u2013 Rev."]]
+      ot: [[1, "Law"], [2, "History"], [3, "Wisdom & poetry"], [4, "Major Prophets"], [5, "Minor Prophets"]],
+      nt: [[1, "Gospels"], [2, "Acts"], [3, "Paul to churches"], [4, "Paul to individuals"], [5, "General letters & Revelation"]]
     };
     // Tap a testament heading for the colour key.
     function showMapKey(which, head) {
       hideVerseTip(); closePeek();
-      const born = Date.now();
       const dim = document.createElement("div");
       dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.18)";
       dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
@@ -2280,11 +2275,8 @@
       const b = document.createElement("div");
       b.className = "pk-bubble pk-key"; b.id = "pkBubble";
       MAP_KEY[which].forEach(function(r) {
-        const row = document.createElement("div"); row.className = "pk-k";
-        const dot = document.createElement("i"); dot.className = "cat-" + r[0];
-        const nm = document.createElement("b"); nm.textContent = r[1];
-        const bk = document.createElement("span"); bk.textContent = r[2];
-        row.appendChild(dot); row.appendChild(nm); row.appendChild(bk); b.appendChild(row);
+        const row = document.createElement("div"); row.className = "pk-k cat-" + r[0];
+        row.textContent = r[1]; b.appendChild(row);
       });
       document.body.appendChild(b);
       const r = head.getBoundingClientRect();
@@ -2307,7 +2299,6 @@
         const ht = document.createElement("span"); ht.textContent = title; h.appendChild(ht);
         if (legend) {
           h.type = "button";
-          h.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5"/></svg>');
           h.setAttribute("aria-label", title + ", colour key");
           h.onclick = function() { showMapKey(legend, h); };
         }
@@ -2445,7 +2436,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-197';
+    const CLIENT_BUILD = 'sync-198';
 
     let queue = [];
     let currentIndex = 0;
