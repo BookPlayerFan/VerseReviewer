@@ -267,21 +267,31 @@
     .vl-row, .vl-strip, .picker-close { transition: none; }
     .vl-row .chev { transition: transform 0.15s ease; }
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
-    /* Book map on the Verse List: a tile for each book, colored by the highest rank in it; tap one to list its verses below. */
-    .vl-map { flex: none; margin: 4px 0 2px; }
-    .vm-sect { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 7px 2px 4px; }
+    /* Book map on the Verse List: a tile for each book, coloured by its section of the Bible; tap one to open its verses. */
+    .vl-map { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 4px 0 2px; }
+    .vm-sect { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 8px 2px 5px; }
     .vm-sect:first-child { margin-top: 2px; }
-    .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
-    .vm-tile { --rc: var(--rl); position: relative; box-sizing: border-box; aspect-ratio: 1; min-height: 0; width: auto; padding: 0; border-radius: 8px; display: flex; flex-direction: column;
+    .vm-lg { display: flex; gap: 8px; font-size: 9px; font-weight: 700; letter-spacing: 0.02em; text-transform: none; color: var(--text-meta); white-space: nowrap; }
+    .vm-lg span { display: inline-flex; align-items: center; gap: 3px; }
+    .vm-lg i { --rc: var(--rl); display: block; width: 7px; height: 7px; border-radius: 2px; background: var(--rc); }
+    .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
+    /* a colour for each section of the Bible */
+    .cat-law { --rl: #7b4fd0; --rd: #b49bff; }
+    .cat-hist { --rl: #2563c9; --rd: #7fa8ff; }
+    .cat-poet { --rl: #b88a00; --rd: #f2c94c; }
+    .cat-proph { --rl: #c9374f; --rd: #ff8a9c; }
+    .cat-gosp { --rl: #138a55; --rd: #4fd18e; }
+    .cat-lett { --rl: #d4690c; --rd: #ffa45c; }
+    .cat-oth { --rl: #8a8f94; --rd: #9aa0a6; }
+    .vm-tile { --rc: var(--rl); position: relative; box-sizing: border-box; min-height: 0; width: auto; padding: 0; border-radius: 8px; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 2px; line-height: 1; letter-spacing: 0; box-shadow: none; color: var(--rc);
       background: color-mix(in srgb, var(--rc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
-    .vm-tile .vm-ab { font-size: 13px; font-weight: 800; }
+    .vm-tile .vm-ab { font-size: 14px; font-weight: 800; }
     .vm-tile .vm-ct { font-size: 11px; font-weight: 700; opacity: 0.85; }
     .vm-tile.dim { opacity: 0.35; }
-    .vm-tile.rank-0 { --rl: #8a8f94; --rd: #9aa0a6; }
-    .vm-tile.empty { background: rgba(128, 128, 128, 0.1); border: 1px dashed var(--border-card); color: var(--text-meta); font-size: 10px; font-weight: 600; pointer-events: none; }
-    .vm-tile.empty.nr { pointer-events: auto; cursor: pointer; }
-    .vm-tile.empty .vm-ab { font-size: 10px; font-weight: 600; }
+    /* a book with no verses yet: the section colour, dimmed, with a dotted outline */
+    .vm-tile.empty { background: color-mix(in srgb, var(--rc) 5%, transparent); border: 1px dashed color-mix(in srgb, var(--rc) 38%, transparent); color: color-mix(in srgb, var(--rc) 50%, var(--text-meta)); opacity: 0.75; pointer-events: none; }
+    .vm-tile.empty .vm-ab { font-size: 12px; font-weight: 600; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
     /* Hold a book: a small preview bubble over a dimmed map. */
@@ -297,10 +307,9 @@
     .pk-open:active { transform: none; filter: none; }
     @keyframes pkFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes pkPop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: none; } }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile { --rc: var(--rd); } }
-    :root[data-theme="dark"] .vm-tile { --rc: var(--rd); }
-    .vm-sum { padding: 14px 0; }
-    #sumTreasury .vl-strip { margin: 12px 0 2px; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .vm-lg i { --rc: var(--rd); } }
+    :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .vm-lg i { --rc: var(--rd); }
+    .vm-sum { padding: 0; }
     .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 14px; }
     .vm-stats { display: flex; gap: 8px; }
     .tr-mini { display: flex; gap: 8px; margin-top: 12px; }
@@ -314,7 +323,7 @@
     .vm-head .vm-name { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; }
     .vm-head .vm-meta { font-size: 12px; color: var(--text-meta); }
     /* The Treasury strip: total points and a bar of how many references sit at each rank. Tapping it opens the Treasury. */
-    .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 14px 0 4px; padding: 14px 16px; border-radius: 12px; min-height: 0;
+    .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 10px 0 0; padding: 14px 16px; border-radius: 12px; min-height: 0;
       flex-direction: row; box-shadow: none; text-align: left; color: var(--text-primary); border: 1px solid var(--border-card); background: var(--bg-card); }
         .vs-pts { font-weight: 800; font-size: 15px; white-space: nowrap; }
     .vs-pts small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
@@ -936,6 +945,7 @@
       border-radius: 99px; padding: 1px 6px; line-height: 14px; }
     .tab.on .tab-count { background: var(--text-accent); }
     #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
+    #verseListView .picker-list { flex: none; overflow: visible; }
     #verseListView .picker-close { display: none; }
     .vl-iconbtn { background: none; border: 0; box-shadow: none; width: auto; min-height: 0; margin: -6px 0; padding: 6px 4px 6px 12px; }
     .vl-iconbtn svg { width: 22px; height: 22px; display: block; stroke: var(--text-accent, #1a73e8); fill: none; stroke-width: 2; stroke-linecap: round; }
@@ -1096,6 +1106,7 @@
       color: var(--text-primary); margin-bottom: 8px; }
     .picker-list { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
+    #treasuryView, #bookView, #searchView, #upcomingView { touch-action: pan-y; }
     .picker-item { display: block; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0;
       box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
       color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
@@ -1181,7 +1192,6 @@
       </div>
       <div class="fail-list" id="failList" style="display: none;"></div>
 
-      <div id="sumTreasury"></div>
 
       <div class="tomorrow-note" id="tomorrowNote" role="button" onclick="openUpcoming()" style="display: none;"></div>
 
@@ -1917,45 +1927,32 @@
       view.classList.add("open");
       document.getElementById("trList").scrollTop = 0;
     }
-    // Swipe right from the left edge to go back, like on a phone: the screen follows your finger and slides off.
-    function attachEdgeBack(id, close) {
+    // Swipe right anywhere on a screen to go back (same mechanic as the swipe in the New tab): it fires as soon as the finger has clearly
+    // gone sideways. Mostly-vertical drags are left to scrolling, and the very edge of the screen is left to iOS.
+    function attachSwipeBack(id, back) {
       const view = document.getElementById(id);
-      let x0 = 0, y0 = 0, dx = 0, on = false, locked = false;
-      view.addEventListener("touchstart", function(e) {
-        on = false; locked = false; dx = 0;
-        if (e.touches.length !== 1 || e.touches[0].clientX > 44) return;
-        x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; on = true;
-      }, { passive: true });
-      view.addEventListener("touchmove", function(e) {
-        if (!on || e.touches.length !== 1) return;
-        const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
-        if (!locked) {
-          if (Math.abs(my) > 14 && Math.abs(my) > Math.abs(mx)) { on = false; return; }   // it is a scroll
-          if (mx < 10) return;
-          locked = true;
-        }
-        dx = Math.max(0, mx);
-        view.style.transition = "none";
-        view.style.transform = "translateX(" + dx + "px)";
-        if (e.cancelable) e.preventDefault();
-      }, { passive: false });
-      const end = function() {
-        if (!on) return;
-        on = false;
-        if (!locked) return;
-        locked = false;
-        const w = view.offsetWidth || 390;
-        view.style.transition = "transform 0.2s ease-out";
-        if (dx > Math.min(110, w * 0.3)) {
-          view.style.transform = "translateX(" + w + "px)";
-          setTimeout(function() { close(); view.style.transition = ""; view.style.transform = ""; }, 200);
-        } else {
-          view.style.transform = "";
-          setTimeout(function() { view.style.transition = ""; }, 200);
-        }
-      };
-      view.addEventListener("touchend", end, { passive: true });
-      view.addEventListener("touchcancel", end, { passive: true });
+      let tracking = false, sx = 0, sy = 0, fired = false;
+      view.addEventListener("pointerdown", function(e) {
+        tracking = false; fired = false;
+        if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+        if (e.pointerType === "touch" && e.clientX < 14) return;
+        tracking = true; sx = e.clientX; sy = e.clientY;
+      });
+      view.addEventListener("pointermove", function(e) {
+        if (!tracking) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }   // a vertical scroll
+        if (dx < SWIPE_MIN || dx < Math.abs(dy) * SWIPE_RATIO) return;
+        tracking = false; fired = true;
+        hideVerseTip();
+        back();
+      });
+      window.addEventListener("pointerup", function() { tracking = false; });
+      window.addEventListener("pointercancel", function() { tracking = false; });
+      // the click that can follow a swipe must not also open or tap something
+      view.addEventListener("click", function(e) {
+        if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
+      }, true);
     }
     let trCloseTimer = null;
     // Back button: slide out, then close. Anything else (changing tab, closing the Verses tab) closes at once.
@@ -2257,7 +2254,18 @@
       box.appendChild(wrap);
     }
 
-    // The book map and, under it, the verses of the selected book.
+    // The section of the Bible a book sits in (its index in BIBLE_BOOKS): the Law, history, poetry, prophets, gospels, letters.
+    function bookCat(i) {
+      if (i < 5) return "law";
+      if (i < 17) return "hist";
+      if (i < 22) return "poet";
+      if (i < 39) return "proph";
+      if (i < 43) return "gosp";
+      if (i === 43) return "hist";   // Acts
+      if (i < 65) return "lett";
+      return "proph";                // Revelation
+    }
+    // The book map: a tile for each book, coloured by its section of the Bible. It fills the screen above the Treasury button.
     function renderVlBooks(map, box) {
       const byKey = {};
       vlVerses.forEach(function(v) {
@@ -2268,25 +2276,32 @@
         if (v.g > g.top) g.top = v.g;
       });
       map.textContent = "";
-      const section = function(title, books) {
+      const section = function(title, books, legend) {
         const h = document.createElement("div");
         h.className = "vm-sect";
-        h.textContent = title;
+        const ht = document.createElement("span"); ht.textContent = title; h.appendChild(ht);
+        if (legend) {
+          const lg = document.createElement("div"); lg.className = "vm-lg";
+          legend.forEach(function(c) { const sp = document.createElement("span"); const dot = document.createElement("i"); dot.className = "cat-" + c[0]; sp.appendChild(dot); sp.appendChild(document.createTextNode(c[1])); lg.appendChild(sp); });
+          h.appendChild(lg);
+        }
         map.appendChild(h);
         const grid = document.createElement("div");
         grid.className = "vm-grid";
+        const rows = Math.ceil(books.length / 8);
+        grid.style.flex = rows + " 1 0"; grid.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
         books.forEach(function(b) {
           const g = byKey[b.key];
           const t = document.createElement(g ? "button" : "div");
           if (g) t.type = "button";
-          t.className = "vm-tile empty";
+          const cat = "cat-" + (typeof b.key === "number" ? bookCat(b.key) : "oth");
+          t.className = "vm-tile empty " + cat;
           if (g) {
-            // a book that only has brand-new (unranked) verses gets the plain dashed look, but can still be tapped
-            t.className = g.top ? "vm-tile rank-" + Math.min(8, g.top) : "vm-tile empty nr";
+            t.className = "vm-tile " + cat;
             const ab = document.createElement("span"); ab.className = "vm-ab"; ab.textContent = b.abbr;
             const ct = document.createElement("span"); ct.className = "vm-ct"; ct.textContent = g.n;
-            t.appendChild(ab); if (g.top) t.appendChild(ct);
-            t.setAttribute("aria-label", g.name + ", " + g.n + (g.n === 1 ? " verse, highest rank " : " verses, highest rank ") + rankName(g.top));
+            t.appendChild(ab); t.appendChild(ct);
+            t.setAttribute("aria-label", g.name + ", " + g.n + (g.n === 1 ? " verse" : " verses"));
             // tap: the book opens as its own screen. hold: a quick preview.
             const heldTile = attachLongPress(t, function() { peekBook(g.key, t); heldTile(); });
             t.onclick = function() { if (heldTile()) return; openBook(g.key); };
@@ -2298,15 +2313,15 @@
       const ot = [], nt = [], other = [];
       BIBLE_BOOKS.forEach(function(b, i) { (i < 39 ? ot : nt).push({ key: i, abbr: BOOK_ABBR[i] }); });
       Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3) }); });
-      section("Old Testament", ot);
-      section("New Testament", nt);
+      section("Old Testament", ot, [["law", "Law"], ["hist", "History"], ["poet", "Poetry"], ["proph", "Prophets"]]);
+      section("New Testament", nt, [["gosp", "Gospels"], ["hist", "History"], ["lett", "Letters"], ["proph", "Prophecy"]]);
       if (other.length) section("Other", other);
 
       box.textContent = "";
       renderVlSummary(box, byKey);
     }
 
-    // One book's references as their own screen: slides in from the right, swipe from the left edge (or Back) to return to the map.
+    // One book's references as their own screen: slides in from the right, swipe right (or Back) to return to the map.
     function openBook(key) {
       hideVerseTip(); closePeek();
       const vs = vlVerses.filter(function(v) { return vlBookKey(v) === key; });
@@ -2404,7 +2419,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-195';
+    const CLIENT_BUILD = 'sync-196';
 
     let queue = [];
     let currentIndex = 0;
@@ -2483,10 +2498,10 @@
     });
 
     window.onload = function() {
-      attachEdgeBack("treasuryView", closeTreasury);
-      attachEdgeBack("bookView", closeBook);
-      attachEdgeBack("searchView", closeSearch);
-      attachEdgeBack("upcomingView", closeUpcoming);
+      attachSwipeBack("treasuryView", backTreasury);
+      attachSwipeBack("bookView", backBook);
+      attachSwipeBack("searchView", closeSearch);
+      attachSwipeBack("upcomingView", closeUpcoming);
       attachRevealHold();
       attachSwipe();
       attachRefHold();
@@ -4219,15 +4234,6 @@
     }
 
     // The Treasury bar on the Review Complete screen: total points and the rank bar; tapping it opens the Treasury.
-    let vlLoadedAt = 0, vlLoading = false;
-    function renderSumTreasury() {
-      const box = document.getElementById("sumTreasury");
-      const draw = function() { box.textContent = ""; if (vlVerses.length) box.appendChild(treasuryButton("sumStrip")); };
-      draw();
-      if (vlLoading || Date.now() - vlLoadedAt < 5000) return;   // the totals are fresh enough
-      vlLoading = true;
-      loadVlVerses(function() { vlLoading = false; vlLoadedAt = Date.now(); draw(); }, function() { vlLoading = false; });
-    }
     function renderEndOfDayScreen() {
       const cardEl = document.getElementById("activeCard");
       const summaryEl = document.getElementById("summaryView");
@@ -4238,7 +4244,6 @@
       document.getElementById("summaryIcon").style.display = "";
       setSummaryButtons(false, false);
       renderTomorrowNote();
-      renderSumTreasury();
       progressFill.style.width = "100%";
 
       // Both end-of-day screens start at the same height, so the trophy / sparkle and title line up.
