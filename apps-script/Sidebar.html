@@ -302,17 +302,50 @@
     .vm-head { display: flex; align-items: center; gap: 10px; padding: 12px 4px 8px; border-bottom: 1px solid var(--border-card); }
     .vm-head .vm-name { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; }
     .vm-head .vm-meta { font-size: 12px; color: var(--text-meta); }
-    /* The Treasury strip: total points and a bar of how many verses sit at each rank. Tapping it switches the list to the rank view. */
+    /* The Treasury strip: total points and a bar of how many references sit at each rank. Tapping it opens the Treasury. */
     .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 4px; padding: 10px 14px; border-radius: 12px; min-height: 0;
       flex-direction: row; box-shadow: none; text-align: left; color: var(--text-primary); border: 1px solid var(--border-card); background: var(--bg-card); }
-    .vl-strip.on { border-color: var(--text-accent, #1a73e8); background: var(--badge-pass-bg, rgba(26,115,232,0.12)); }
-    .vs-pts { font-weight: 800; font-size: 15px; white-space: nowrap; }
+        .vs-pts { font-weight: 800; font-size: 15px; white-space: nowrap; }
     .vs-pts small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
     .vs-bar { display: flex; flex: 1; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border-card); }
     .vs-bar i { display: block; background: var(--rl); }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vs-bar i { background: var(--rd); } }
     :root[data-theme="dark"] .vs-bar i { background: var(--rd); }
     .vs-lbl { font-size: 12px; font-weight: 700; color: var(--text-accent, #1a73e8); }
+    /* Treasury screen */
+    .tr-head { margin: 4px 0 10px; padding: 14px 16px 16px; border-radius: 16px; border: 1px solid var(--border-card); background: var(--bg-body, transparent); }
+    .tr-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .tr-pts { font-size: 40px; font-weight: 800; line-height: 1; color: var(--text-primary); letter-spacing: -0.5px; }
+    .tr-pts small { font-size: 16px; font-weight: 600; color: var(--text-muted); letter-spacing: 0; margin-left: 4px; }
+    .tr-counts { text-align: right; font-size: 13px; line-height: 1.35; color: var(--text-muted); }
+    .tr-bar { display: flex; height: 9px; margin-top: 14px; border-radius: 5px; overflow: hidden; background: var(--border-card); }
+    .tr-bar i { display: block; background: var(--rl); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tr-bar i { background: var(--rd); } }
+    :root[data-theme="dark"] .tr-bar i { background: var(--rd); }
+    .tr-row { --rc: var(--rl); display: flex; align-items: center; gap: 12px; width: 100%; min-height: 0; padding: 12px 4px; margin: 0; background: none; border: 0; border-bottom: 1px solid var(--border-card);
+      box-shadow: none; border-radius: 0; flex-direction: row; text-align: left; font-family: inherit; color: var(--text-primary); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tr-row, :root:not([data-theme="light"]) .tr-card { --rc: var(--rd); } }
+    :root[data-theme="dark"] .tr-row, :root[data-theme="dark"] .tr-card { --rc: var(--rd); }
+    .tr-row:active { transform: none; filter: none; }
+    .tr-row .tr-ic { flex: none; display: block; width: 26px; height: 26px; color: var(--rc); }
+    .tr-row .tr-ic svg { display: block; width: 100%; height: 100%; }
+    .tr-row .tr-n { flex: 1; min-width: 0; font-size: 14px; color: var(--text-muted); }
+    .tr-row .tr-p { font-size: 15px; font-weight: 800; white-space: nowrap; }
+    .tr-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
+    .tr-row.open .chev { transform: rotate(90deg); }
+    .tr-row.zero { opacity: 0.45; cursor: default; }
+    .tr-body { display: none; padding: 4px 0 6px; border-bottom: 1px solid var(--border-card); }
+    .tr-body.open { display: block; }
+    .tr-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 0 4px; }
+    .tr-card { --rc: var(--rl); box-sizing: border-box; min-width: 0; padding: 9px 11px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--rc) 35%, var(--border-card)); background: color-mix(in srgb, var(--rc) 9%, transparent);
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .tr-card.lp-down { background: color-mix(in srgb, var(--rc) 20%, transparent); }
+    .tr-card b { display: block; font-size: 14px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tr-card span { display: block; font-size: 12px; color: var(--text-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tr-card em { display: block; font-style: normal; font-size: 12px; font-weight: 700; color: var(--rc); margin-top: 3px; }
+    .tr-book { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 14px 5px; margin-top: 2px; background: var(--bg-body, transparent); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+    .vl-due { font-size: 12px; color: var(--text-meta); white-space: nowrap; margin-left: 10px; }
+    .vl-due.now { color: var(--text-accent); font-weight: 700; }
     .vl-sect { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px 6px; border-bottom: 1px solid var(--border-card); }
     .vl-sect.first { padding-top: 8px; }
     .vl-sect b { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); }
@@ -335,7 +368,7 @@
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
-    #verseListView, #upcomingView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #verseListView, #upcomingView, #treasuryView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -893,7 +926,7 @@
     #verseListView .vl-titleblock { flex: 1; min-width: 0; }
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
-    #upcomingView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
+    #upcomingView, #treasuryView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
     .vl-search { margin: 0 0 2px; }
     .vl-search .picker-search { margin-bottom: 8px; }
     .vl-verse.hit { flex-wrap: wrap; }
@@ -1145,7 +1178,7 @@
       <button type="button" class="picker-close" onclick="closeVerseList()">Close</button>
     </div>
     <div class="vl-search" id="vlSearchRow" style="display:none"><input id="vlSearch" type="search" class="picker-search" placeholder="Search reference or verse text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onVlSearch()"></div>
-    <button type="button" class="vl-strip" id="vlStrip" style="display:none" onclick="toggleVlRank()"></button>
+    <button type="button" class="vl-strip" id="vlStrip" style="display:none" onclick="openTreasury()"></button>
     <div class="vl-map" id="vlMap" style="display:none"></div>
     <div class="picker-list" id="vlList"></div>
   </div>
@@ -1156,6 +1189,14 @@
       <button type="button" class="picker-close" onclick="closeUpcoming()">Back</button>
     </div>
     <div class="picker-list" id="upList"></div>
+  </div>
+
+  <div class="picker" id="treasuryView">
+    <div class="picker-head">
+      <span class="picker-title">Treasury</span>
+      <button type="button" class="picker-close" onclick="closeTreasury()">Back</button>
+    </div>
+    <div class="picker-list" id="trList"></div>
   </div>
 
   <nav class="tabbar" id="tabbar">
@@ -1546,6 +1587,7 @@
     // ── Bottom tabs ──
     function goTab(t) {
       closeUpcoming();
+      closeTreasury();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       if (t === "verses") {
         if (!listOpen) openVerseList();
@@ -1669,26 +1711,15 @@
 
     function closeVerseList() {
       hideVerseTip();
+      closeTreasury();
       resetVlSearch();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
     }
 
-    // The Treasury strip switches between the Book list and the Rank list.
-    function toggleVlRank() {
-      vlSort = vlSort === "rank" ? "book" : "rank";
-      vlOpen = {};
-      updateVlControls();
-      renderVerseList();
-    }
+    function updateVlControls() {}
 
-    function updateVlControls() {
-      const strip = document.getElementById("vlStrip");
-      strip.classList.toggle("on", vlSort === "rank");
-      strip.setAttribute("aria-pressed", vlSort === "rank" ? "true" : "false");
-    }
-
-    // Strip content: total points (Bronze 1 ... Diamond 8 per verse) and a bar sized by how many verses sit at each rank.
+    // Strip content: total points (Bronze 1 ... Diamond 8 per reference) and a bar sized by how many references sit at each rank. Tapping it opens the Treasury.
     function renderVlStrip() {
       const strip = document.getElementById("vlStrip");
       const searching = document.getElementById("vlSearchRow").style.display !== "none";
@@ -1698,8 +1729,8 @@
       vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += g; });
       let bar = "";
       for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
-      strip.innerHTML = '<span class="vs-pts">' + pts + ' <small>pts</small></span><span class="vs-bar">' + bar + '</span><span class="vs-lbl">Ranks</span>';
-      strip.setAttribute("aria-label", "Treasury, " + pts + " points. Show verses by rank");
+      strip.innerHTML = '<span class="vs-pts">' + pts + ' <small>pts</small></span><span class="vs-bar">' + bar + '</span><span class="vs-lbl">Treasury \u203A</span>';
+      strip.setAttribute("aria-label", "Treasury, " + pts + " points. Open");
       strip.style.display = "";
     }
 
@@ -1742,8 +1773,117 @@
       document.getElementById("upcomingView").classList.remove("open");
     }
 
+    // ── Treasury: every rank with its references; a rank opens in place on this screen ──
+    let trOpen = null;
+    function trDue(v) {
+      if (v.d === null || v.d === undefined) return { text: "", now: false, long: "" };
+      if (v.d <= 0) return { text: "today", now: true, long: "due today" };
+      if (v.d === 1) return { text: "tomorrow", now: false, long: "due tomorrow" };
+      return { text: "in " + v.d + " d", now: false, long: "due in " + v.d + " days" };
+    }
+    function trBookName(v) { return v.p.book === 999 ? v.p.name : BIBLE_BOOKS[v.p.book][0]; }
+    function trBody(g, vs, body) {
+      if (vs.length <= 8) {
+        const grid = document.createElement("div");
+        grid.className = "tr-cards";
+        vs.forEach(function(v) {
+          const card = document.createElement("div");
+          card.className = "tr-card rank-" + g;
+          const t = document.createElement("b"); t.textContent = v.f;
+          const w = document.createElement("span"); w.textContent = v.w || "";
+          card.appendChild(t); card.appendChild(w);
+          const du = trDue(v);
+          if (du.long) { const e = document.createElement("em"); e.textContent = du.long; card.appendChild(e); }
+          const heldCard = attachLongPress(card, function() { hideVerseTip(); showPreview({ f: v.f, v: v.v, t: v.t || v.x }, true); });
+          card.onclick = function(ev) { ev.stopPropagation(); heldCard(); }; // hold for the whole verse
+          grid.appendChild(card);
+        });
+        body.appendChild(grid);
+        return;
+      }
+      let last = null, group = null, count = 0, headEl = null;
+      const flush = function() { if (headEl) headEl.lastChild.textContent = count; };
+      vs.forEach(function(v) {
+        const k = vlBookKey(v);
+        if (k !== last) {
+          flush();
+          last = k; count = 0;
+          headEl = document.createElement("div");
+          headEl.className = "tr-book";
+          const nm = document.createElement("span"); nm.textContent = trBookName(v);
+          const ct = document.createElement("span"); ct.textContent = "0";
+          headEl.appendChild(nm); headEl.appendChild(ct);
+          body.appendChild(headEl);
+        }
+        count++;
+        body.appendChild(vlItem(v, false, trDue(v)));
+      });
+      flush();
+    }
+    function renderTreasury() {
+      hideVerseTip();
+      const box = document.getElementById("trList");
+      box.textContent = "";
+      const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+      let pts = 0, verses = 0;
+      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += g; verses += v.n; });
+      const total = vlVerses.length;
+      const head = document.createElement("div");
+      head.className = "tr-head";
+      let bar = "";
+      for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
+      head.innerHTML = '<div class="tr-top"><div class="tr-pts">' + pts + '<small>pts</small></div><div class="tr-counts">' + total + (total === 1 ? " reference" : " references") + '<br>' + verses + (verses === 1 ? " verse" : " verses") + '</div></div><div class="tr-bar">' + bar + '</div>';
+      box.appendChild(head);
+      const bodies = [], rows = [];
+      for (let g = 8; g >= 1; g--) {
+        const vs = vlVerses.filter(function(v) { return v.g === g; });
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "tr-row rank-" + g + (vs.length ? "" : " zero");
+        const ic = document.createElement("span"); ic.className = "tr-ic";
+        ic.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (RANK_ICON[g] || "") + "</svg>";
+        const n = document.createElement("span"); n.className = "tr-n";
+        n.textContent = vs.length + (vs.length === 1 ? " reference" : " references");
+        const p = document.createElement("span"); p.className = "tr-p";
+        p.textContent = (vs.length * g) + (vs.length * g === 1 ? " pt" : " pts");
+        const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "\u203A";
+        row.appendChild(ic); row.appendChild(makePill(g)); row.appendChild(n); row.appendChild(p); row.appendChild(chev);
+        box.appendChild(row);
+        const body = document.createElement("div");
+        body.className = "tr-body";
+        if (vs.length) box.appendChild(body);
+        rows.push(row); bodies.push(body);
+        let built = false;
+        row.onclick = function() {
+          if (!vs.length) return;
+          hideVerseTip();
+          const open = !body.classList.contains("open");
+          rows.forEach(function(r, i) { r.classList.remove("open"); bodies[i].classList.remove("open"); });
+          if (open) {
+            if (!built) { trBody(g, vs, body); built = true; }
+            row.classList.add("open"); body.classList.add("open");
+            trOpen = g;
+            try { row.scrollIntoView({ block: "nearest" }); } catch (e) {}
+          } else trOpen = null;
+        };
+        if (trOpen === g && vs.length) row.onclick();
+      }
+    }
+    function openTreasury() {
+      hideVerseTip();
+      if (!vlVerses.length) return;
+      trOpen = null;
+      renderTreasury();
+      document.getElementById("treasuryView").classList.add("open");
+      document.getElementById("trList").scrollTop = 0;
+    }
+    function closeTreasury() {
+      hideVerseTip();
+      document.getElementById("treasuryView").classList.remove("open");
+    }
+
     // One verse row (reference, version badge if not ESV, rank pill): tap for its first words, hold for the whole verse.
-    function vlItem(v, showPills) {
+    function vlItem(v, showPills, due) {
       const item = document.createElement("div");
       item.className = "vl-verse";
       const left = document.createElement("span");
@@ -1760,6 +1900,7 @@
       }
       item.appendChild(left);
       if (showPills) item.appendChild(makePill(v.g));
+      if (due) { const du = document.createElement("span"); du.className = "vl-due" + (due.now ? " now" : ""); du.textContent = due.text; item.appendChild(du); }
       const heldRow = attachLongPress(item, function() {
         hideVerseTip();
         showPreview({ f: v.f, v: v.v, t: v.t || v.x }, true);
@@ -2140,19 +2281,6 @@
         box.appendChild(e);
         return;
       }
-      if (vlSort === "rank") {
-        for (let g = 8; g >= 0; g--) {
-          const vs = vlVerses.filter(function(v) { return v.g === g; });
-          if (g === 0 && vs.length === 0) continue;
-          vlGroup("g" + g, makePill(g), vs.length, vs, false);
-        }
-        const verseTotal = vlVerses.reduce(function(sum, v) { return sum + v.n; }, 0);
-        const foot = document.createElement("div");
-        foot.className = "vl-foot";
-        foot.textContent = verseTotal + (verseTotal === 1 ? " verse" : " verses") + " · " + vlVerses.length + (vlVerses.length === 1 ? " reference" : " references");
-        box.appendChild(foot);
-        return;
-      }
       map.style.display = "";
       renderVlBooks(map, box);
     }
@@ -2161,7 +2289,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-184';
+    const CLIENT_BUILD = 'sync-185';
 
     let queue = [];
     let currentIndex = 0;

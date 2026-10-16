@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-75'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-76'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -818,6 +818,34 @@ function hydrate_(s, preRead) {
 /**
  * Returns today's session, creating it the first time any device asks today.
  */
+// A session saved before Treasury points existed has no pts. Work today's out from the Log tab: the net level change per verse
+// (each row's Level After minus Level Before, same-day repeats left out), which also counts a promoted new verse as +1.
+function backfillPts_(s) {
+  if (!s || !s.stats || typeof s.stats.pts === 'number') return false;
+  const per = {};
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
+    if (sheet && sheet.getLastRow() >= 2) {
+      const last = sheet.getLastRow(), first = Math.max(2, last - 799);
+      const vals = sheet.getRange(first, 1, last - first + 1, 9).getValues();
+      const tz = Session.getScriptTimeZone(), day = todayKey_();
+      vals.forEach(function(v) {
+        const t = v[0] instanceof Date ? v[0] : new Date(v[0]);
+        if (isNaN(t.getTime()) || Utilities.formatDate(t, tz, 'yyyy-MM-dd') !== day) return;
+        if (String(v[8] || '') === 'Yes') return;
+        const lb = Number(v[3]), la = Number(v[4]), ref = cleanRef_(v[1]);
+        if (!ref || isNaN(lb) || isNaN(la) || lb === la) return;
+        const e = per[ref] || (per[ref] = { f: ref, g: la, d: 0 });
+        e.d += la - lb; e.g = la;
+      });
+    }
+  } catch (e) { console.error('backfillPts_ failed: ' + e); }
+  const refs = Object.keys(per).map(function(k) { return per[k]; }).filter(function(e) { return e.d !== 0; });
+  s.stats.ptsRefs = refs;
+  s.stats.pts = refs.reduce(function(a, e) { return a + e.d; }, 0);
+  return true;
+}
+
 function loadSession() {
   const t0 = Date.now();
   const lock = LockService.getScriptLock();
@@ -829,6 +857,7 @@ function loadSession() {
     stampLearningDates_(data);
     if (!s || s.date !== today) { if (sortVerses_()) data = readSheetData_(); s = createState_(today); }
     else if (releaseLater_(s, nowMs_())) writeState_(s);
+    if (s && s.date === today && backfillPts_(s)) writeState_(s);
     const out = hydrate_(s, data);
     out.ms = Date.now() - t0;
     return out;
