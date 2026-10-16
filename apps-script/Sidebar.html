@@ -769,7 +769,9 @@
     .fail-list .fail-note { padding: 8px 6px; font-size: 12px; color: var(--text-muted); text-align: center; }
     .fail-list .fail-row + .fail-note { border-top: 1px solid var(--border-body); }
     .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
-    .fail-list .fail-head .pts-sum { margin-left: 10px; text-transform: none; letter-spacing: 0; font-size: 12px; }
+    .fail-list .fail-head .pts-sum { margin-left: 12px; display: inline-flex; gap: 12px; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; }
+    .fail-list .fail-head .pts-sum .up { color: var(--text-accent); }
+    .fail-list .fail-head .pts-sum .down { color: var(--btn-fail-text); }
     .pts-badge { min-width: 34px; text-align: right; font-weight: 800; font-size: 14px; }
     .pts-badge.up { color: var(--text-accent); }
     .pts-badge.down { color: var(--btn-fail-text); }
@@ -2158,7 +2160,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-182';
+    const CLIENT_BUILD = 'sync-183';
 
     let queue = [];
     let currentIndex = 0;
@@ -4253,7 +4255,8 @@
           const gain = items.reduce(function(a, it) { return a + (it.d > 0 ? it.d : 0); }, 0), loss = items.reduce(function(a, it) { return a + (it.d < 0 ? -it.d : 0); }, 0);
           const sum = document.createElement("span");
           sum.className = "fail-title pts-sum";
-          sum.textContent = (gain ? "+" + gain + " gained" : "") + (gain && loss ? " \u00b7 " : "") + (loss ? "\u2212" + loss + " lost" : "");
+          if (gain) { const g = document.createElement("span"); g.className = "up"; g.textContent = "+" + gain + " gained"; sum.appendChild(g); }
+          if (loss) { const l = document.createElement("span"); l.className = "down"; l.textContent = "\u2212" + loss + " lost"; sum.appendChild(l); }
           head.appendChild(sum);
         }
       }
