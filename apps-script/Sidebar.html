@@ -401,10 +401,30 @@
     .vl-row .load-bar { width: 74px; height: 8px; border-radius: 4px; background: rgba(128, 128, 128, 0.16); overflow: hidden; flex: none; }
     .vl-row .load-bar i { display: block; height: 100%; border-radius: 4px; background: var(--text-accent); opacity: 0.55; }
     .vl-row .load-bar.busy i { background: var(--text-repeat); opacity: 0.9; }
-    .vl-row .sk-bar, .vl-row .sk-n { display: block; flex: none; border-radius: 4px; background: rgba(128, 128, 128, 0.16); animation: skPulse 1.1s ease-in-out infinite; }
-    .vl-row .sk-bar { width: 74px; height: 8px; }
-    .vl-row .sk-n { width: 16px; height: 12px; }
+    /* Upcoming reviews: a calendar. Each day shows how many references are due; the shade is the day's word load. */
+    .cal-sum { font-size: 12px; color: var(--text-muted); margin: 0 2px 6px; min-height: 15px; }
+    .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 0 0 4px; font-size: 10px; font-weight: 700; color: var(--text-meta); text-align: center; letter-spacing: 0.04em; }
+    .cal-mon { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 10px 2px 4px; }
+    .cal-mon:first-of-type { margin-top: 4px; }
+    .cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+    .cal-d { --h: 0; position: relative; box-sizing: border-box; height: 44px; min-height: 0; width: auto; padding: 0; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; color: var(--text-primary); box-shadow: none;
+      background: color-mix(in srgb, var(--text-accent) calc(var(--h) * 13%), transparent); border: 1px solid color-mix(in srgb, var(--text-accent) calc(8% + var(--h) * 9%), transparent); }
+    .cal-d i { position: absolute; left: 5px; top: 3px; font-style: normal; font-size: 8.5px; font-weight: 700; color: var(--text-meta); }
+    .cal-d.z { color: transparent; background: none; border: 1px dashed color-mix(in srgb, var(--border-card) 70%, transparent); pointer-events: none; }
+    .cal-d.past { opacity: 0.28; }
+    .cal-d.h4 { background: color-mix(in srgb, var(--text-accent) 52%, transparent); border-color: var(--text-accent); }
+    .cal-d.hot { color: #fff; background: #d98200; border-color: #d98200; }
+    .cal-d.hot i { color: rgba(255, 255, 255, 0.8); }
+    .cal-d.today { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3.5px var(--text-accent); }
+    .cal-d:active { transform: none; filter: none; }
+    .cal-d.sk { animation: skPulse 1.1s ease-in-out infinite; }
     @keyframes skPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+    .cal-gap { display: flex; align-items: center; gap: 8px; margin: 8px 2px 10px; font-size: 11px; font-weight: 600; color: var(--text-meta); }
+    .cal-gap::before, .cal-gap::after { content: ""; flex: 1; border-top: 1px dashed var(--border-card); }
+    .cal-end { text-align: center; font-size: 12px; color: var(--text-meta); margin: 12px 0 4px; }
+    .cal-key { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 10px; color: var(--text-meta); margin: 6px 0 8px; }
+    .cal-key b { display: block; width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border-card); }
+    .pk-bubble.pk-day { left: 16px; right: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .vl-row.zero .vl-count { color: var(--text-meta); font-weight: 500; }
     .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
     .vl-row.open .chev { transform: rotate(90deg); }
@@ -505,7 +525,7 @@
       box-shadow: 0 0 5px rgba(26, 115, 232, 0.4);
     }
 
-    /* A New card that is behind: the filled dots turn amber (one late rep today) or red (two or more) */
+    /* A New card with a rep waiting: the filled dots turn amber, a gentle reminder (late-2 is no longer used) */
     .pips-container.late-1 .pip.filled { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245, 158, 11, 0.45); }
     .pips-container.late-2 .pip.filled { background: #e5484d; border-color: #e5484d; box-shadow: 0 0 5px rgba(229, 72, 77, 0.45); }
     .lock-chips.late-1 .lock-chip.on { background: #f59e0b; border-color: #f59e0b; }
@@ -1819,40 +1839,126 @@
     }
 
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
+    // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
+    // (the same load the old bars used; amber is a heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
     function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
       const keepTop = box.scrollTop;
       box.textContent = "";
-      const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const MS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-      // Each day's load (verse words / 30, 1 to 5 per verse) drives the short bar; a day with at least 3 short verses of load and 1.6 times the average busy day turns amber.
-      const loads = [];
-      for (let d = 0; d < 14; d++) loads.push(vlVerses.reduce(function(a, v) { return v.d === d ? a + (v.l || 1) : a; }, 0));
-      const maxLoad = Math.max.apply(null, loads);
-      const filled = loads.filter(function(l) { return l > 0; });
+      const today = new Date(); today.setHours(12, 0, 0, 0);
+      const dayAt = function(off) { const d = new Date(today); d.setDate(d.getDate() + off); return d; };
+      const short = function(d) { return MS[d.getMonth()] + " " + d.getDate(); };
+      const byDay = {}, loads = {};
+      let lastOff = -1, total = 0;
+      if (!placeholder) vlVerses.forEach(function(v) {
+        if (v.d === null || v.d === undefined) return;
+        (byDay[v.d] = byDay[v.d] || []).push(v);
+        loads[v.d] = (loads[v.d] || 0) + (v.l || 1);
+        total++; if (v.d > lastOff) lastOff = v.d;
+      });
+      const filled = Object.keys(loads).map(function(k) { return loads[k]; });
+      const maxLoad = filled.length ? Math.max.apply(null, filled) : 0;
       const avgLoad = filled.length ? filled.reduce(function(a, b) { return a + b; }, 0) / filled.length : 0;
-      const busy = loads.map(function(l) { return l >= Math.max(3, 1.6 * avgLoad); });
-      for (let d = 0; d < 14; d++) {
-        const dt = new Date();
-        dt.setHours(12, 0, 0, 0);
-        dt.setDate(dt.getDate() + d);
-        let label = DOW[dt.getDay()] + ", " + MON[dt.getMonth()] + " " + dt.getDate();
-        if (d === 0) label = "Today · " + label; else if (d === 1) label = "Tomorrow · " + label;
-        if (placeholder) {
-          vlGroup("d" + d, label, 0, [], true, box, null);
-          const row = box.lastChild;
-          row.classList.remove("zero");
-          const right = row.querySelector(".vl-right");
-          row.querySelector(".vl-count").remove();
-          const bar = document.createElement("span"); bar.className = "sk-bar"; bar.setAttribute("aria-hidden", "true");
-          const n = document.createElement("span"); n.className = "sk-n"; n.setAttribute("aria-hidden", "true");
-          right.insertBefore(n, right.firstChild); right.insertBefore(bar, right.firstChild);
-          continue;
+      const heavy = Math.max(3, 1.6 * avgLoad);
+
+      const sum = document.createElement("div"); sum.className = "cal-sum";
+      sum.textContent = placeholder ? "" : total ? total + (total === 1 ? " review" : " reviews") + " coming up, through " + short(dayAt(lastOff)) : "Nothing scheduled yet";
+      box.appendChild(sum);
+      const dow = document.createElement("div"); dow.className = "cal-dow";
+      ["S","M","T","W","T","F","S"].forEach(function(x) { const e = document.createElement("span"); e.textContent = x; dow.appendChild(e); });
+      box.appendChild(dow);
+
+      const start = -today.getDay();                                  // this week's Sunday, as days from today
+      const weeks = placeholder ? 5 : Math.min(104, Math.floor((Math.max(lastOff, 0) - start) / 7) + 1);
+      const weekHas = function(w) { for (let i = 0; i < 7; i++) if (byDay[start + w * 7 + i]) return true; return false; };
+      let lastMonth = -1, w = 0;
+      while (w < weeks) {
+        if (!placeholder && w > 0 && !weekHas(w)) {
+          let e = w; while (e < weeks && !weekHas(e)) e++;
+          if (e - w >= 2) {
+            const g = document.createElement("div"); g.className = "cal-gap";
+            g.textContent = "Nothing due · " + short(dayAt(start + w * 7)) + " – " + short(dayAt(start + e * 7 - 1));
+            box.appendChild(g); w = e; continue;
+          }
         }
-        const vs = vlVerses.filter(function(v) { return v.d === d; });
-        vlGroup("d" + d, label, vs.length, vs, true, box, { load: loads[d], max: maxLoad, busy: busy[d] });
+        // a month label above the week that holds the 1st (or the first week shown)
+        let mDay = dayAt(start + w * 7);
+        for (let i = 0; i < 7; i++) { const d = dayAt(start + w * 7 + i); if (d.getDate() === 1) { mDay = d; break; } }
+        if (mDay.getMonth() !== lastMonth) {
+          lastMonth = mDay.getMonth();
+          const l = document.createElement("div"); l.className = "cal-mon"; l.textContent = MON[mDay.getMonth()] + " " + mDay.getFullYear();
+          box.appendChild(l);
+        }
+        const row = document.createElement("div"); row.className = "cal-wk";
+        for (let i = 0; i < 7; i++) {
+          const off = start + w * 7 + i, d = dayAt(off), vs = byDay[off] || [];
+          const load = loads[off] || 0, ratio = maxLoad ? load / maxLoad : 0;
+          const h = !vs.length ? 0 : ratio <= 0.25 ? 1 : ratio <= 0.5 ? 2 : ratio <= 0.75 ? 3 : 4;
+          const c = document.createElement(vs.length ? "button" : "div");
+          if (vs.length) c.type = "button";
+          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (h === 4 ? " h4" : "") + (vs.length && load >= heavy ? " hot" : "");
+          c.style.setProperty("--h", h);
+          const n = document.createElement("i"); n.textContent = d.getDate(); c.appendChild(n);
+          if (vs.length) {
+            c.appendChild(document.createTextNode(vs.length));
+            c.setAttribute("aria-label", DOW[d.getDay()] + ", " + short(d) + ", " + vs.length + (vs.length === 1 ? " reference" : " references"));
+            c.onclick = function() { peekDay(c, off, vs); };
+          }
+          row.appendChild(c);
+        }
+        box.appendChild(row);
+        w++;
+      }
+      if (!placeholder && total) {
+        const end = document.createElement("div"); end.className = "cal-end"; end.textContent = "Nothing else due after " + short(dayAt(lastOff));
+        box.appendChild(end);
+        const key = document.createElement("div"); key.className = "cal-key";
+        key.innerHTML = 'lighter day <b style="background:color-mix(in srgb,var(--text-accent) 13%,transparent)"></b><b style="background:color-mix(in srgb,var(--text-accent) 26%,transparent)"></b><b style="background:color-mix(in srgb,var(--text-accent) 39%,transparent)"></b><b style="background:color-mix(in srgb,var(--text-accent) 52%,transparent)"></b> busier <b style="background:#d98200;border-color:#d98200;margin-left:8px"></b> heaviest';
+        box.appendChild(key);
       }
       box.scrollTop = keepTop;
+    }
+    // Tap a day: its tile lifts over a dimmed calendar and a card lists the day's references.
+    function peekDay(cell, off, vs) {
+      hideVerseTip(); closePeek();
+      const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], MS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + off);
+      let label = DOW[d.getDay()] + ", " + MS[d.getMonth()] + " " + d.getDate();
+      if (off === 0) label = "Today · " + label; else if (off === 1) label = "Tomorrow · " + label;
+      const dim = document.createElement("div");
+      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
+      dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
+      document.body.appendChild(dim);
+      const r = cell.getBoundingClientRect();
+      const lift = cell.cloneNode(true);
+      lift.className += " pk-tile"; lift.id = "pkTile";
+      lift.style.left = r.left + "px"; lift.style.top = r.top + "px"; lift.style.width = r.width + "px"; lift.style.height = r.height + "px";
+      document.body.appendChild(lift);
+      const b = document.createElement("div");
+      b.className = "pk-bubble pk-day"; b.id = "pkBubble";
+      const h = document.createElement("div"); h.className = "pk-h";
+      const hn = document.createElement("div"); hn.textContent = label;
+      const hm = document.createElement("span"); hm.textContent = vs.length + (vs.length === 1 ? " review" : " reviews");
+      h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
+      vs.forEach(function(v) {
+        const row = document.createElement("div"); row.className = "pk-r";
+        const rf = document.createElement("span"); rf.textContent = v.f;
+        row.appendChild(rf); row.appendChild(makePill(v.g)); b.appendChild(row);
+      });
+      document.body.appendChild(b);
+      // below the tile, or above it, whichever has room (the card scrolls if the list is long)
+      const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
+      const below = bottomLimit - (r.bottom + 10), above = r.top - 10 - 10;
+      let top, maxH = 0;
+      if (b.offsetHeight <= below) top = r.bottom + 10;
+      else if (b.offsetHeight <= above) top = r.top - 10 - b.offsetHeight;
+      else if (below >= above) { top = r.bottom + 10; maxH = below; }
+      else { top = 10; maxH = above; }
+      if (maxH) b.style.maxHeight = maxH + "px";
+      b.style.top = top + "px";
     }
     // The days and their dates show at once; the counts and bars fill in when the numbers arrive (shown straight away if they were loaded already).
     function openUpcoming() {
@@ -1883,7 +1989,7 @@
       upCloseTimer = setTimeout(closeUpcoming, 170);
     }
     function closeUpcoming() {
-      hideVerseTip();
+      hideVerseTip(); closePeek();
       clearTimeout(upCloseTimer);
       const view = document.getElementById("upcomingView");
       view.classList.remove("closing");
@@ -2511,7 +2617,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-203';
+    const CLIENT_BUILD = 'sync-204';
 
     let queue = [];
     let currentIndex = 0;
@@ -4141,10 +4247,9 @@
       }
       return out;
     }
-    // The dots are a warning, not a record: amber (one rep late right now) or red (two or more) only while behind. Once caught up they go back to normal.
+    // The dots are a gentle reminder to do the rep that is waiting: amber while one is waiting, normal once caught up. No red.
     function lateLevel(card) {
-      const n = lateNow(card).late;
-      return n >= 2 ? 2 : n;
+      return lateNow(card).late ? 1 : 0;   // one gentle amber, however many reps are waiting
     }
     let lateTimer = null;
     function paintLateState(card) {
@@ -4168,9 +4273,9 @@
       const part = card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7";
       const late = lateNow(card).late, missed = card.missed || 0;
       let text, lv;
-      if (!late) { text = "on schedule"; lv = 0; }   // caught up: back to normal, whatever was late earlier
-      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is late"; lv = 1; }
-      else { text = late + " reps late"; lv = 2; }
+      if (!late) { text = "on track"; lv = 0; }   // caught up: back to normal, whatever was waiting earlier
+      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is ready"; lv = 1; }
+      else { text = late + " reps ready"; lv = 1; }
       return { text: part + " \u00b7 " + text, level: lv };
     }
     function predictLearn(card, kind) {
