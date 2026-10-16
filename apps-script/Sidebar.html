@@ -273,7 +273,7 @@
     .vm-sect:first-child { margin-top: 0; }
     .vm-sect:active { transform: none; filter: none; }
     /* tap a testament's heading: the colour key, as boxes in the same style as the map's tiles */
-    .pk-bubble.pk-key { left: 16px; right: auto; width: 230px; display: flex; flex-direction: column; gap: 4px; padding: 0; background: none; box-shadow: none; border-radius: 0; overflow: visible; animation: pkFade 0.15s ease; }
+    .pk-bubble.pk-key { left: 16px; right: auto; width: 246px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 14px; animation: pkFade 0.15s ease; }
     .pk-k { --rc: var(--rl); box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; font-size: 13px; font-weight: 800; white-space: nowrap; color: var(--rc);
       background-color: var(--bg-card); background-image: linear-gradient(color-mix(in srgb, var(--rc) 14%, transparent), color-mix(in srgb, var(--rc) 14%, transparent)); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
     .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
@@ -369,8 +369,15 @@
     .tr-grp .vl-verse + .vl-verse { border-top-color: color-mix(in srgb, var(--rc) 18%, var(--border-card)); }
     .tr-grp .vl-verse.lp-down { background: color-mix(in srgb, var(--rc) 20%, transparent); }
     /* The Treasury slides in over the Verses tab and slides back out. */
-    #treasuryView.open, #bookView.open { animation: trIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
-    #treasuryView.closing, #bookView.closing { animation: trOut 0.2s ease-in forwards; }
+    #treasuryView.open { animation: trIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    #treasuryView.closing { animation: trOut 0.2s ease-in forwards; }
+    /* a book opens as a nearly full-screen card that fades in right over the map, and fades back out to it */
+    #bookView.open { animation: bkIn 0.2s ease-out; }
+    #bookView.closing { animation: bkOut 0.16s ease-in forwards; }
+    @keyframes bkIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+    @keyframes bkOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.97); } }
+    .bk-dim { position: fixed; left: 0; right: 0; top: 0; bottom: var(--tab-h); z-index: 41; background: rgba(0, 0, 0, 0.34); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .bk-dim.on { opacity: 1; pointer-events: auto; }
     @keyframes trIn { from { transform: translateX(36px); opacity: 0; } to { transform: none; opacity: 1; } }
     @keyframes trOut { from { transform: none; opacity: 1; } to { transform: translateX(36px); opacity: 0; } }
     .vl-due { font-size: 12px; color: var(--text-meta); white-space: nowrap; margin-left: 10px; }
@@ -957,6 +964,7 @@
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
     #upcomingView, #treasuryView, #bookView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
+    #bookView { inset: calc(max(14px, env(safe-area-inset-top)) + 22px) 10px calc(var(--tab-h) + 10px) 10px; padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
     #bookView .vl-titleblock { flex: 1; min-width: 0; }
     #bookView .vl-total { display: block; margin: 1px 0 0; }
     #searchView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; overflow-x: hidden; }
@@ -1235,13 +1243,14 @@
     <div class="picker-list" id="trList"></div>
   </div>
 
+  <div class="bk-dim" id="bookDim" onclick="backBook()"></div>
   <div class="picker" id="bookView">
     <div class="picker-head">
       <div class="vl-titleblock">
         <span class="picker-title" id="bkTitle"></span>
         <span class="vl-total" id="bkMeta"></span>
       </div>
-      <button type="button" class="picker-close" onclick="backBook()">Back</button>
+      <button type="button" class="picker-close" onclick="backBook()">Close</button>
     </div>
     <div class="picker-list" id="bkList"></div>
   </div>
@@ -2342,7 +2351,7 @@
       renderVlSummary(box, byKey);
     }
 
-    // One book's references as their own screen: slides in from the right, swipe right (or Back) to return to the map.
+    // One book's references as a nearly full-screen card over the map: fades in, swipe right (or Close, or tap outside it) to fade back to the map.
     function openBook(key) {
       hideVerseTip(); closePeek();
       const vs = vlVerses.filter(function(v) { return vlBookKey(v) === key; });
@@ -2359,6 +2368,7 @@
       clearTimeout(bkCloseTimer);
       view.classList.remove("closing");
       view.classList.add("open");
+      document.getElementById("bookDim").classList.add("on");
       list.scrollTop = 0;
     }
     let bkCloseTimer = null;
@@ -2366,7 +2376,8 @@
       const view = document.getElementById("bookView");
       if (!view.classList.contains("open") || view.classList.contains("closing")) return;
       view.classList.add("closing");
-      bkCloseTimer = setTimeout(closeBook, 210);
+      document.getElementById("bookDim").classList.remove("on");
+      bkCloseTimer = setTimeout(closeBook, 170);
     }
     function closeBook() {
       hideVerseTip(); closePeek();
@@ -2374,6 +2385,7 @@
       const view = document.getElementById("bookView");
       view.classList.remove("closing");
       view.classList.remove("open");
+      document.getElementById("bookDim").classList.remove("on");
     }
     // The hold preview: the book's tile lifts over a dimmed map and a bubble lists its first references, with a button to open it.
     function peekBook(key, tile) {
@@ -2440,7 +2452,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-199';
+    const CLIENT_BUILD = 'sync-200';
 
     let queue = [];
     let currentIndex = 0;
