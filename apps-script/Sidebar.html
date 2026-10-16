@@ -710,7 +710,7 @@
     .stat-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
     .val-pass { color: var(--btn-pass-text); }
     .val-grad { color: var(--text-accent); }
-    .val-fail { color: var(--btn-fail-text); }
+    .val-fail, .val-grad.neg { color: var(--btn-fail-text); }
     .stat-box.tappable { cursor: pointer; }
     /* every repeat verse cleared at least once */
     .stat-box { position: relative; }
@@ -1105,7 +1105,7 @@
         </div>
         <div class="stat-box" id="statGradBox" onclick="toggleStatList('grad')">
           <div class="stat-val val-grad" id="statGraduated">0</div>
-          <div class="stat-lbl">Leveled Up</div>
+          <div class="stat-lbl">Treasury</div>
         </div>
         <div class="stat-box" id="statFailBox" onclick="toggleStatList('fail')">
           <div class="stat-val val-fail" id="statFailed">0</div>
@@ -2154,7 +2154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-180';
+    const CLIENT_BUILD = 'sync-181';
 
     let queue = [];
     let currentIndex = 0;
@@ -2184,7 +2184,7 @@
     let revealCursor = -1;  // the piece revealed most recently; a tap reveals the next hidden piece after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
-    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
+    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
     let sessionVersion = 0;
     let sessionDate = "";
     // Which screen you are on: 'review' (the daily deck) or 'learning' (Level 0 verses).
@@ -2369,6 +2369,7 @@
       baseCount = session.baseCount || 0;
       currentIndex = session.currentIndex || 0;
       sessionStats = session.stats || { reviewed: 0, passed: 0, failed: 0, graduated: 0 };
+      if (!Number.isInteger(sessionStats.pts)) sessionStats.pts = 0;
       if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
       if (!Array.isArray(sessionStats.gradRefs)) sessionStats.gradRefs = [];
       if (!Array.isArray(sessionStats.clearedRefs)) sessionStats.clearedRefs = [];
@@ -3713,6 +3714,8 @@
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && kind !== 'skip';
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
       if (promote) {
+        sessionStats.pts = (sessionStats.pts || 0) + 1;      // a new verse in Bronze is one more Treasury point
+        recordStatRef('gradRefs', card.reference, 1);
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
         isScoring = true;
         playLevelUp(1, 1, "Promoted \u2713");
@@ -3940,6 +3943,7 @@
         }
       }
 
+      if (card.group > 0) sessionStats.pts = (sessionStats.pts || 0) + (newGroup - card.group);   // Treasury points: the net change in level
       if (graduated && card.group > 0) {
         sessionStats.graduated++;
         recordStatRef('gradRefs', card.reference, newGroup);
@@ -3994,13 +3998,12 @@
         document.getElementById("summaryStats").style.display = "grid";
 
         document.getElementById("statReviewed").textContent = sessionStats.reviewed;
-        document.getElementById("statGraduated").textContent = sessionStats.graduated;
-        document.getElementById("statGradBox").classList.toggle("gold", sessionStats.graduated >= 7);
+        paintPts(sessionStats.pts || 0);
         document.getElementById("statFailed").textContent = sessionStats.failed;
         // A day with reviews and no repeats gets the gold badge.
         updateStatLists();
         // Count up only when the numbers actually changed; clearing a same-day repeat or evening card leaves them as they were.
-        const sig = [sessionStats.reviewed, sessionStats.passed, sessionStats.graduated, sessionStats.failed].join("|");
+        const sig = [sessionStats.reviewed, sessionStats.passed, sessionStats.pts || 0, sessionStats.failed].join("|");
         // The gold badge pops in once the numbers finish counting; with no count-up it is simply there.
         let counting = false;
         if (countUpPending) {
@@ -4022,11 +4025,20 @@
       if (animate) { void el.offsetWidth; el.classList.add("pop"); }
     }
 
+    // The Treasury box: points added today (+3, 0, or \u22122 after misses). Gold from +7.
+    function fmtPts(v) { return v > 0 ? "+" + v : (v < 0 ? "\u2212" + (-v) : "0"); }
+    function paintPts(v) {
+      const el = document.getElementById("statGraduated");
+      el.textContent = fmtPts(v);
+      el.classList.toggle("neg", v < 0);
+      document.getElementById("statGradBox").classList.toggle("gold", v >= 7);
+    }
     function runCountUp() {
       const items = [
         ["statReviewed", sessionStats.reviewed],
-        ["statGraduated", sessionStats.graduated], ["statFailed", sessionStats.failed]
+        ["statGraduated", sessionStats.pts || 0], ["statFailed", sessionStats.failed]
       ];
+      const show = function(id, v) { document.getElementById(id).textContent = id === "statGraduated" ? fmtPts(v) : v; };
       const gold = document.getElementById("statGradBox");
       const token = ++countUpToken;
       const DUR = 900, GAP = 100;
@@ -4037,14 +4049,15 @@
         plan.push({ id: it[0], v: it[1], from: t, d: d });
         t += d + (it[1] > 0 ? GAP : 0);
       });
-      plan.forEach(function(p) { document.getElementById(p.id).textContent = 0; });
+      plan.forEach(function(p) { show(p.id, 0); });
+      document.getElementById("statGraduated").classList.toggle("neg", (sessionStats.pts || 0) < 0);
       gold.classList.remove("gold");
       const flawlessEl = document.getElementById("flawlessBadge");
       flawlessEl.classList.remove("pop");
       flawlessEl.style.display = "none";
       function finish() {
-        plan.forEach(function(p) { document.getElementById(p.id).textContent = p.v; });
-        gold.classList.toggle("gold", sessionStats.graduated >= 7);
+        plan.forEach(function(p) { show(p.id, p.v); });
+        gold.classList.toggle("gold", (sessionStats.pts || 0) >= 7);
         if (token === countUpToken) showFlawlessBadge(false);
       }
       (function tick() {
@@ -4057,7 +4070,7 @@
           if (now < p.from) { v = 0; done = false; }
           else if (p.d === 0 || now >= p.from + p.d) { v = p.v; }
           else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); done = false; }
-          document.getElementById(p.id).textContent = v;
+          show(p.id, v);
         });
         gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 7);
         if (!done) setTimeout(tick, 33);

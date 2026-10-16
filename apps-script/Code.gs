@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-70'; // shown in the app's status readout (hold the Verses tab)
+const BUILD = 'sync-71'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -532,7 +532,10 @@ function learnAction(reference, action, expectedRep) {
 
     // Other phones notice the change through the session version, like any other review.
     const s = readState_();
-    if (s && s.date === todayKey_()) { s.version++; writeState_(s); }
+    if (s && s.date === todayKey_()) {
+      if (promoted) { s.stats = sanitizeStats_(s.stats); s.stats.pts += 1; }  // a new verse in Bronze is one more Treasury point
+      s.version++; writeState_(s);
+    }
 
     // The day's Learn / Lock pushes are kept in line with the new state: the last rep of the day, Skip and Promote drop what is left.
     try { syncSlotPushes_(); } catch (e) { pushLog_('slot sync ERROR', ref, 0, false, String(e)); }
@@ -700,7 +703,7 @@ function activeEnd_(s) {
 }
 
 function emptyStats_() {
-  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
+  return { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, failedRefs: [], gradRefs: [], clearedRefs: [] };
 }
 
 function createState_(dateKey) {
@@ -990,7 +993,9 @@ function sanitizeStats_(st) {
     });
     return out;
   };
-  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
+  // pts: Treasury points added today (can be negative after misses): the net change in levels, +1 for each new verse promoted to Bronze.
+  const pts = Number.isInteger(Number(st.pts)) ? Math.max(-999, Math.min(999, Number(st.pts))) : 0;
+  return { reviewed: n(st.reviewed), passed: n(st.passed), failed: n(st.failed), graduated: n(st.graduated), pts: pts, failedRefs: cleanRefs(st.failedRefs), gradRefs: cleanRefs(st.gradRefs), clearedRefs: cleanRefs(st.clearedRefs) };
 }
 
 /**
