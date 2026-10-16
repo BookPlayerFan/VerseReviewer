@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-56'; // shown in the app's status readout (tap the "Verse List" title)
+const BUILD = 'sync-58'; // shown in the app's status readout (hold the Verses tab)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -53,17 +53,57 @@ function clientExpected_() {
 }
 
 // Intervals (days) are used only here. The client mirrors names and repsNeeded only.
+// Load balancing. When a review sets a card's next date, Bronze, Silver and Gold always land on the exact interval (a short
+// interval can't be stretched without hurting recall). Platinum and above may move a few days to a quieter day:
+//   early / late = the most days the date may move earlier / later than the exact interval (the hard cap)
+//   costEarly / costLate = the price, in "reviews", of each day moved. A day is chosen by (reviews already due that day) + price,
+//   lowest wins, so a card only moves when another day is clearly quieter. Platinum is pickier (higher price) because 1 day is
+//   about 8% of its 12-day interval. Later costs more than earlier because a late review risks forgetting.
 const GROUP_CONFIG = {
-  0: { name: "New",               interval: 0,   repsNeeded: 1 },
-  1: { name: "Bronze",             interval: 1,   repsNeeded: 3 },
-  2: { name: "Silver",             interval: 2,   repsNeeded: 3 },
-  3: { name: "Gold",             interval: 5,   repsNeeded: 2 },
-  4: { name: "Platinum",            interval: 12,  repsNeeded: 2 },
-  5: { name: "Sapphire",           interval: 30,  repsNeeded: 2 },
-  6: { name: "Emerald",         interval: 75,  repsNeeded: 1 },
-  7: { name: "Ruby",         interval: 180, repsNeeded: 1 },
-  8: { name: "Diamond",           interval: 360, repsNeeded: 1 }
+  0: { name: "New",               interval: 0,   repsNeeded: 1, early: 0,  late: 0 },
+  1: { name: "Bronze",             interval: 1,   repsNeeded: 3, early: 0,  late: 0 },
+  2: { name: "Silver",             interval: 2,   repsNeeded: 3, early: 0,  late: 0 },
+  3: { name: "Gold",             interval: 5,   repsNeeded: 2, early: 0,  late: 0 },
+  4: { name: "Platinum",            interval: 12,  repsNeeded: 2, early: 1,  late: 1,  costEarly: 1,    costLate: 2 },
+  5: { name: "Sapphire",           interval: 30,  repsNeeded: 2, early: 2,  late: 1,  costEarly: 0.25, costLate: 0.5 },
+  6: { name: "Emerald",         interval: 75,  repsNeeded: 1, early: 3,  late: 2,  costEarly: 0.25, costLate: 0.5 },
+  7: { name: "Ruby",         interval: 180, repsNeeded: 1, early: 5,  late: 3,  costEarly: 0.25, costLate: 0.5 },
+  8: { name: "Diamond",           interval: 360, repsNeeded: 1, early: 7,  late: 4,  costEarly: 0.25, costLate: 0.5 }
 };
+
+// The due date for a card moving to `group`. `skipRow` is the card being scheduled, so its own old date is not counted;
+// New cards (level 0) and cards with no date are not counted either. On a tie the exact day wins, then the earlier day.
+function balancedDueDate_(sheet, group, today, skipRow) {
+  const cfg = GROUP_CONFIG[group];
+  const base = new Date(today.getTime());
+  base.setDate(base.getDate() + cfg.interval);
+  const early = cfg.early || 0, late = cfg.late || 0;
+  if (!early && !late) return base;
+  const last = sheet.getLastRow();
+  const counts = {};
+  if (last >= 2) {
+    const vals = sheet.getRange(2, 2, last - 1, 4).getValues(); // B..E: next date, last date, rep, level
+    for (let i = 0; i < vals.length; i++) {
+      if (i + 2 === skipRow) continue;
+      const d = toMidnight_(vals[i][0]);
+      if (!d || !(Number(vals[i][3]) > 0)) continue;
+      const k = d.getTime();
+      counts[k] = (counts[k] || 0) + 1;
+    }
+  }
+  let best = base, bestScore = Infinity;
+  const reach = Math.max(early, late);
+  for (let step = 0; step <= reach * 2; step++) {
+    const off = step === 0 ? 0 : (step % 2 === 1 ? -Math.ceil(step / 2) : Math.ceil(step / 2));
+    if (off < -early || off > late) continue;
+    const c = new Date(base.getTime());
+    c.setDate(c.getDate() + off);
+    if (c.getTime() <= today.getTime()) continue;
+    const score = (counts[c.getTime()] || 0) + (off < 0 ? -off * cfg.costEarly : off * cfg.costLate);
+    if (score < bestScore) { best = c; bestScore = score; }
+  }
+  return best;
+}
 
 const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
 
@@ -808,9 +848,7 @@ function writeReview_(review) {
   let lastDateVal = "";
   if (newGroup > 0) {
     const today = today_();
-    const next = new Date(today.getTime());
-    next.setDate(next.getDate() + GROUP_CONFIG[newGroup].interval);
-    nextDateVal = next;
+    nextDateVal = balancedDueDate_(sheet, newGroup, today, row);
     lastDateVal = today;
   }
 
