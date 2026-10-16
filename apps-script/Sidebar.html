@@ -330,7 +330,7 @@
     .vl-row.zero .vl-count { color: var(--text-meta); font-weight: 500; }
     .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
     .vl-row.open .chev { transform: rotate(90deg); }
-    .vl-verses { border-bottom: 1px solid var(--border-card); padding: 2px 0 6px; }
+    .vl-verses { border-bottom: 1px solid var(--border-card); padding: 0; }
     .vl-verse { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 14px;
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
@@ -341,10 +341,7 @@
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
-    .vl-tip.on-row { top: 50%; transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; padding: 3px 11px; font-size: 13px; line-height: 1.25; }
-    .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.18); } /* an even glow, so it doesn't look lower than the row */
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.5); } }
-    :root[data-theme="dark"] .vl-tip.on-row { box-shadow: 0 0 12px rgba(0,0,0,0.5); }
+    .vl-tip.on-row { top: 50%; transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; }
     .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
       background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
       padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
@@ -1855,8 +1852,6 @@
         if (room >= 80) {
           const ver = item.querySelector(".version-badge");
           tip.classList.add("on-row");
-          // the list has a little extra room under its last row and above its first, so nudge the popup to sit evenly between the lines
-          if (!item.nextElementSibling) tip.style.top = "calc(50% + 3px)"; else if (!item.previousElementSibling) tip.style.top = "calc(50% - 1px)";
           tip.style.left = left + "px";
           tip.style.maxWidth = room + "px";
           if (ver) tip.style.minWidth = Math.min(room, ver.offsetLeft + ver.offsetWidth - left + 8) + "px"; // wide enough to hide the version tag
@@ -2144,7 +2139,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-175';
+    const CLIENT_BUILD = 'sync-176';
 
     let queue = [];
     let currentIndex = 0;
