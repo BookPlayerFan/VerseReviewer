@@ -1975,7 +1975,7 @@
       hideVerseTip(); closePeek();
       const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], MS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + off);
-      let label = DOW[d.getDay()] + ", " + MS[d.getMonth()] + " " + d.getDate();
+      let label = DOW[d.getDay()] + ", " + MS[d.getMonth()] + " " + d.getDate() + (d.getFullYear() !== new Date().getFullYear() ? ", " + d.getFullYear() : "");
       if (off === 0) label = "Today · " + label; else if (off === 1) label = "Tomorrow · " + label;
       const dim = document.createElement("div");
       dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
@@ -2667,7 +2667,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-223';
+    const CLIENT_BUILD = 'sync-224';
 
     let queue = [];
     let currentIndex = 0;
