@@ -1880,8 +1880,8 @@
         loads[v.d] = (loads[v.d] || 0) + (v.l || 1);
         total++; if (v.d > lastOff) lastOff = v.d;
       });
-      // shade by the day's word load: up to 5, up to 10, up to 15; more than 15 is amber (a verse counts 1 to 5, about a point per 30 words)
-      const LOAD_STEPS = [5, 10, 15];
+      // shade by the day's word load: up to 3, up to 6, up to 9; more than 9 is amber (a verse counts 1 to 5, about a point per 30 words)
+      const LOAD_STEPS = [3, 6, 9];
 
       if (!placeholder && !total) {
         const sum = document.createElement("div"); sum.className = "cal-sum"; sum.textContent = "Nothing scheduled yet";
@@ -2673,7 +2673,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-213';
+    const CLIENT_BUILD = 'sync-214';
 
     let queue = [];
     let currentIndex = 0;
