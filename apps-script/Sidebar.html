@@ -1973,7 +1973,7 @@
         tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
       };
       row([[2, false, "12", "3"]], "The badge", "how many references are due that day");
-      row([[1, false], [2, false], [3, false]], "The shade", "how much there is to learn; darker is a heavier day");
+      row([[1, false], [2, false], [3, false]], "The shade", "how much there is to learn; a stronger color is a heavier day");
       row([[3, true]], "Amber", "the heaviest days");
       document.body.appendChild(b);
     }
@@ -2674,7 +2674,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-216';
+    const CLIENT_BUILD = 'sync-217';
 
     let queue = [];
     let currentIndex = 0;
