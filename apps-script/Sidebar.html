@@ -408,20 +408,21 @@
     #upList { padding: 2px 4px 4px; }
     .cal-s > .cal-d { width: 100%; }
     .cal-s { padding: 3px; min-width: 0; }
-    /* a day: its date in the middle on a tile coloured by the day's word load: light blue, strong blue, amber for heavy (lighter is less load in light and dark) */
+    /* a day: its date in the middle on a tile coloured by the day's word load: green for a light day, blue for medium, amber for heavy */
     .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 50px; min-height: 0; width: auto; padding: 0; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; box-shadow: none;
       --fill: transparent; --ink: var(--rc); background: var(--fill); color: var(--ink); }
-    /* the 1st of a month carries the month's short name along the bottom */
-    .cal-d .mn { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-style: normal; font-size: 7.5px; font-weight: 800; letter-spacing: 0.08em; line-height: 1; text-transform: uppercase; color: var(--ink); opacity: 0.85; }
-    .cal-d.first { padding-bottom: 7px; }
-    .cal-d.s1, .tomorrow-note.s1 { --fill: #dbe8fd; --ink: #1d56b3; }
-    .cal-d.s2, .tomorrow-note.s2 { --fill: #3d7ae0; --ink: #fff; }
-    .cal-d.s3, .tomorrow-note.s3 { --fill: #f3d9ae; --ink: #8a4f00; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.s1, :root:not([data-theme="light"]) .tomorrow-note.s1 { --fill: #a9c2ec; --ink: #10264f; }
-      :root:not([data-theme="light"]) .cal-d.s2, :root:not([data-theme="light"]) .tomorrow-note.s2 { --fill: #5a80c2; --ink: #fff; }
+    /* the 1st of a month, and the first day with reviews after a gap, carry the month's short name above the date (with the year when it is not this year) */
+    .cal-d.lbl { flex-direction: column; font-size: 19px; line-height: 1; }
+    .cal-d .mn { order: -1; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; line-height: 1; margin-bottom: 2px; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+    .cal-d .mn.yr { font-size: 9.5px; letter-spacing: 0.03em; }
+    .cal-d.s1, .tomorrow-note.s1 { --fill: #d4efdb; --ink: #1b6b36; }
+    .cal-d.s2, .tomorrow-note.s2 { --fill: #d0e1fc; --ink: #1a4fa8; }
+    .cal-d.s3, .tomorrow-note.s3 { --fill: #f7dcab; --ink: #8a4f00; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.s1, :root:not([data-theme="light"]) .tomorrow-note.s1 { --fill: #1f4a33; --ink: #8fe0ae; }
+      :root:not([data-theme="light"]) .cal-d.s2, :root:not([data-theme="light"]) .tomorrow-note.s2 { --fill: #1f3d6e; --ink: #9cc2ff; }
       :root:not([data-theme="light"]) .cal-d.s3, :root:not([data-theme="light"]) .tomorrow-note.s3 { --fill: #5a4122; --ink: #ffb454; } }
-    :root[data-theme="dark"] .cal-d.s1, :root[data-theme="dark"] .tomorrow-note.s1 { --fill: #a9c2ec; --ink: #10264f; }
-    :root[data-theme="dark"] .cal-d.s2, :root[data-theme="dark"] .tomorrow-note.s2 { --fill: #5a80c2; --ink: #fff; }
+    :root[data-theme="dark"] .cal-d.s1, :root[data-theme="dark"] .tomorrow-note.s1 { --fill: #1f4a33; --ink: #8fe0ae; }
+    :root[data-theme="dark"] .cal-d.s2, :root[data-theme="dark"] .tomorrow-note.s2 { --fill: #1f3d6e; --ink: #9cc2ff; }
     :root[data-theme="dark"] .cal-d.s3, :root[data-theme="dark"] .tomorrow-note.s3 { --fill: #5a4122; --ink: #ffb454; }
     .tomorrow-note.s1, .tomorrow-note.s2, .tomorrow-note.s3 { background: var(--fill); color: var(--ink); }
     /* a day with nothing due is just a faint number */
@@ -1894,7 +1895,7 @@
       const start = -today.getDay();                                  // this week's Sunday, as days from today
       const weeks = placeholder ? 5 : Math.min(104, Math.floor((Math.max(lastOff, 0) - start) / 7) + 1);
       const weekHas = function(w) { for (let i = 0; i < 7; i++) if (byDay[start + w * 7 + i]) return true; return false; };
-      let w = 0;
+      let w = 0, afterGap = false;
       while (w < weeks) {
         if (!placeholder && w > 0 && !weekHas(w)) {
           // weeks with nothing due fold into one quiet line (not tappable)
@@ -1906,9 +1907,11 @@
           const gl = document.createElement("span");
           gl.textContent = n + (n === 1 ? " week" : " weeks") + " \u00b7 " + range(dayAt(start + w * 7), dayAt(start + e * 7 - 1));
           g.appendChild(gl);
-          box.appendChild(g); w = e; continue;
+          box.appendChild(g); afterGap = true; w = e; continue;
         }
         const row = document.createElement("div"); row.className = "cal-wk";
+        let lead = -1;                                              // the first day with reviews in the week that follows a gap
+        if (afterGap) { for (let i = 0; i < 7; i++) if (byDay[start + w * 7 + i]) { lead = i; break; } afterGap = false; }
         for (let i = 0; i < 7; i++) {
           const off = start + w * 7 + i, d = dayAt(off), vs = byDay[off] || [];
           const load = loads[off] || 0;
@@ -1920,9 +1923,11 @@
           const first = d.getDate() === 1;
           if (first) c.classList.add("first");
           c.appendChild(document.createTextNode(d.getDate()));
-          if (first) {
-            const mn = document.createElement("em"); mn.className = "mn";
-            mn.textContent = MS[d.getMonth()] + (d.getMonth() === 0 ? " \u2019" + String(d.getFullYear()).slice(2) : "");
+          if (first || i === lead) {
+            c.classList.add("lbl");
+            const yr = d.getMonth() === 0 || d.getFullYear() !== today.getFullYear();   // January, or any month of another year, says which year
+            const mn = document.createElement("em"); mn.className = "mn" + (yr ? " yr" : "");
+            mn.textContent = MS[d.getMonth()] + (yr ? " \u2019" + String(d.getFullYear()).slice(2) : "");
             c.appendChild(mn);
           }
           if (vs.length) {
@@ -1959,7 +1964,7 @@
         const tx = document.createElement("div"); const bb = document.createElement("b"); bb.textContent = title; const sm = document.createElement("small"); sm.textContent = sub;
         tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
       };
-      row([[1], [2], [3]], "The color", "how much there is to learn that day: light, medium or heavy");
+      row([[1], [2], [3]], "The color", "how much there is to learn that day: green is light, blue medium, amber heavy");
       row([[2, "12"]], "Tap a day", "to see its verses and exact load");
       document.body.appendChild(b);
     }
@@ -2660,7 +2665,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-221';
+    const CLIENT_BUILD = 'sync-222';
 
     let queue = [];
     let currentIndex = 0;
