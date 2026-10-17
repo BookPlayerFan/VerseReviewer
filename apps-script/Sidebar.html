@@ -464,6 +464,35 @@
       padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); } }
     :root[data-theme="dark"] .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+    /* Peek: the first words swap in over the reference (the rank pill stays), wiping in with a soft edge */
+    .vl-peek { position: absolute; z-index: 9; top: 50%; margin-top: -15px; height: 30px; display: flex; align-items: center; box-sizing: border-box; padding: 0 2px; overflow: hidden; pointer-events: none;
+      white-space: nowrap; font-weight: 700; font-style: italic; color: var(--text-accent); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+    .vl-peek span { -webkit-mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); padding-right: 6px; }
+    /* Full verse popup: the row opens into a card with a Verse tab and a Background tab */
+    .vp-dim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.4); }
+    .vp-wrap { position: fixed; z-index: 91; left: 20px; right: 20px; max-width: 460px; margin: 0 auto; filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.38)); }
+    .vp-pop { position: relative; display: flex; flex-direction: column; background: var(--bg-card); color: var(--text-primary); border-radius: 22px; overflow: hidden; }
+    .vp-pop button { border: 0; background: none; color: inherit; font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
+    .vp-pop button:active { opacity: .6; }
+    .vp-h { display: flex; align-items: center; gap: 10px; padding: 16px 6px 4px 20px; }
+    .vp-h b { font-size: 20px; font-weight: 800; flex: none; }
+    .vp-h .vp-sp { flex: 1; }
+    .vp-x { font-size: 19px !important; line-height: 1 !important; padding: 8px 14px !important; color: var(--text-muted) !important; }
+    .vp-tabs { display: flex; position: relative; margin: 4px 20px 0; border-bottom: 1px solid var(--border-card); }
+    .vp-tab { flex: 1; text-align: center; padding: 10px 0 !important; font-size: 14px !important; font-weight: 700 !important; color: var(--text-muted) !important; transition: color .2s; }
+    .vp-tab.on { color: var(--text-accent) !important; }
+    .vp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-accent); margin-left: 6px; vertical-align: middle; position: relative; top: -1px; }
+    .vp-dot.pop { animation: vpDot .45s ease; }
+    @keyframes vpDot { 0% { transform: scale(0); } 60% { transform: scale(1.7); } 100% { transform: scale(1); } }
+    .vp-ul { position: absolute; left: 0; bottom: -1px; width: 50%; height: 3px; border-radius: 3px; background: var(--text-accent); transition: transform .28s cubic-bezier(.3, .8, .3, 1); }
+    .vp-ul.bg { transform: translateX(100%); }
+    .vp-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 16px 20px 20px; min-height: 160px; }
+    .vp-pane.in { animation: vpIn .22s ease; }
+    @keyframes vpIn { from { opacity: 0; } to { opacity: 1; } }
+    .vp-body .pv-text { overflow: visible; padding: 0; }
+    .vp-bgp .ctx-scroll { overflow: visible; padding: 0; }
+    .vp-bgp button { border: 0; background: none; color: var(--text-accent); font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
+    .vp-bgp { font-size: 15px; line-height: 1.5; }
     .vl-verse + .vl-verse { border-top: 1px solid var(--border-card); }
 
     .rank-1 { --rl: #a8643a; --rd: #d9945f; }
@@ -1363,6 +1392,8 @@
         <div class="help-row"><span>Undo the last review</span><kbd>Hold Review tab</kbd></div>
         <div class="help-row"><span>Press early, or skip ahead (New tab)</span><kbd>Hold the button</kbd></div>
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
+        <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
+        <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
         <div class="help-row"><span>This panel: status and gestures</span><kbd>Two-finger tap</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
@@ -1825,7 +1856,7 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { failed(); return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: textVerses(v.t, v.f), pn: textVerses(v.t, v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1 }; });
+          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: textVerses(v.t, v.f), pn: textVerses(v.t, v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0 }; });
           vlVerses.sort(compareVerses);
           setTreasury(treasuryTotal());
           done();
@@ -2210,11 +2241,12 @@
       if (due) { const du = document.createElement("span"); du.className = "vl-due" + (due.now ? " now" : ""); du.textContent = due.text; item.appendChild(du); }
       const heldRow = attachLongPress(item, function() {
         hideVerseTip();
-        showPreview({ f: v.f, v: v.v, t: v.t || v.x }, true);
+        openVersePopup({ f: v.f, v: v.v, t: v.t || v.x }, item);
       });
       item.onclick = function(ev) {
         ev.stopPropagation();
         if (heldRow()) return; // the hold already opened the full verse
+        if (item.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: v.f, v: v.v, t: v.t || v.x }, item); return; } // a second tap while the peek shows opens it
         showVerseTip(item, v.w);
       };
       return item;
@@ -2302,12 +2334,194 @@
     let vlTipTimer = null;
     function hideVerseTip() {
       clearTimeout(vlTipTimer);
-      document.querySelectorAll(".vl-tip").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+      document.querySelectorAll(".vl-tip, .vl-peek").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+    }
+
+    // The colour behind a row (the first ancestor that has one), so the peek can cover the reference cleanly.
+    function rowBackdrop(el) {
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const c = getComputedStyle(n).backgroundColor;
+        if (c && c !== "transparent" && !/rgba\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(c)) return c;
+      }
+      return "#fff";
+    }
+    // Peek: the first words swap in over the reference with a soft wipe, in the rank's colour, for about two seconds.
+    // The rank pill stays where it is; the version tag is covered while the words show. Returns false when there is no room.
+    const PEEK_MS = 2100;
+    function peekSwap(item, words) {
+      const nameEl = item.querySelector(".vl-ref > span, .fail-ref");
+      if (!nameEl || !words) return false;
+      if (getComputedStyle(item).position === "static") item.style.position = "relative";
+      const stopEl = item.querySelector(".rank-badge, .vl-due, .pts-badge");
+      const ir = item.getBoundingClientRect(), nr = nameEl.getBoundingClientRect();
+      const left = nr.left - ir.left - 2;
+      const stop = stopEl ? stopEl.getBoundingClientRect().left - ir.left - 8 : ir.width - 12;
+      const w = stop - left;
+      if (!(w >= 70)) return false;
+      const pill = item.querySelector(".rank-badge:not(.is-new)");
+      const pk = document.createElement("div");
+      pk.className = "vl-peek";
+      pk.style.left = left + "px"; pk.style.width = w + "px"; pk.style.background = rowBackdrop(item);
+      if (pill) pk.style.color = getComputedStyle(pill).color;
+      const sp = document.createElement("span");
+      sp.textContent = words;
+      pk.appendChild(sp);
+      item.appendChild(pk);
+      if (pk.animate) {
+        const G = "linear-gradient(90deg, #000 33.3%, transparent 66.6%)";
+        pk.style.webkitMaskImage = G; pk.style.maskImage = G; pk.style.webkitMaskSize = "300% 100%"; pk.style.maskSize = "300% 100%";
+        const pos = function(p) { return { maskPosition: p, webkitMaskPosition: p }; };
+        const A = pos("100% 0"), B = pos("0% 0");
+        pk.animate([
+          Object.assign({ opacity: 1 }, A),
+          Object.assign({ opacity: 1, offset: 0.24 }, B),
+          Object.assign({ opacity: 1, offset: 0.86 }, B),
+          Object.assign({ opacity: 0 }, B)
+        ], { duration: PEEK_MS, easing: "cubic-bezier(.3,.7,.3,1)", fill: "both" });
+      }
+      vlTipTimer = setTimeout(hideVerseTip, PEEK_MS);
+      return true;
+    }
+
+    // ── Full verse popup: the row opens into a card with a Verse tab and a Background tab ──
+    // Background is the same note you get by holding a card's reference. A small dot on its tab shows that one is already saved.
+    let vpState = null;
+    function hasBackground(f) {
+      if (ctxCache[f]) return true;
+      for (let i = 0; i < vlVerses.length; i++) if (vlVerses[i].f === f) return !!vlVerses[i].c;
+      return false;
+    }
+    function markHasBackground(f) {
+      vlVerses.forEach(function(v) { if (v.f === f) v.c = 1; });
+      if (vpState && vpState.ref === f && !vpState.dot) {
+        const d = document.createElement("i");
+        d.className = "vp-dot pop";
+        vpState.tabBg.appendChild(d);
+        vpState.dot = d;
+      }
+    }
+    function fillVerseText(box, it) {
+      box.textContent = "";
+      const segs = parseVerseSegments(it.t || "", it.f);
+      if (!segs.length) { box.textContent = "No text saved for this verse."; return; }
+      segs.forEach(function(sg, i) {
+        if (sg.num && segs.length > 1) {
+          const n = document.createElement("span");
+          n.className = "pv-n";
+          n.textContent = sg.num;
+          box.appendChild(n);
+        }
+        box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
+      });
+    }
+    function closeVersePopup(instant) {
+      const st = vpState;
+      if (!st) return;
+      vpState = null;
+      ctxToken++; // an answer still on its way is kept, but not drawn
+      const done = function() { if (st.dim.parentNode) st.dim.parentNode.removeChild(st.dim); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap); };
+      if (instant || !st.pop.animate) { done(); return; }
+      st.dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
+      Array.prototype.forEach.call(st.pop.children, function(c) { c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" }); });
+      const pr = st.pop.getBoundingClientRect();
+      const sr = st.row && st.row.isConnected ? st.row.getBoundingClientRect() : null;
+      if (sr) {
+        st.pop.animate([
+          { clipPath: "inset(0px 0px 0px 0px round 22px)" },
+          { clipPath: "inset(" + (sr.top - pr.top) + "px " + (pr.right - sr.right) + "px " + (pr.bottom - sr.bottom) + "px " + (sr.left - pr.left) + "px round 0px)" }
+        ], { duration: 260, easing: "cubic-bezier(.5,0,.75,.4)", fill: "forwards" });
+      } else {
+        st.wrap.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: "forwards" });
+      }
+      setTimeout(done, 270);
+    }
+    function openVersePopup(it, row) {
+      closeVersePopup(true);
+      hideVerseTip();
+      const dim = document.createElement("div");
+      dim.className = "vp-dim";
+      const born = Date.now();
+      dim.onclick = function(e) { e.stopPropagation(); if (Date.now() - born > 350) closeVersePopup(); };   // the lift-off of a hold is not a tap
+      const wrap = document.createElement("div");
+      wrap.className = "vp-wrap";
+      wrap.setAttribute("role", "dialog");
+      wrap.setAttribute("aria-label", it.f);
+      const pop = document.createElement("div");
+      pop.className = "vp-pop";
+      const head = document.createElement("div");
+      head.className = "vp-h";
+      const title = document.createElement("b");
+      title.textContent = it.f;
+      head.appendChild(title);
+      const ver = (it.v || "").trim();
+      if (ver && ver.toUpperCase() !== "ESV") { const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = ver; head.appendChild(vb); }
+      const sp = document.createElement("span"); sp.className = "vp-sp"; head.appendChild(sp);
+      const x = document.createElement("button");
+      x.type = "button"; x.className = "vp-x"; x.textContent = "\u2715"; x.setAttribute("aria-label", "Close");
+      x.onclick = function(e) { e.stopPropagation(); closeVersePopup(); };
+      head.appendChild(x);
+      const tabs = document.createElement("div");
+      tabs.className = "vp-tabs";
+      const tabV = document.createElement("button"); tabV.type = "button"; tabV.className = "vp-tab on"; tabV.textContent = "Verse";
+      const tabB = document.createElement("button"); tabB.type = "button"; tabB.className = "vp-tab"; tabB.appendChild(document.createTextNode("Background"));
+      const ul = document.createElement("i"); ul.className = "vp-ul";
+      tabs.appendChild(tabV); tabs.appendChild(tabB); tabs.appendChild(ul);
+      const body = document.createElement("div");
+      body.className = "vp-body";
+      const paneV = document.createElement("div"); paneV.className = "vp-pane vp-verse pv-text";
+      fillVerseText(paneV, it);
+      const paneB = document.createElement("div"); paneB.className = "vp-pane vp-bgp"; paneB.style.display = "none";
+      const scroll = document.createElement("div"); scroll.className = "ctx-scroll"; paneB.appendChild(scroll);
+      body.appendChild(paneV); body.appendChild(paneB);
+      pop.appendChild(head); pop.appendChild(tabs); pop.appendChild(body);
+      wrap.appendChild(pop);
+      document.body.appendChild(dim); document.body.appendChild(wrap);
+      const st = { dim: dim, wrap: wrap, pop: pop, row: row, ref: it.f, tabBg: tabB, dot: null, loaded: false };
+      vpState = st;
+      if (hasBackground(it.f)) { const d = document.createElement("i"); d.className = "vp-dot"; tabB.appendChild(d); st.dot = d; }
+      // sized to fit, near the row it came from
+      const top0 = Math.max(50, Math.round(window.innerHeight * 0.12));
+      wrap.style.top = top0 + "px";
+      const tabH = (document.getElementById("tabbar") || {}).offsetHeight || 54;
+      const room = window.innerHeight - tabH - 24;
+      body.style.maxHeight = Math.max(160, room - top0 - head.offsetHeight - tabs.offsetHeight) + "px";
+      const rr = row && row.isConnected ? row.getBoundingClientRect() : null;
+      if (rr) {
+        const h = wrap.offsetHeight;
+        wrap.style.top = Math.max(40, Math.min(rr.top + rr.height / 2 - h / 2, room - h)) + "px";
+      }
+      function show(which) {
+        const bg = which === "bg";
+        tabV.classList.toggle("on", !bg); tabB.classList.toggle("on", bg);
+        ul.classList.toggle("bg", bg);
+        paneV.style.display = bg ? "none" : ""; paneB.style.display = bg ? "" : "none";
+        const p = bg ? paneB : paneV;
+        p.classList.remove("in"); void p.offsetWidth; p.classList.add("in");
+        body.scrollTop = 0;
+        if (bg && !st.loaded) {
+          st.loaded = true;
+          const card = { reference: it.f, version: it.v || "", text: it.t || "" };
+          if (ctxCache[it.f]) ctxRender(paneB, card, { text: ctxCache[it.f] }, false); else ctxLoad(paneB, card, false);
+        }
+      }
+      tabV.onclick = function(e) { e.stopPropagation(); show("verse"); };
+      tabB.onclick = function(e) { e.stopPropagation(); show("bg"); };
+      // opens out of the row it came from: the card starts as the row's own shape and grows
+      const pr = pop.getBoundingClientRect();
+      if (pop.animate && rr) {
+        dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, fill: "both" });
+        pop.animate([
+          { clipPath: "inset(" + (rr.top - pr.top) + "px " + (pr.right - rr.right) + "px " + (pr.bottom - rr.bottom) + "px " + (rr.left - pr.left) + "px round 0px)" },
+          { clipPath: "inset(0px 0px 0px 0px round 22px)" }
+        ], { duration: 500, easing: "cubic-bezier(.25,.85,.25,1)", fill: "both" });
+        [head, tabs, body].forEach(function(e) { e.animate([{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }], { duration: 550, easing: "ease", fill: "both" }); });
+      }
     }
     function showVerseTip(item, words) {
       const had = item.querySelector(".vl-tip");
       hideVerseTip();
       if (had) return; // tapping the same verse again closes it
+      if ((item.classList.contains("fail-row") || (item.classList.contains("vl-verse") && !item.classList.contains("hit"))) && peekSwap(item, words)) return;
       const tip = document.createElement("div");
       tip.className = "vl-tip";
       tip.textContent = words ? words : "(no text)";
@@ -2450,7 +2664,9 @@
         let snip = vlSnippet(v.x || "", res.raw, false);
         let isFull = false;
         item.appendChild(snip);
+        const heldHit = attachLongPress(item, function() { hideVerseTip(); openVersePopup({ f: v.f, v: v.v, t: v.t || v.x }, item); });   // hold: the full verse and its Background
         item.onclick = function() { // tap to read the whole verse, tap again to collapse
+          if (heldHit()) return;
           isFull = !isFull;
           const next = vlSnippet(v.x || "", res.raw, isFull);
           item.replaceChild(next, snip);
@@ -2628,7 +2844,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-233';
+    const CLIENT_BUILD = 'sync-234';
 
     let queue = [];
     let currentIndex = 0;
@@ -3287,7 +3503,7 @@
       ctxRender(p, card, { loading: true }, force);
       google.script.run
         .withSuccessHandler(function(res) {
-          if (res && res.ok && res.text) ctxCache[card.reference] = res.text;
+          if (res && res.ok && res.text) { ctxCache[card.reference] = res.text; markHasBackground(card.reference); }
           if (token !== ctxToken) return;
           if (res && res.ok && res.text) ctxRender(p, card, { text: res.text }, false);
           else ctxRender(p, card, { error: (res && res.message) || "Couldn't get the background for this verse.", code: res && res.code }, force);
@@ -4922,12 +5138,14 @@
         const heldStat = attachLongPress(row, function() {
           hideVerseTip();
           const info = verseInfoFor(it.f);
-          showPreview({ f: it.f, v: info.v, t: info.t }, true);
+          openVersePopup({ f: it.f, v: info.v, t: info.t }, row);
         });
         row.onclick = function(ev) {
           ev.stopPropagation();
           if (heldStat()) return;
-          showVerseTip(row, verseInfoFor(it.f).w);
+          const info = verseInfoFor(it.f);
+          if (row.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: it.f, v: info.v, t: info.t }, row); return; }   // a second tap while the peek shows opens it
+          showVerseTip(row, info.w);
         };
         inner.appendChild(row);
       });
@@ -5273,22 +5491,7 @@
       const ver = (it.v || "").trim();
       const vb = document.getElementById(verId);
       if (ver && (alwaysVer || ver.toUpperCase() !== "ESV")) { vb.textContent = ver; vb.style.display = "inline-block"; } else { vb.style.display = "none"; }
-      const box = document.getElementById(textId);
-      box.textContent = "";
-      const segs = parseVerseSegments(it.t || "", it.f);
-      if (!segs.length) {
-        box.textContent = "No text saved for this verse.";
-      } else {
-        segs.forEach(function(sg, i) {
-          if (sg.num && segs.length > 1) {
-            const n = document.createElement("span");
-            n.className = "pv-n";
-            n.textContent = sg.num;
-            box.appendChild(n);
-          }
-          box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
-        });
-      }
+      fillVerseText(document.getElementById(textId), it);
     }
 
     // mode "delete" (press and hold in the Choose a verse list): the popup offers Delete instead of Add.

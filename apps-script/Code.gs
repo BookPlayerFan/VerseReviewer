@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-83'; // shown in the app's status readout (two-finger tap)
+const BUILD = 'sync-84'; // shown in the app's status readout (two-finger tap)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1725,6 +1725,9 @@ function addPastedVerse(reference, version, text) {
 // For the Verse List screen: every verse you've started (Level 0 and up). Unassigned verses are left out.
 function getVerseList() {
   const data = readSheetData_();
+  // Which verses already have a saved background note (column I), so the app can mark them. Read in one go.
+  let ctxCol = [];
+  try { const sh = versesSheet_(); if (sh && data.length) ctxCol = sh.getRange(1, CONTEXT_COL, data.length, 1).getValues(); } catch (e) {}
   const verses = [];
   const todayMs = today_().getTime();
   for (let i = 1; i < data.length; i++) {
@@ -1740,7 +1743,7 @@ function getVerseList() {
     // Days from today until the next review (overdue shows as 0); null when there is no review date (Level 0).
     const nd = g > 0 ? toMidnight_(data[i][1]) : null;
     const due = nd ? Math.max(0, Math.round((nd.getTime() - todayMs) / 86400000)) : null;
-    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due, l: Math.round(verseLoad_(data[i][7]) * 10) / 10 });
+    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, x: words.join(' '), t: String(data[i][7] || ''), d: due, l: Math.round(verseLoad_(data[i][7]) * 10) / 10, c: (ctxCol[i] && String(ctxCol[i][0] || '').trim()) ? 1 : 0 });
   }
   return { verses: verses };
 }
