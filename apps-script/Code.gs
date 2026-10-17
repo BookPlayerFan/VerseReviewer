@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-82'; // shown in the app's status readout (two-finger tap)
+const BUILD = 'sync-83'; // shown in the app's status readout (two-finger tap)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -236,6 +236,18 @@ function dueTomorrowCount_(data) {
 }
 
 // The same deck's word load (the sum of verseLoad_), which colours the "due tomorrow" note like the calendar days.
+// The Treasury's total points: every verse's level points times its verse count. Sent with the session so the Treasury pill has it on the first paint.
+function treasuryTotal_(data) {
+  let pts = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (!cleanRef_(data[i][5])) continue;
+    const str = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
+    if (str === '' || isNaN(Number(str))) continue;
+    pts += ptsOf_(Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str))))) * verseCount_(data[i][7]);
+  }
+  return pts;
+}
+
 function dueTomorrowLoad_(data) {
   const limit = today_();
   limit.setDate(limit.getDate() + 1);
@@ -577,6 +589,7 @@ function learnAction(reference, action, expectedRep) {
     const tdata = readSheetData_();
     result.tomorrow = dueTomorrowCount_(tdata);
     result.tomorrowLoad = dueTomorrowLoad_(tdata);
+    result.treasury = treasuryTotal_(tdata);
     return result;
   } finally {
     lock.releaseLock();
@@ -848,7 +861,8 @@ function hydrate_(s, preRead) {
     learning: learning,
     seen: seenFor_(s, learning),
     tomorrow: dueTomorrowCount_(data),
-    tomorrowLoad: dueTomorrowLoad_(data)
+    tomorrowLoad: dueTomorrowLoad_(data),
+    treasury: treasuryTotal_(data)
   };
 }
 
@@ -1233,7 +1247,7 @@ function submitReview(expectedVersion, review, next) {
 
     writeState_(s);
     const result = { ok: true, version: s.version, undoId: undoId };
-    if (review) { const tdata = readSheetData_(); result.tomorrow = dueTomorrowCount_(tdata); result.tomorrowLoad = dueTomorrowLoad_(tdata); }
+    if (review) { const tdata = readSheetData_(); result.tomorrow = dueTomorrowCount_(tdata); result.tomorrowLoad = dueTomorrowLoad_(tdata); result.treasury = treasuryTotal_(tdata); }
     if (review) { try { cancelDailyIfDone_(); } catch (e) { pushLog_('daily cancel ERROR', '', 0, false, String(e)); } }
     return result;
   } finally {

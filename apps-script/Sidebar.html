@@ -1806,6 +1806,7 @@
           if (!res || !Array.isArray(res.verses)) { failed(); return; }
           vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: textVerses(v.t, v.f), pn: textVerses(v.t, v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1 }; });
           vlVerses.sort(compareVerses);
+          setTreasury(treasuryTotal());
           done();
         })
         .withFailureHandler(failed)
@@ -2660,7 +2661,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-229';
+    const CLIENT_BUILD = 'sync-230';
 
     let queue = [];
     let currentIndex = 0;
@@ -2889,6 +2890,7 @@
       sessionDate = session.date;
       if (typeof session.tomorrow === 'number') tomorrowCount = session.tomorrow;
       if (typeof session.tomorrowLoad === 'number') tomorrowLoad = session.tomorrowLoad;
+      if (typeof session.treasury === 'number') setTreasury(session.treasury);
       hideUndo();
       serverBuild = session.build || "(old server code)";
       if (session.client) noteClientBuild(session.client);
@@ -3041,7 +3043,7 @@
           learnPending = false;
           if (res && res.ok) {
             if (typeof res.version === 'number') sessionVersion = res.version;
-            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; renderTomorrowNote(); }
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); renderTomorrowNote(); }
             outbox.shift();
             if (res.promoted) {
               // Normally the card is already gone (the Promote animation). After a resend it is still on screen, so take it off.
@@ -3089,7 +3091,7 @@
           inFlight = false;
           if (res && res.ok) {
             sessionVersion = res.version;
-            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; renderTomorrowNote(); }
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); renderTomorrowNote(); }
             outbox.shift();
             if (res.undoId && outbox.length === 0) showUndo(res.undoId);
             pumpOutbox();
@@ -3431,6 +3433,18 @@
 
     // ── Treasury pill on Review Complete: total points and a way in ──
     let trPillAt = 0, trPillBusy = false;
+    let trTotal = null;   // the Treasury's total as the server last said (sent with the session and with every review), so the pill never waits for the verse list
+    function setTreasury(n) {
+      if (typeof n !== "number" || isNaN(n)) return;
+      trTotal = n;
+      try { localStorage.setItem("vr_trpts", JSON.stringify(n)); } catch (e) {}
+    }
+    function knownTreasury() {
+      if (typeof trTotal === "number") return trTotal;
+      if (vlVerses.length) return treasuryTotal();
+      try { const sv = JSON.parse(localStorage.getItem("vr_trpts") || "null"); if (typeof sv === "number") return sv; } catch (e) {}
+      return null;
+    }
     function treasuryTotal() {
       let pts = 0;
       vlVerses.forEach(function(v) { pts += ptsOf(Math.max(0, Math.min(8, v.g | 0))) * (v.pn || 1); });
@@ -3449,15 +3463,13 @@
       if (!el) return;
       if (!show) { el.style.display = "none"; return; }
       // show the last total at once (it rarely moves within a day), then refresh it quietly from the verse list
-      let pts = vlVerses.length ? treasuryTotal() : null;
-      if (pts === null) { try { const sv = JSON.parse(localStorage.getItem("vr_trpts") || "null"); if (typeof sv === "number") pts = sv; } catch (e) {} }
-      paintTreasuryPill(pts);
+      paintTreasuryPill(knownTreasury());
       if (trPillBusy || Date.now() - trPillAt < 15000) return;
       trPillBusy = true;
       loadVlVerses(function() {
         trPillBusy = false; trPillAt = Date.now();
         const t = treasuryTotal();
-        try { localStorage.setItem("vr_trpts", JSON.stringify(t)); } catch (e) {}
+        setTreasury(t);
         if (document.getElementById("summaryView").style.display !== "none") paintTreasuryPill(t);
       }, function() { trPillBusy = false; });
     }
@@ -3529,8 +3541,7 @@
       });
       const setNet = function(el, n) { el.textContent = n === null ? "\u2014" : fmtPts(n); el.classList.toggle("neg", n !== null && n < 0); };
       setNet(val.today, sessionStats.pts || 0);
-      let tot = vlVerses.length ? treasuryTotal() : null;
-      if (tot === null) { try { const sv = JSON.parse(localStorage.getItem("vr_trpts") || "null"); if (typeof sv === "number") tot = sv; } catch (e) {} }
+      const tot = knownTreasury();
       val.tot.textContent = tot === null ? "\u2014" : tot.toLocaleString("en-US");
       val.tot.classList.add("tot");
       netPointsOver(7, function(n) { if (document.getElementById("pkBubble") === b) setNet(val.w, n); });
