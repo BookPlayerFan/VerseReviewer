@@ -537,6 +537,26 @@
       transition: background-color 0.2s ease, transform 0.2s ease;
     }
 
+    /* a rep filling in: the ring fills solid all at once with a little pop. When every dot is full they turn green one after another in a wave, and the pill flashes green. */
+    .pip { position: relative; color: var(--text-accent); }
+    .card.ranked .pip { color: var(--rc); }
+    .pips-container.late-1 .pip { color: #f59e0b; }
+    .pip.pop { animation: pipPop 0.42s ease-out both; }
+    @keyframes pipPop {
+      0% { transform: scale(1.25); background: transparent; border-color: currentColor; }
+      38% { transform: scale(1.65); background: currentColor; border-color: currentColor; }
+      72% { transform: scale(1.05); background: currentColor; border-color: currentColor; }
+      100% { transform: scale(1.15); background: currentColor; border-color: currentColor; }
+    }
+    .pips-container { position: relative; }
+    .pips-container.fin .pip { animation: pipGreen 0.8s ease-out both; animation-delay: calc(var(--k, 0) * 0.08s); }
+    @keyframes pipGreen {
+      35% { transform: scale(1.55); background: #34c759; border-color: #34c759; box-shadow: 0 0 10px #34c759; }
+      70% { transform: scale(1.15); background: #34c759; border-color: #34c759; }
+    }
+    .rank-badge.fin-pill { animation: pipPill 0.7s ease-out 0.35s both; }
+    @keyframes pipPill { 35% { transform: scale(1.22); color: #34c759; box-shadow: 0 0 0 1px #34c759, 0 0 10px rgba(52, 199, 89, 0.45); } }
+
     /* the rep you are on: a ring; it fills when the rep is done */
     .pip.cur { background: transparent; border-color: var(--text-accent); transform: scale(1.25); box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.22); }
     .pip.filled {
@@ -2595,7 +2615,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-231';
+    const CLIENT_BUILD = 'sync-232';
 
     let queue = [];
     let currentIndex = 0;
@@ -3776,6 +3796,7 @@
       return i > 0 ? i - 1 : -1;
     }
 
+    let lastPips = { ref: "", stage: "", now: 0 };   // what the dots last showed, to pop the one that just filled
     function paintLearningHeader(card) {
       const metaTag = document.getElementById("cardMeta");
       metaTag.className = "meta-tag";
@@ -3790,9 +3811,12 @@
       pips.classList.remove("lock-chips");
       // The same dots as the review reps: the rep you are on is a ring, done reps are filled. Learn has 7 reps; Lock has two (AM, then PM).
       const total = isLock ? 2 : 7, now = isLock ? (card.lockPart === 'pm' ? 2 : 1) : (card.dot || 1);
+      // the same card, one rep further on: the dot that just filled pops
+      const before = lastPips.ref === card.reference && lastPips.stage === card.stage ? lastPips.now : 0;
+      lastPips = { ref: card.reference, stage: card.stage, now: now };
       for (let i = 1; i <= total; i++) {
         const pip = document.createElement("div");
-        pip.className = "pip" + (i < now ? " filled" : i === now ? " cur" : "");
+        pip.className = "pip" + (i < now ? " filled" : i === now ? " cur" : "") + (before > 0 && i >= before && i < now ? " pop" : "");
         if (isLock) pip.title = i === 1 ? "Lock AM" : "Lock PM";
         pips.appendChild(pip);
       }
@@ -4254,7 +4278,22 @@
             render();
           });
         };
-        if (fillCurrentPip()) setTimeout(go, PIP_FILL_MS); else go();   // the PM ring fills in first
+        // the PM ring fills in, then both dots turn green as the rank-up fades in over them
+        if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(go, PIP_FILL_MS + 450); } else go();
+      } else if (kind !== 'skip' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
+        // The seventh rep: its dot fills, every dot turns green in a wave, then the card moves on (to the next verse, or to Lock).
+        const startedIn = epoch;
+        isScoring = true;
+        fillCurrentPip();
+        setTimeout(pipFinale, PIP_FILL_MS);
+        setTimeout(function() {
+          if (startedIn !== epoch) return;
+          isScoring = false;
+          const now = learningCards.concat(learningHeld).find(function(x) { return x.reference === card.reference; });
+          if (now && now.rep === card.rep) applyLearnCard(predictLearn(card, kind));   // the server has not answered yet: show the next state
+          else if (mode === 'learning') render();                                        // it has: the card is already updated underneath
+          else updateTabs();
+        }, PIP_FILL_MS + PIP_FINALE_MS);
       } else {
         applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
       }
@@ -4498,8 +4537,20 @@
     function fillCurrentPip() {
       const cur = document.querySelector("#cardPips .pip.cur");
       if (!cur) return false;
-      cur.classList.remove("cur"); cur.classList.add("filled");
+      cur.classList.remove("cur"); cur.classList.add("filled", "pop");
       return true;
+    }
+    // Every dot is full: they turn green one after another in a wave, the pill flashes green, then it all settles back. Runs about 1.3 seconds.
+    const PIP_FINALE_MS = 1300;
+    function pipFinale() {
+      const pips = document.getElementById("cardPips");
+      const list = pips.querySelectorAll(".pip");
+      if (!list.length) return;
+      list.forEach(function(p, k) { p.style.setProperty("--k", k); });
+      pips.classList.add("fin");
+      const pill = document.querySelector("#cardMeta .rank-badge");
+      if (pill) pill.classList.add("fin-pill");
+      setTimeout(function() { pips.classList.remove("fin"); if (pill) pill.classList.remove("fin-pill"); }, PIP_FINALE_MS + 200);
     }
 
     // The Treasury bar on the Review Complete screen: total points and the rank bar; tapping it opens the Treasury.
