@@ -433,14 +433,8 @@
     .cal-d.pk-tile { position: fixed; z-index: 58; margin: 0; opacity: 1; pointer-events: none; transform: scale(1.12); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
     .cal-d.sk { animation: skPulse 1.1s ease-in-out infinite; }
     @keyframes skPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
-    .cal-gap { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 0; margin: 6px 0 6px; padding: 8px 0; border-radius: 0; background: none; box-shadow: none; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-meta); -webkit-tap-highlight-color: transparent; }
+    .cal-gap { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 0; margin: 6px 0 6px; padding: 8px 0; font-size: 11.5px; font-weight: 600; color: var(--text-meta); }
     .cal-gap::before, .cal-gap::after { content: ""; flex: 1; height: 1px; background: var(--border-card); }
-    .cal-gap:active { transform: none; filter: none; }
-    .cal-gap .chev { display: inline-block; margin-left: 3px; font-size: 15px; line-height: 1; transition: transform 0.15s ease; }
-    .cal-gap.open .chev { transform: rotate(90deg); }
-    .cal-gapwk { display: flex; justify-content: space-between; padding: 5px 6px; font-size: 11px; color: var(--text-meta); opacity: 0.8; }
-    .cal-gapwk + .cal-gapwk { border-top: 1px solid var(--border-card); }
-    .cal-gaps { margin: 0 0 6px; }
     .pk-bubble.pk-explain { top: 60px; left: 20px; right: 20px; padding: 6px 0; }
     .pk-x { display: flex; align-items: center; gap: 14px; padding: 12px 18px; font-size: 14px; color: var(--text-primary); }
     .pk-x + .pk-x { border-top: 1px solid var(--border-card); }
@@ -1903,26 +1897,16 @@
       let w = 0;
       while (w < weeks) {
         if (!placeholder && w > 0 && !weekHas(w)) {
-          // weeks with nothing due fold into one line; tap it to see which weeks they are
+          // weeks with nothing due fold into one quiet line (not tappable)
           let e = w; while (e < weeks && !weekHas(e)) e++;
           const n = e - w;
           const range = function(a, b) { return short(a) + " \u2013 " + (a.getMonth() === b.getMonth() ? b.getDate() : short(b)); };
-          const g = document.createElement("button"); g.type = "button"; g.className = "cal-gap";
+          const g = document.createElement("div"); g.className = "cal-gap";
           g.dataset.from = start + w * 7; g.dataset.weeks = n;
           const gl = document.createElement("span");
           gl.textContent = n + (n === 1 ? " week" : " weeks") + " \u00b7 " + range(dayAt(start + w * 7), dayAt(start + e * 7 - 1));
-          const gc = document.createElement("b"); gc.className = "chev"; gc.textContent = "\u203A";
-          gl.appendChild(gc); g.appendChild(gl);
-          g.setAttribute("aria-expanded", "false");
-          const list = document.createElement("div"); list.className = "cal-gaps"; list.hidden = true;
-          for (let k = w; k < e; k++) {
-            const r = document.createElement("div"); r.className = "cal-gapwk";
-            const a = document.createElement("span"); a.textContent = range(dayAt(start + k * 7), dayAt(start + k * 7 + 6));
-            const z = document.createElement("span"); z.textContent = "nothing due";
-            r.appendChild(a); r.appendChild(z); list.appendChild(r);
-          }
-          g.onclick = function() { const o = list.hidden; list.hidden = !o; g.classList.toggle("open", o); g.setAttribute("aria-expanded", o ? "true" : "false"); };
-          box.appendChild(g); box.appendChild(list); w = e; continue;
+          g.appendChild(gl);
+          box.appendChild(g); w = e; continue;
         }
         const row = document.createElement("div"); row.className = "cal-wk";
         for (let i = 0; i < 7; i++) {
@@ -2676,7 +2660,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-220';
+    const CLIENT_BUILD = 'sync-221';
 
     let queue = [];
     let currentIndex = 0;
