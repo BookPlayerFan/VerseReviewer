@@ -405,29 +405,25 @@
     .cal-sum { font-size: 12px; color: var(--text-muted); margin: 0 2px 10px; min-height: 15px; }
     .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; margin: 0 0 4px; font-size: 10px; font-weight: 700; color: var(--text-meta); text-align: center; letter-spacing: 0.04em; opacity: 0.8; }
     .cal-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; }
-    #upList { padding: 8px 7px 4px; }   /* room for the badges that hang off the right and top edges */
+    #upList { padding: 2px 4px 4px; }
     .cal-s > .cal-d { width: 100%; }
     .cal-s { padding: 3px; min-width: 0; }
-    /* a day: its date in the middle, a solid square whose shade follows the day's word load (amber is the heaviest), and a badge with the number of references due */
-    .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 50px; min-height: 0; width: auto; padding: 0; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: var(--rc); box-shadow: none;
-      --fill: transparent; --ink: var(--rc); --bdg: #123a85; --bdi: #fff; background: var(--fill); color: var(--ink); }
-    .cal-d .bd { position: absolute; top: -6px; right: -5px; min-width: 22px; height: 22px; padding: 0 4px; box-sizing: border-box; border-radius: 11px; display: flex; align-items: center; justify-content: center; text-align: center; font-style: normal; font-size: 11.5px; font-weight: 800; line-height: 1; letter-spacing: 0; font-variant-numeric: normal; text-indent: 0; background: var(--bdg); color: var(--bdi); box-shadow: 0 0 0 2.5px var(--bg-card); }
+    /* a day: its date in the middle on a tile coloured by the day's word load: light blue, strong blue, amber for heavy (lighter is less load in light and dark) */
+    .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 50px; min-height: 0; width: auto; padding: 0; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; box-shadow: none;
+      --fill: transparent; --ink: var(--rc); background: var(--fill); color: var(--ink); }
     /* the 1st of a month carries the month's short name along the bottom */
     .cal-d .mn { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-style: normal; font-size: 7.5px; font-weight: 800; letter-spacing: 0.08em; line-height: 1; text-transform: uppercase; color: var(--ink); opacity: 0.85; }
     .cal-d.first { padding-bottom: 7px; }
-    /* three blues, clearly apart: the lightest tile is the lightest load, each step is deeper (the same direction in light and dark) */
-    .cal-d.s1 { --fill: #dbe8fd; --ink: #1d56b3; }
-    .cal-d.s2 { --fill: #a3c4f6; --ink: #0d3a8a; }
-    .cal-d.s3 { --fill: #3d7ae0; --ink: #fff; --bdg: #0c2d6b; }
-    .cal-d.hot { --rc: #c47400; --fill: #f3d9ae; --ink: #8a4f00; --bdg: #6b3c00; --bdi: #fff; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.s1 { --fill: #a9c2ec; --ink: #10264f; --bdg: #10264f; --bdi: #fff; }
-      :root:not([data-theme="light"]) .cal-d.s2 { --fill: #5a80c2; --ink: #fff; --bdg: #e8f0ff; --bdi: #14306b; }
-      :root:not([data-theme="light"]) .cal-d.s3 { --fill: #274c9b; --ink: #fff; --bdg: #e8f0ff; --bdi: #14306b; }
-      :root:not([data-theme="light"]) .cal-d.hot { --rc: #ffb454; --fill: #5a4122; --ink: #ffb454; --bdg: #ffd9a0; --bdi: #3b2400; } }
-    :root[data-theme="dark"] .cal-d.s1 { --fill: #a9c2ec; --ink: #10264f; --bdg: #10264f; --bdi: #fff; }
-    :root[data-theme="dark"] .cal-d.s2 { --fill: #5a80c2; --ink: #fff; --bdg: #e8f0ff; --bdi: #14306b; }
-    :root[data-theme="dark"] .cal-d.s3 { --fill: #274c9b; --ink: #fff; --bdg: #e8f0ff; --bdi: #14306b; }
-    :root[data-theme="dark"] .cal-d.hot { --rc: #ffb454; --fill: #5a4122; --ink: #ffb454; --bdg: #ffd9a0; --bdi: #3b2400; }
+    .cal-d.s1, .tomorrow-note.s1 { --fill: #dbe8fd; --ink: #1d56b3; }
+    .cal-d.s2, .tomorrow-note.s2 { --fill: #3d7ae0; --ink: #fff; }
+    .cal-d.s3, .tomorrow-note.s3 { --fill: #f3d9ae; --ink: #8a4f00; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.s1, :root:not([data-theme="light"]) .tomorrow-note.s1 { --fill: #a9c2ec; --ink: #10264f; }
+      :root:not([data-theme="light"]) .cal-d.s2, :root:not([data-theme="light"]) .tomorrow-note.s2 { --fill: #5a80c2; --ink: #fff; }
+      :root:not([data-theme="light"]) .cal-d.s3, :root:not([data-theme="light"]) .tomorrow-note.s3 { --fill: #5a4122; --ink: #ffb454; } }
+    :root[data-theme="dark"] .cal-d.s1, :root[data-theme="dark"] .tomorrow-note.s1 { --fill: #a9c2ec; --ink: #10264f; }
+    :root[data-theme="dark"] .cal-d.s2, :root[data-theme="dark"] .tomorrow-note.s2 { --fill: #5a80c2; --ink: #fff; }
+    :root[data-theme="dark"] .cal-d.s3, :root[data-theme="dark"] .tomorrow-note.s3 { --fill: #5a4122; --ink: #ffb454; }
+    .tomorrow-note.s1, .tomorrow-note.s2, .tomorrow-note.s3 { background: var(--fill); color: var(--ink); }
     /* a day with nothing due is just a faint number */
     .cal-d.z { background: none; color: var(--text-meta); font-size: 18px; font-weight: 500; opacity: 0.5; pointer-events: none; }
     .cal-d.past { opacity: 0.22; }
@@ -450,7 +446,6 @@
     .pk-x + .pk-x { border-top: 1px solid var(--border-card); }
     .pk-x > span { flex: none; width: 74px; display: flex; gap: 4px; justify-content: center; }
     .pk-x .cal-d { width: 30px; height: 30px; font-size: 13px; border-radius: 8px; pointer-events: none; }
-    .pk-x .cal-d .bd { top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 10px; box-shadow: 0 0 0 2px var(--bg-card); }
     .pk-x b { font-weight: 700; }
     .pk-x small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 1px; }
     .pk-bubble.pk-day { left: 14px; right: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 20px; }
@@ -1873,6 +1868,8 @@
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
     // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
     // (amber is a very heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
+    // Three colours for a day's word load (about a point per 30 words, at least 1 per verse): light up to 5, medium up to 10, heavy above.
+    function loadStep(load) { return load <= 5 ? 1 : load <= 10 ? 2 : 3; }
     function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
       const keepTop = box.scrollTop;
@@ -1891,8 +1888,6 @@
         loads[v.d] = (loads[v.d] || 0) + (v.l || 1);
         total++; if (v.d > lastOff) lastOff = v.d;
       });
-      // shade by the day's word load: up to 4, up to 8, up to 12; more than 12 is amber (a verse counts 1 to 5, about a point per 30 words)
-      const LOAD_STEPS = [4, 8, 12];
 
       if (!placeholder && !total) {
         const sum = document.createElement("div"); sum.className = "cal-sum"; sum.textContent = "Nothing scheduled yet";
@@ -1933,10 +1928,10 @@
         for (let i = 0; i < 7; i++) {
           const off = start + w * 7 + i, d = dayAt(off), vs = byDay[off] || [];
           const load = loads[off] || 0;
-          const h = !vs.length ? 0 : load <= LOAD_STEPS[0] ? 1 : load <= LOAD_STEPS[1] ? 2 : 3;
+          const h = !vs.length ? 0 : loadStep(load);
           const c = document.createElement(vs.length ? "button" : "div");
           if (vs.length) c.type = "button";
-          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (vs.length ? " s" + h : "") + (vs.length && load > LOAD_STEPS[2] ? " hot" : "");
+          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (vs.length ? " s" + h : "");
           c.style.setProperty("--h", h);
           const first = d.getDate() === 1;
           if (first) c.classList.add("first");
@@ -1947,7 +1942,6 @@
             c.appendChild(mn);
           }
           if (vs.length) {
-            const bd = document.createElement("i"); bd.className = "bd"; bd.textContent = vs.length; c.appendChild(bd);
             c.setAttribute("aria-label", DOW[d.getDay()] + ", " + short(d) + ", " + vs.length + (vs.length === 1 ? " reference" : " references"));
             c.onclick = function() { peekDay(c, off, vs); };
           }
@@ -1974,17 +1968,15 @@
         const r = document.createElement("div"); r.className = "pk-x";
         const l = document.createElement("span");
         tiles.forEach(function(t) {
-          const c = document.createElement("div"); c.className = "cal-d s" + t[0] + (t[1] ? " hot" : ""); c.style.setProperty("--h", t[0]); c.textContent = t[2] || "";
-          if (t[3]) { const bd = document.createElement("i"); bd.className = "bd"; bd.textContent = t[3]; c.appendChild(bd); }
+          const c = document.createElement("div"); c.className = "cal-d s" + t[0]; c.style.setProperty("--h", t[0]); c.textContent = t[1] || "";
           l.appendChild(c);
         });
         r.appendChild(l);
         const tx = document.createElement("div"); const bb = document.createElement("b"); bb.textContent = title; const sm = document.createElement("small"); sm.textContent = sub;
         tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
       };
-      row([[2, false, "12", "3"]], "The badge", "how many references are due that day");
-      row([[1, false], [2, false], [3, false]], "The shade", "how much there is to learn; a stronger color is a heavier day");
-      row([[3, true]], "Amber", "the heaviest days");
+      row([[1], [2], [3]], "The color", "how much there is to learn that day: light, medium or heavy");
+      row([[2, "12"]], "Tap a day", "to see its verses and exact load");
       document.body.appendChild(b);
     }
     // Tap a day: its tile lifts over a dimmed calendar and a card lists the day's references.
@@ -2684,7 +2676,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-219';
+    const CLIENT_BUILD = 'sync-220';
 
     let queue = [];
     let currentIndex = 0;
@@ -2696,7 +2688,7 @@
     let totalCardsProcessed = 0;
     let progressHigh = 0;
     let loadedAt = 0;
-    let tomorrowCount = null;
+    let tomorrowCount = null, tomorrowLoad = null;   // tomorrowLoad: the word load of that deck, for the note's colour
     let countUpPending = false;
     let regularScoredThisLoad = false; // a real (non-repeat) card was scored since this page opened
     let countUpToken = 0;
@@ -2908,6 +2900,7 @@
       sessionVersion = session.version;
       sessionDate = session.date;
       if (typeof session.tomorrow === 'number') tomorrowCount = session.tomorrow;
+      if (typeof session.tomorrowLoad === 'number') tomorrowLoad = session.tomorrowLoad;
       hideUndo();
       serverBuild = session.build || "(old server code)";
       if (session.client) noteClientBuild(session.client);
@@ -3060,7 +3053,7 @@
           learnPending = false;
           if (res && res.ok) {
             if (typeof res.version === 'number') sessionVersion = res.version;
-            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; renderTomorrowNote(); }
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; renderTomorrowNote(); }
             outbox.shift();
             if (res.promoted) {
               // Normally the card is already gone (the Promote animation). After a resend it is still on screen, so take it off.
@@ -3108,7 +3101,7 @@
           inFlight = false;
           if (res && res.ok) {
             sessionVersion = res.version;
-            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; renderTomorrowNote(); }
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; renderTomorrowNote(); }
             outbox.shift();
             if (res.undoId && outbox.length === 0) showUndo(res.undoId);
             pumpOutbox();
@@ -3508,6 +3501,7 @@
       renderMonthStrip(onComplete);
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       el.textContent = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
+      el.className = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
       el.style.display = "block";
     }
 

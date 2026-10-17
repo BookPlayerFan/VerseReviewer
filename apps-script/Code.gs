@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-80'; // shown in the app's status readout (two-finger tap)
+const BUILD = 'sync-81'; // shown in the app's status readout (two-finger tap)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -233,6 +233,21 @@ function dueTomorrowCount_(data) {
     if (!nextDue || nextDue <= limit) n++;
   }
   return n;
+}
+
+// The same deck's word load (the sum of verseLoad_), which colours the "due tomorrow" note like the calendar days.
+function dueTomorrowLoad_(data) {
+  const limit = today_();
+  limit.setDate(limit.getDate() + 1);
+  let load = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (!cleanRef_(data[i][5])) continue;
+    const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
+    if (groupStr === '' || isNaN(Number(groupStr)) || Number(groupStr) < 1) continue;
+    const nextDue = toMidnight_(data[i][1]);
+    if (!nextDue || nextDue <= limit) load += verseLoad_(data[i][7]);
+  }
+  return Math.round(load * 10) / 10;
 }
 
 // Verses added before "Day N" existed have no date; stamp them with today so counting starts.
@@ -558,7 +573,9 @@ function learnAction(reference, action, expectedRep) {
     try { syncSlotPushes_(); } catch (e) { pushLog_('slot sync ERROR', ref, 0, false, String(e)); }
 
     const result = { ok: true, promoted: promoted, card: card, version: s && s.date === todayKey_() ? s.version : undefined };
-    result.tomorrow = dueTomorrowCount_(readSheetData_());
+    const tdata = readSheetData_();
+    result.tomorrow = dueTomorrowCount_(tdata);
+    result.tomorrowLoad = dueTomorrowLoad_(tdata);
     return result;
   } finally {
     lock.releaseLock();
@@ -829,7 +846,8 @@ function hydrate_(s, preRead) {
     cards: cards,
     learning: learning,
     seen: seenFor_(s, learning),
-    tomorrow: dueTomorrowCount_(data)
+    tomorrow: dueTomorrowCount_(data),
+    tomorrowLoad: dueTomorrowLoad_(data)
   };
 }
 
@@ -1214,7 +1232,7 @@ function submitReview(expectedVersion, review, next) {
 
     writeState_(s);
     const result = { ok: true, version: s.version, undoId: undoId };
-    if (review) result.tomorrow = dueTomorrowCount_(readSheetData_());
+    if (review) { const tdata = readSheetData_(); result.tomorrow = dueTomorrowCount_(tdata); result.tomorrowLoad = dueTomorrowLoad_(tdata); }
     return result;
   } finally {
     lock.releaseLock();
