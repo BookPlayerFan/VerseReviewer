@@ -1861,7 +1861,7 @@
 
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
     // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
-    // (the same load the old bars used; amber is a heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
+    // (amber is a very heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
     function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
       const keepTop = box.scrollTop;
@@ -1880,10 +1880,8 @@
         loads[v.d] = (loads[v.d] || 0) + (v.l || 1);
         total++; if (v.d > lastOff) lastOff = v.d;
       });
-      const filled = Object.keys(loads).map(function(k) { return loads[k]; });
-      const maxLoad = filled.length ? Math.max.apply(null, filled) : 0;
-      const avgLoad = filled.length ? filled.reduce(function(a, b) { return a + b; }, 0) / filled.length : 0;
-      const heavy = Math.max(3, 1.6 * avgLoad);   // amber: a heavy day, and one of the very heaviest
+      // shade by the day's word load: up to 5, up to 10, up to 15; more than 15 is amber (a verse counts 1 to 5, about a point per 30 words)
+      const LOAD_STEPS = [5, 10, 15];
 
       if (!placeholder && !total) {
         const sum = document.createElement("div"); sum.className = "cal-sum"; sum.textContent = "Nothing scheduled yet";
@@ -1923,11 +1921,11 @@
         const row = document.createElement("div"); row.className = "cal-wk";
         for (let i = 0; i < 7; i++) {
           const off = start + w * 7 + i, d = dayAt(off), vs = byDay[off] || [];
-          const load = loads[off] || 0, ratio = maxLoad ? load / maxLoad : 0;
-          const h = !vs.length ? 0 : ratio <= 1 / 3 ? 1 : ratio <= 2 / 3 ? 2 : 3;
+          const load = loads[off] || 0;
+          const h = !vs.length ? 0 : load <= LOAD_STEPS[0] ? 1 : load <= LOAD_STEPS[1] ? 2 : 3;
           const c = document.createElement(vs.length ? "button" : "div");
           if (vs.length) c.type = "button";
-          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (vs.length && load >= heavy && ratio >= 0.7 ? " hot" : "");
+          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (vs.length && load > LOAD_STEPS[2] ? " hot" : "");
           c.style.setProperty("--h", h);
           const first = d.getDate() === 1;
           if (first) c.classList.add("first");
@@ -2675,7 +2673,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-212';
+    const CLIENT_BUILD = 'sync-213';
 
     let queue = [];
     let currentIndex = 0;
