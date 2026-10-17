@@ -263,8 +263,8 @@
     }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
-    .vl-row:active, .vl-strip:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
-    .vl-row, .vl-strip, .picker-close { transition: none; }
+    .vl-row:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
+    .vl-row, .picker-close { transition: none; }
     .vl-row .chev { transition: transform 0.15s ease; }
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
     /* Book map on the Verse List: a tile for each book, coloured by its section of the Bible; tap one to open its verses. */
@@ -312,7 +312,6 @@
     @keyframes pkPop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: none; } }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vm-tile, :root:not([data-theme="light"]) .pk-k { --rc: var(--rd); } }
     :root[data-theme="dark"] .vm-tile, :root[data-theme="dark"] .pk-k { --rc: var(--rd); }
-    .vm-sum { padding: 0; }
     .vm-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 14px; }
     .vm-stats { display: flex; gap: 8px; }
     .tr-mini { display: flex; gap: 8px; margin-top: 12px; }
@@ -325,16 +324,6 @@
     .vm-head { display: flex; align-items: center; gap: 10px; padding: 12px 4px 8px; border-bottom: 1px solid var(--border-card); }
     .vm-head .vm-name { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; }
     .vm-head .vm-meta { font-size: 12px; color: var(--text-meta); }
-    /* The Treasury strip: total points and a bar of how many references sit at each rank. Tapping it opens the Treasury. */
-    .vl-strip { display: flex; align-items: center; gap: 12px; width: 100%; margin: 10px 0 0; padding: 14px 16px; border-radius: 12px; min-height: 0;
-      flex-direction: row; box-shadow: none; text-align: left; color: var(--text-primary); border: 1px solid var(--border-card); background: var(--bg-card); }
-        .vs-pts { font-weight: 800; font-size: 15px; white-space: nowrap; }
-    .vs-pts small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
-    .vs-bar { display: flex; flex: 1; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border-card); }
-    .vs-bar i { display: block; background: var(--rl); }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vs-bar i { background: var(--rd); } }
-    :root[data-theme="dark"] .vs-bar i { background: var(--rd); }
-    .vs-lbl { font-size: 12px; font-weight: 700; color: var(--text-accent, #1a73e8); }
     /* Treasury screen */
     .tr-head { margin: 4px 0 10px; padding: 14px 16px 16px; border-radius: 16px; border: 1px solid var(--border-card); background: var(--bg-body, transparent); }
     .tr-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
@@ -370,8 +359,8 @@
     .tr-grp .vl-verse { padding-left: 16px; padding-right: 14px; }
     .tr-grp .vl-verse + .vl-verse { border-top-color: color-mix(in srgb, var(--rc) 18%, var(--border-card)); }
     .tr-grp .vl-verse.lp-down { background: color-mix(in srgb, var(--rc) 20%, transparent); }
-    /* The Treasury slides in over the Verses tab and slides back out. */
-    #treasuryView.open { animation: trIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    /* The Treasury fades in over the screen and fades back out. */
+    #treasuryView.open { animation: trIn 0.25s ease-out; }
     #treasuryView.closing { animation: trOut 0.2s ease-in forwards; }
     /* a book opens as a nearly full-screen card that fades in right over the map, and fades back out to it */
     #bookView.open, #upcomingView.open { animation: bkIn 0.2s ease-out; }
@@ -383,8 +372,8 @@
     @keyframes bkOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.97); } }
     .bk-dim { position: fixed; left: 0; right: 0; top: 0; bottom: var(--tab-h); z-index: 41; background: rgba(0, 0, 0, 0.34); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
     .bk-dim.on { opacity: 1; pointer-events: auto; }
-    @keyframes trIn { from { transform: translateX(36px); opacity: 0; } to { transform: none; opacity: 1; } }
-    @keyframes trOut { from { transform: none; opacity: 1; } to { transform: translateX(36px); opacity: 0; } }
+    @keyframes trIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes trOut { from { opacity: 1; } to { opacity: 0; } }
     .vl-due { font-size: 12px; color: var(--text-meta); white-space: nowrap; margin-left: 10px; }
     .vl-due.now { color: var(--text-accent); font-weight: 700; }
     .vl-sect { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px 6px; border-bottom: 1px solid var(--border-card); }
@@ -1134,21 +1123,15 @@
     button:disabled:active { transform: none; filter: none; }
 
 
-    /* Month line at the top of Review Complete: month | Perfect Days | points this month (one outlined pill, not tappable). */
-    .month-strip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%;
+    /* Treasury pill at the top of Review Complete: total points | Treasury \u203A. Tap it (or swipe right) to open the Treasury. */
+    .tr-pill { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; cursor: pointer;
       display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-card);
-      font-size: 13px; font-weight: 700; color: var(--text-muted); pointer-events: none; white-space: nowrap; }
-    .month-strip span { padding: 7px 14px; }
-    .month-strip span + span { border-left: 1px solid var(--border-card); }
-    .month-strip b { color: var(--text-primary); font-weight: 800; }
-    .month-strip .ms-mon { color: var(--text-primary); font-weight: 800; }
-    .month-strip i { font-style: normal; }
-    .month-strip .ms-gold, .month-strip .ms-gold b { color: #c98f00; }
-    .month-strip .ms-pts { color: var(--text-primary); }
-    .month-strip .ms-pts b { color: var(--text-accent); }
-    .month-strip .ms-pts.neg b { color: var(--badge-fail); }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .month-strip .ms-gold, :root:not([data-theme="light"]) .month-strip .ms-gold b { color: #f2c94c; } }
-    :root[data-theme="dark"] .month-strip .ms-gold, :root[data-theme="dark"] .month-strip .ms-gold b { color: #f2c94c; }
+      font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+    .tr-pill span { padding: 7px 14px; }
+    .tr-pill span + span { border-left: 1px solid var(--border-card); }
+    .tr-pill b { color: var(--text-primary); font-weight: 800; }
+    .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
+    .tr-pill:active { opacity: 0.6; }
 
     /* Simple "pick a verse" sheet */
     .picker {
@@ -1227,7 +1210,7 @@
     </div>
 
     <div class="summary-card" id="summaryView" style="display: none;">
-      <div class="month-strip" id="monthStrip" style="display: none;"></div>
+      <div class="tr-pill" id="trPill" role="button" onclick="openTreasury()" style="display: none;"></div>
       <div class="summary-header">
         <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Perfect Day</div>
         <div class="sum-title-row">
@@ -1845,22 +1828,6 @@
 
     function updateVlControls() {}
 
-    // The Treasury button at the bottom of the Verses tab: total points (the points table, per verse) and a bar sized by how many
-    // references sit at each rank. Tapping it slides the Treasury in.
-    function treasuryButton(id) {
-      const strip = document.createElement("button");
-      strip.type = "button"; strip.className = "vl-strip"; strip.id = id || "vlStrip";
-      const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-      let pts = 0;
-      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; pts += ptsOf(g) * (v.pn || 1); });
-      let bar = "";
-      for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
-      strip.innerHTML = '<span class="vs-pts">' + pts + ' <small>pts</small></span><span class="vs-bar">' + bar + '</span><span class="vs-lbl">Treasury \u203A</span>';
-      strip.setAttribute("aria-label", "Treasury, " + pts + " points. Open");
-      strip.onclick = function() { openTreasury(); };
-      return strip;
-    }
-
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
     // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
     // (amber is a very heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
@@ -2130,7 +2097,9 @@
     }
     function openTreasury() {
       hideVerseTip();
-      if (!vlVerses.length) return;
+      const tv = document.getElementById("treasuryView");
+      if (tv.classList.contains("open") && !tv.classList.contains("closing")) return;
+      if (!vlVerses.length) { loadVlVerses(function() { if (vlVerses.length) openTreasury(); }, function() {}); return; }   // opened from Review Complete before the list is loaded
       trOpen = null;
       renderTreasury();
       const view = document.getElementById("treasuryView");
@@ -2469,14 +2438,6 @@
       i.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (clear ? '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" fill="none"/>' : (RANK_ICON[Math.min(8, g)] || "")) + "</svg>";
       return i;
     }
-    // What shows under the map before a book is tapped: the Treasury button.
-    function renderVlSummary(box, byKey) {
-      const wrap = document.createElement("div");
-      wrap.className = "vm-sum";
-      wrap.appendChild(treasuryButton());
-      box.appendChild(wrap);
-    }
-
     // The section of the Bible a book sits in (its index in BIBLE_BOOKS). Five colours, repeated across the testaments:
     // 1 Law / Gospels, 2 History / Acts, 3 Wisdom / Paul's letters to churches, 4 Major Prophets / Paul's letters to individuals, 5 Minor Prophets / General letters and Revelation.
     function bookCat(i) {
@@ -2510,7 +2471,7 @@
       if (top + b.offsetHeight > room) top = r.top - 4 - b.offsetHeight >= 8 ? r.top - 4 - b.offsetHeight : Math.max(8, room - b.offsetHeight);
       b.style.top = top + "px";
     }
-    // The book map: a tile for each book, coloured by its section of the Bible. It fills the screen above the Treasury button.
+    // The book map: a tile for each book, coloured by its section of the Bible. It fills the screen.
     function renderVlBooks(map, box) {
       const byKey = {};
       vlVerses.forEach(function(v) {
@@ -2563,7 +2524,6 @@
       if (other.length) section("Other", other);
 
       box.textContent = "";
-      renderVlSummary(box, byKey);
     }
 
     // One book's references as a nearly full-screen card over the map: fades in, swipe left (or Close, or tap outside it) to fade back to the map.
@@ -2667,7 +2627,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-224';
+    const CLIENT_BUILD = 'sync-225';
 
     let queue = [];
     let currentIndex = 0;
@@ -2747,6 +2707,8 @@
 
     window.onload = function() {
       attachSwipeBack("treasuryView", backTreasury, "left");
+      attachSwipeBack("verseListView", openTreasury, "right");      // swipe right on the Verses tab or on Review Complete opens the Treasury
+      attachSwipeBack("summaryView", openTreasury, "right");
       attachSwipeBack("bookView", backBook, "left");
       attachSwipeBack("upcomingView", backUpcoming, "left");
       attachSwipeBack("searchView", backSearch, "left");
@@ -3432,54 +3394,37 @@
         .undoLast(id);
     }
 
-    // ── Month line on Review Complete: Perfect Days and Treasury points this month ──
-    let monthCache = null;   // { at, data } for the current month
-    let monthBusy = false;
-    function monthTotals(data) {
-      let perfect = 0, pts = 0;
-      Object.keys(data.days || {}).forEach(function(k) { const d = data.days[k]; if (d[0] > 0 && d[1] === 0) perfect++; pts += d[4]; });
-      return { perfect: perfect, pts: pts };
+    // ── Treasury pill on Review Complete: total points and a way in ──
+    let trPillAt = 0, trPillBusy = false;
+    function treasuryTotal() {
+      let pts = 0;
+      vlVerses.forEach(function(v) { pts += ptsOf(Math.max(0, Math.min(8, v.g | 0))) * (v.pn || 1); });
+      return pts;
     }
-    function paintMonthStrip(data) {
-      const t = monthTotals(data);
-      const el = document.getElementById("monthStrip");
-      const seg = function(cls, html) { const e = document.createElement("span"); if (cls) e.className = cls; e.innerHTML = html; el.appendChild(e); };
+    function paintTreasuryPill(pts) {
+      const el = document.getElementById("trPill");
       el.textContent = "";
-      seg("ms-mon", ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][data.m - 1]);
-      if (t.perfect > 0) seg("", '<i class="ms-gold">\u2726 <b>' + t.perfect + "</b></i> Perfect Day" + (t.perfect === 1 ? "" : "s"));
-      else seg("", "No Perfect Days yet");
-      if (t.pts !== 0) seg("ms-pts" + (t.pts < 0 ? " neg" : ""), "<b>" + (t.pts > 0 ? "+" : "\u2212") + Math.abs(t.pts) + "</b> pts");
+      if (typeof pts === "number") { const a = document.createElement("span"); a.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> pts"; el.appendChild(a); }
+      const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury \u203A"; el.appendChild(g);
+      el.setAttribute("aria-label", (typeof pts === "number" ? "Treasury, " + pts + " points. " : "Treasury. ") + "Open");
       el.style.display = "inline-flex";
     }
-    function renderMonthStrip(show) {
-      const el = document.getElementById("monthStrip");
+    function renderTreasuryPill(show) {
+      const el = document.getElementById("trPill");
       if (!el) return;
       if (!show) { el.style.display = "none"; return; }
-      const now = new Date();
-      // show what was saved last time at once (the numbers rarely change within a day), then refresh quietly
-      if (!monthCache) {
-        try {
-          const sv = JSON.parse(localStorage.getItem("vr_month") || "null");
-          if (sv && sv.data && sv.data.y === now.getFullYear() && sv.data.m === now.getMonth() + 1) monthCache = { at: 0, data: sv.data };
-        } catch (e) {}
-      }
-      const fresh = monthCache && Date.now() - monthCache.at < 15000;
-      if (monthCache) paintMonthStrip(monthCache.data); else el.style.display = "none";
-      if (fresh || monthBusy) return;
-      monthBusy = true;
-      const d = new Date();
-      try {
-        google.script.run
-          .withSuccessHandler(function(res) {
-            monthBusy = false;
-            if (!res || !res.days) return;
-            monthCache = { at: Date.now(), data: res };
-            try { localStorage.setItem("vr_month", JSON.stringify({ at: monthCache.at, data: res })); } catch (e) {}
-            if (document.getElementById("summaryView").style.display !== "none") paintMonthStrip(res);
-          })
-          .withFailureHandler(function() { monthBusy = false; })
-          .getMonthStats(d.getFullYear(), d.getMonth() + 1);
-      } catch (e) { monthBusy = false; }   // an older Code.gs has no getMonthStats
+      // show the last total at once (it rarely moves within a day), then refresh it quietly from the verse list
+      let pts = vlVerses.length ? treasuryTotal() : null;
+      if (pts === null) { try { const sv = JSON.parse(localStorage.getItem("vr_trpts") || "null"); if (typeof sv === "number") pts = sv; } catch (e) {} }
+      paintTreasuryPill(pts);
+      if (trPillBusy || Date.now() - trPillAt < 15000) return;
+      trPillBusy = true;
+      loadVlVerses(function() {
+        trPillBusy = false; trPillAt = Date.now();
+        const t = treasuryTotal();
+        try { localStorage.setItem("vr_trpts", JSON.stringify(t)); } catch (e) {}
+        if (document.getElementById("summaryView").style.display !== "none") paintTreasuryPill(t);
+      }, function() { trPillBusy = false; });
     }
 
     function renderTomorrowNote() {
@@ -3489,7 +3434,7 @@
         document.getElementById("btnAddVerse").style.display === "none" &&
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
-      renderMonthStrip(onComplete);
+      renderTreasuryPill(onComplete);
       if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       el.textContent = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
       el.className = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
