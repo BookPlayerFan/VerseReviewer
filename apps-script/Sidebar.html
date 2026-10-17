@@ -296,6 +296,7 @@
     /* a book with no verses yet: the section colour, dimmed, with a dotted outline */
     .vm-tile.empty { background: color-mix(in srgb, var(--rc) 5%, transparent); border: 1px dashed color-mix(in srgb, var(--rc) 38%, transparent); color: color-mix(in srgb, var(--rc) 50%, var(--text-meta)); opacity: 0.75; pointer-events: none; }
     .vm-tile.empty .vm-ab { font-size: 12px; font-weight: 600; }
+    .vm-tile.skel { opacity: 0.55; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
     /* Hold a book: a small preview bubble over a dimmed map. */
@@ -1005,7 +1006,7 @@
     #verseListView .vl-total:empty { display: none; }
     #upcomingView, #treasuryView, #bookView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
     #upcomingView { inset: max(env(safe-area-inset-top, 0px), 8px) max(env(safe-area-inset-right, 0px), 12px) calc(var(--tab-h) + 6px) max(env(safe-area-inset-left, 0px), 12px); }   /* exactly the card behind it */
-    #bookView { inset: calc(max(14px, env(safe-area-inset-top)) + 22px) 10px calc(var(--tab-h) + 10px) 10px; }
+    #bookView { inset: max(env(safe-area-inset-top, 0px), 10px) 10px calc(var(--tab-h) + 10px) 10px; }   /* full size, over the map's headings; openBook shrinks it to fit and centres it */
     #bookView, #upcomingView { padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
     #bookView .vl-titleblock { flex: 1; min-width: 0; }
     #bookView .vl-total { display: block; margin: 1px 0 0; }
@@ -1814,14 +1815,16 @@
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
       updateTabs();
-      vlListNote("Loading…");
       vlSort = "book";
       vlOpen = {};
       updateVlControls();
-      loadVlVerses(renderVerseList, function() { vlListNote("Couldn't load."); });
+      // the map is on screen at once: the list from last time, or empty tiles that fill in when the list arrives (so nothing jumps)
+      if (vlVerses.length) renderVerseList(); else renderVerseList(true);
+      loadVlVerses(function() { renderVerseList(); }, function() { if (!vlVerses.length) vlListNote("Couldn't load."); });
     }
     function vlListNote(msg) {
       const box = document.getElementById("vlList");
+      document.getElementById("vlMap").style.display = "none";
       box.textContent = "";
       const e = document.createElement("div");
       e.className = "picker-empty";
@@ -2485,9 +2488,9 @@
       b.style.top = top + "px";
     }
     // The book map: a tile for each book, coloured by its section of the Bible. It fills the screen.
-    function renderVlBooks(map, box) {
+    function renderVlBooks(map, box, skeleton) {
       const byKey = {};
-      vlVerses.forEach(function(v) {
+      (skeleton ? [] : vlVerses).forEach(function(v) {
         const k = vlBookKey(v);
         const g = byKey[k] || (byKey[k] = { key: k, name: v.p.name, verses: [], top: 0, n: 0 });
         g.verses.push(v);
@@ -2514,7 +2517,7 @@
           const t = document.createElement(g ? "button" : "div");
           if (g) t.type = "button";
           const cat = "cat-" + (typeof b.key === "number" ? bookCat(b.key) : "oth");
-          t.className = "vm-tile empty " + cat;
+          t.className = "vm-tile empty " + cat + (skeleton ? " skel" : "");
           if (g) {
             t.className = "vm-tile " + cat;
             const ab = document.createElement("span"); ab.className = "vm-ab"; ab.textContent = b.abbr;
@@ -2558,6 +2561,22 @@
       view.classList.add("open");
       document.getElementById("bookDim").classList.add("on");
       list.scrollTop = 0;
+      fitBookCard(view, list);
+    }
+    // The card is as tall as its references need (at least BOOK_MIN_ROWS rows), centred over the map, and fills the page once there are too many for it.
+    const BOOK_MIN_ROWS = 4;
+    function fitBookCard(view, list) {
+      view.style.top = ""; view.style.bottom = ""; view.style.height = "";   // back to full size to measure
+      const top = Math.max(parseFloat(getComputedStyle(view).top) || 10, 10);
+      const tabH = document.getElementById("tabbar").offsetHeight || 54;
+      const availH = window.innerHeight - tabH - 10 - top;
+      const row = list.querySelector(".vl-verse");
+      const rowH = row ? row.offsetHeight : 40;
+      const rows = list.querySelectorAll(".vl-verse").length;
+      view.style.bottom = "auto"; view.style.height = "auto"; view.style.maxHeight = availH + "px";
+      const natural = view.offsetHeight;
+      const h = Math.min(availH, natural + Math.max(0, (BOOK_MIN_ROWS - rows) * rowH));
+      view.style.height = h + "px"; view.style.top = (top + (availH - h) / 2) + "px";
     }
     let bkCloseTimer = null;
     function backBook() {
@@ -2618,13 +2637,14 @@
       ["pkDim", "pkTile", "pkBubble"].forEach(function(id) { const n = document.getElementById(id); if (n) n.remove(); });
     }
 
-    function renderVerseList() {
+    function renderVerseList(skeleton) {
       hideVerseTip();
       const box = document.getElementById("vlList");
       const map = document.getElementById("vlMap");
       box.textContent = "";
       map.style.display = "none";
       updateVlControls();
+      if (skeleton === true) { map.style.display = ""; renderVlBooks(map, box, true); return; }   // empty tiles while the list loads
       if (vlVerses.length === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
@@ -2640,7 +2660,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-228';
+    const CLIENT_BUILD = 'sync-229';
 
     let queue = [];
     let currentIndex = 0;
