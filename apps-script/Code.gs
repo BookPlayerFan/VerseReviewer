@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-81'; // shown in the app's status readout (two-finger tap)
+const BUILD = 'sync-82'; // shown in the app's status readout (two-finger tap)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -571,6 +571,7 @@ function learnAction(reference, action, expectedRep) {
 
     // The day's Learn / Lock pushes are kept in line with the new state: the last rep of the day, Skip and Promote drop what is left.
     try { syncSlotPushes_(); } catch (e) { pushLog_('slot sync ERROR', ref, 0, false, String(e)); }
+    try { cancelDailyIfDone_(); } catch (e) { pushLog_('daily cancel ERROR', ref, 0, false, String(e)); }
 
     const result = { ok: true, promoted: promoted, card: card, version: s && s.date === todayKey_() ? s.version : undefined };
     const tdata = readSheetData_();
@@ -1233,6 +1234,7 @@ function submitReview(expectedVersion, review, next) {
     writeState_(s);
     const result = { ok: true, version: s.version, undoId: undoId };
     if (review) { const tdata = readSheetData_(); result.tomorrow = dueTomorrowCount_(tdata); result.tomorrowLoad = dueTomorrowLoad_(tdata); }
+    if (review) { try { cancelDailyIfDone_(); } catch (e) { pushLog_('daily cancel ERROR', '', 0, false, String(e)); } }
     return result;
   } finally {
     lock.releaseLock();
@@ -1784,6 +1786,7 @@ const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
 const PUSH_SLOTMAP_KEY = 'VR_PUSH_SLOTMAP'; // { send time in ms: { id: notificationId, learn: [references], lock: [references] } }
 const DAILY_PUSH_MIN = 6 * 60;               // the morning push arrives at 6:00 AM
 const PUSH_DAILY_KEY = 'VR_PUSH_DAILY';     // date key of the last daily push
+const PUSH_DAILY_ID_KEY = 'VR_PUSH_DAILY_ID'; // { id, at } of the daily push while it is still waiting to go out (so finishing early can cancel it)
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
 
 // ───────────── Push log ─────────────
@@ -1912,7 +1915,28 @@ function dailyPush() {
   const now = nowMs_();
   const at = atClock_(now, 0, DAILY_PUSH_MIN);
   const r = osSend_(words.title, words.text, at > now + 30000 ? at : 0, 'vr-daily', go);
-  if (r.ok) props.setProperty(PUSH_DAILY_KEY, today);
+  if (r.ok) {
+    props.setProperty(PUSH_DAILY_KEY, today);
+    if (r.json && r.json.id && at > now + 30000) props.setProperty(PUSH_DAILY_ID_KEY, JSON.stringify({ id: r.json.id, at: at }));
+  }
+}
+
+// The 6:00 AM daily push is scheduled at about 5:00. If everything it would mention (due reviews, the 4 AM Learn / Lock cards) is finished before it
+// goes out, it is cancelled. Cheap: it does nothing unless a daily push is still waiting, which is only between about 5:00 and 6:00 AM.
+function cancelDailyIfDone_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(PUSH_DAILY_ID_KEY);
+  if (!raw) return false;
+  let e = null;
+  try { e = JSON.parse(raw); } catch (x) { e = null; }
+  const now = nowMs_();
+  if (!e || !e.id || !e.at || e.at <= now + 120000) { props.deleteProperty(PUSH_DAILY_ID_KEY); return false; }   // gone out already, or about to
+  const nc = newCardCounts_(readSheetData_(), now);
+  if (pushWords_(getDueCards(false).length, nc.learnRefs, nc.lockRefs)) return false;   // something is still waiting
+  const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
+  pushLog_('cancel (all done early)', '', e.at, !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
+  props.deleteProperty(PUSH_DAILY_ID_KEY);
+  return !!c.ok;
 }
 
 // Run from the editor when a morning notification did not arrive. It adds a few "status" rows to the Push Log tab: whether the daily

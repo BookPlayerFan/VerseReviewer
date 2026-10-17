@@ -219,6 +219,9 @@
       }
     }
     .rank-badge.is-new { --rc: var(--text-meta); font-weight: 700; }
+    /* a Lock card's pill: blue, with a padlock, so it reads differently from Learn */
+    .rank-badge.is-new.is-lock { --rc: var(--text-accent); background: color-mix(in srgb, var(--text-accent) 12%, transparent); }
+    .rank-badge .lk-ic { width: 10px; height: 10px; fill: currentColor; vertical-align: -1px; margin-right: 4px; }
     @keyframes rankGlow {
       0%   { box-shadow: 0 0 0 0 var(--rc); }
       60%  { box-shadow: 0 0 14px 5px color-mix(in srgb, var(--rc) 45%, transparent); }
@@ -237,7 +240,7 @@
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc) 70%, transparent), 0 0 34px 8px color-mix(in srgb, var(--rc) 42%, transparent);
       animation: luGlow 1.2s ease-out 0.3s both; }
     @keyframes luGlow { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
-    .lu-sweepbox { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 9; transform: translateZ(0); }
+    .lu-sweepbox { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 9; transform: translateZ(0); isolation: isolate; -webkit-mask-image: -webkit-radial-gradient(white, black); }
     .lu-sweepbox i { position: absolute; top: -10%; bottom: -10%; left: 0; width: 38%; opacity: 0.8; will-change: transform; backface-visibility: hidden;
       transform: translate3d(-110%, 0, 0) skewX(-18deg);
       background: linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent);
@@ -257,14 +260,8 @@
     .lu-ring { position: absolute; inset: -1px; border-radius: 999px; border: 2px solid var(--rc); opacity: 0; pointer-events: none;
       animation: luRing 0.8s ease-out forwards; animation-delay: var(--rd2, 0.22s); }
     @keyframes luRing { 0% { transform: scale(0.95); opacity: 0.85; } 100% { transform: scale(1.22, 1.75); opacity: 0; } }
-    .lu-spark { position: absolute; left: 50%; top: 50%; font-size: 11px; line-height: 1; color: var(--rc); opacity: 0; pointer-events: none;
-      animation: luSpark 0.9s ease-out forwards; animation-delay: var(--sd, 0.2s); }
+    .lu-spark { position: absolute; left: 50%; top: 50%; font-size: 11px; line-height: 1; color: var(--rc); opacity: 0; pointer-events: none; will-change: transform, opacity; }
     .lu-spark.dot { font-size: 6px; }
-    @keyframes luSpark {
-      0%   { transform: translate(calc(-50% + var(--ex)), calc(-50% + var(--ey))) scale(0.3); opacity: 0; }
-      15%  { opacity: 1; }
-      100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
-    }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
     .vl-row:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
@@ -548,9 +545,9 @@
 
     /* A New card with a rep waiting: the filled dots turn amber, a gentle reminder (late-2 is no longer used) */
     .pips-container.late-1 .pip.filled { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245, 158, 11, 0.45); }
+    .pips-container.late-1 .pip.cur { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25); }
+    .pips-container.late-2 .pip.cur { border-color: #e5484d; box-shadow: 0 0 0 2px rgba(229, 72, 77, 0.25); }
     .pips-container.late-2 .pip.filled { background: #e5484d; border-color: #e5484d; box-shadow: 0 0 5px rgba(229, 72, 77, 0.45); }
-    .lock-chips.late-1 .lock-chip.on { background: #f59e0b; border-color: #f59e0b; }
-    .lock-chips.late-2 .lock-chip.on { background: #e5484d; border-color: #e5484d; }
     .lm-st.late-1 { color: #d98200; font-weight: 700; }
     .lm-st.late-2 { color: #e5484d; font-weight: 700; }
 
@@ -764,13 +761,6 @@
     .btn-pass.clear { background: var(--btn-restart-bg); color: var(--btn-restart-text); }   /* repeat cards: blue, like the New tab's Review button */
 
     .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time) */
-    .lock-chips { display: flex; align-items: center; justify-content: center; gap: 10px; }
-    .lock-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
-      padding: 3px 10px 3px 8px; border-radius: 999px; border: 1.5px solid var(--border-card); color: var(--text-muted); background: transparent; }
-    .lock-chip svg { width: 15px; height: 15px; display: block; fill: currentColor; }
-    .lock-chip.on { background: var(--text-accent); border-color: var(--text-accent); color: #fff; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .lock-chip.on { color: #0b1a33; } }
-    :root[data-theme="dark"] .lock-chip.on { color: #0b1a33; }
     .pt-right { display: inline-flex; align-items: center; gap: 10px; }
     .v-num.dim { opacity: 0.45; }                           /* verses other than the one you are learning today */
     .lm-item { display: block; width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 700;
@@ -1523,7 +1513,7 @@
             p.className = "pip" + (i < filled ? " filled" : i === filled ? " cur" : "");
             pips.appendChild(p);
           }
-          if (toG === 1) pips.classList.remove("lock-chips");
+          pips.classList.remove("lock-chips");
         }
       }
       const badge = meta && meta.querySelector(".rank-badge");
@@ -1547,12 +1537,14 @@
           const ex = Math.cos(ang) * 46, ey = Math.sin(ang) * 11, more = 10 + ((i * 7) % 9);
           sp.className = "lu-spark" + (i % 3 === 0 ? " dot" : "");
           sp.textContent = i % 3 === 0 ? "\u25CF" : "\u2726";
-          sp.style.setProperty("--ex", Math.round(ex) + "px");
-          sp.style.setProperty("--ey", Math.round(ey) + "px");
-          sp.style.setProperty("--dx", Math.round(ex + Math.cos(ang) * more) + "px");
-          sp.style.setProperty("--dy", Math.round(ey + Math.sin(ang) * more * 0.6) + "px");
-          sp.style.setProperty("--sd", (0.4 + (i % 3) * 0.06) + "s");
           fx.appendChild(sp);
+          // literal keyframes (no var() inside), so the phone can run them on its compositor
+          const ex0 = Math.round(ex), ey0 = Math.round(ey), dx0 = Math.round(ex + Math.cos(ang) * more), dy0 = Math.round(ey + Math.sin(ang) * more * 0.6);
+          if (sp.animate) sp.animate([
+            { transform: "translate(calc(-50% + " + ex0 + "px), calc(-50% + " + ey0 + "px)) scale(0.3)", opacity: 0, offset: 0 },
+            { opacity: 1, offset: 0.15 },
+            { transform: "translate(calc(-50% + " + dx0 + "px), calc(-50% + " + dy0 + "px)) scale(1)", opacity: 0, offset: 1 }
+          ], { duration: 900, delay: Math.round((0.4 + (i % 3) * 0.06) * 1000), easing: "ease-out", fill: "both" });
         }
       }
       const passBtn = clone.querySelector(".btn-pass");
@@ -2648,7 +2640,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-227';
+    const CLIENT_BUILD = 'sync-228';
 
     let queue = [];
     let currentIndex = 0;
@@ -3809,8 +3801,7 @@
     }
 
     // ── New card pieces ──
-    const SUN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></g></svg>';
-    const MOON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>';
+    const LOCK_SVG = '<svg class="lk-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1zm2 0h6V8a3 3 0 0 0-6 0v2z"/></svg>';
 
     // Where a plain tap starts on a multi-verse Learn card: just before the verse you are on today (so it runs to the end, then wraps).
     function curStart() {
@@ -3826,26 +3817,20 @@
       metaTag.className = "meta-tag";
       metaTag.textContent = "";
       const pill = document.createElement("span");
-      pill.className = "rank-badge is-new";
-      pill.textContent = card.stage === 'lock' ? "Lock" : "Learn";
+      const isLock = card.stage === 'lock';
+      pill.className = "rank-badge is-new" + (isLock ? " is-lock" : "");
+      if (isLock) pill.innerHTML = LOCK_SVG + "Lock"; else pill.textContent = "Learn";
       metaTag.appendChild(pill);
       const pips = document.getElementById("cardPips");
       pips.innerHTML = "";
-      pips.classList.toggle("lock-chips", card.stage === 'lock');
-      if (card.stage === 'lock') {
-        [["am", SUN_SVG, "AM"], ["pm", MOON_SVG, "PM"]].forEach(function(c) {
-          const chip = document.createElement("span");
-          chip.className = "lock-chip" + ((c[0] === "am" || card.lockPart === "pm") ? " on" : "");
-          chip.innerHTML = c[1] + c[2];
-          pips.appendChild(chip);
-        });
-      } else {
-        const dot = card.dot || 1;
-        for (let i = 1; i <= 7; i++) {
-          const pip = document.createElement("div");
-          pip.className = "pip" + (i <= dot ? " filled" : "");
-          pips.appendChild(pip);
-        }
+      pips.classList.remove("lock-chips");
+      // The same dots as the review reps: the rep you are on is a ring, done reps are filled. Learn has 7 reps; Lock has two (AM, then PM).
+      const total = isLock ? 2 : 7, now = isLock ? (card.lockPart === 'pm' ? 2 : 1) : (card.dot || 1);
+      for (let i = 1; i <= total; i++) {
+        const pip = document.createElement("div");
+        pip.className = "pip" + (i < now ? " filled" : i === now ? " cur" : "");
+        if (isLock) pip.title = i === 1 ? "Lock AM" : "Lock PM";
+        pips.appendChild(pip);
       }
       paintLateState(card);
       scheduleLate(card);
@@ -4293,15 +4278,19 @@
         notePts(card.reference, textVerses(card.text, card.reference) * ptsOf(1), 1);      // a new card in Bronze: one Treasury point per verse
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
         isScoring = true;
-        playLevelUp(1, 1, "Promoted \u2713");
         learningCards.splice(learningIndex, 1);
         learningIndex = Math.min(learningIndex, Math.max(0, learningCards.length - 1));
         const startedIn = epoch;
-        levelUpThen(luMs(1), function() {
+        const go = function() {
           if (startedIn !== epoch) return;
-          document.getElementById("toastNotice").textContent = "";
-          render();
-        });
+          playLevelUp(1, 1, "Promoted \u2713");
+          levelUpThen(luMs(1), function() {
+            if (startedIn !== epoch) return;
+            document.getElementById("toastNotice").textContent = "";
+            render();
+          });
+        };
+        if (fillCurrentPip()) setTimeout(go, PIP_FILL_MS); else go();   // the PM ring fills in first
       } else {
         applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
       }
@@ -4524,9 +4513,13 @@
       );
 
       if (isFastTrackRestored || graduated) {
-        playLevelUp(newGroup, newRep);
         const startedIn = epoch;
-        levelUpThen(luMs(newGroup), function() { advanceCard(startedIn); });
+        const go = function() {
+          if (startedIn !== epoch) return;
+          playLevelUp(newGroup, newRep);
+          levelUpThen(luMs(newGroup), function() { advanceCard(startedIn); });
+        };
+        if (fillCurrentPip()) setTimeout(go, PIP_FILL_MS); else go();   // the last rep's ring fills in first
       } else if (action === "Fail" && card.group > 0) {
         animateOut();
         advanceAfter(REPEAT_SWAP_MS);
@@ -4537,9 +4530,12 @@
       }
     }
     // The rep just passed: its ring fills in before the card goes.
+    const PIP_FILL_MS = 380;
     function fillCurrentPip() {
       const cur = document.querySelector("#cardPips .pip.cur");
-      if (cur) { cur.classList.remove("cur"); cur.classList.add("filled"); }
+      if (!cur) return false;
+      cur.classList.remove("cur"); cur.classList.add("filled");
+      return true;
     }
 
     // The Treasury bar on the Review Complete screen: total points and the rank bar; tapping it opens the Treasury.
