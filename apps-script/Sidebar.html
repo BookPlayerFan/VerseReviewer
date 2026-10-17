@@ -409,12 +409,12 @@
     .cal-s { padding: 3px; min-width: 0; }
     /* a day: its date in the middle, a solid square whose shade follows the day's word load (amber is the heaviest), and a badge with the number of references due */
     .cal-d { --h: 0; --rc: var(--text-accent, #1a73e8); position: relative; box-sizing: border-box; height: 50px; min-height: 0; width: auto; padding: 0; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: var(--rc); box-shadow: none;
-      background: color-mix(in srgb, var(--rc) calc(9% + var(--h) * 8%), var(--bg-card)); }
+      background: color-mix(in srgb, var(--rc) calc(var(--h) * 14%), var(--bg-card)); }
     .cal-d .bd { position: absolute; top: -6px; right: -5px; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; font-weight: 800; line-height: 1; background: color-mix(in srgb, var(--rc) 68%, #000); color: #fff; box-shadow: 0 0 0 2.5px var(--bg-card); }
     /* the 1st of a month carries the month's short name along the bottom */
     .cal-d .mn { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-style: normal; font-size: 7.5px; font-weight: 800; letter-spacing: 0.08em; line-height: 1; text-transform: uppercase; color: var(--text-accent, #1a73e8); }
     .cal-d.first { padding-bottom: 7px; }
-    .cal-d.hot { --rc: #c47400; background: color-mix(in srgb, var(--rc) calc(14% + var(--h) * 8%), var(--bg-card)); }
+    .cal-d.hot { --rc: #c47400; background: color-mix(in srgb, var(--rc) 32%, var(--bg-card)); }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-d.hot { --rc: #ffb454; } }
     :root[data-theme="dark"] .cal-d.hot { --rc: #ffb454; }
     /* a day with nothing due is just a faint number */
@@ -1924,10 +1924,10 @@
         for (let i = 0; i < 7; i++) {
           const off = start + w * 7 + i, d = dayAt(off), vs = byDay[off] || [];
           const load = loads[off] || 0, ratio = maxLoad ? load / maxLoad : 0;
-          const h = !vs.length ? 0 : ratio <= 0.25 ? 1 : ratio <= 0.5 ? 2 : ratio <= 0.75 ? 3 : 4;
+          const h = !vs.length ? 0 : ratio <= 1 / 3 ? 1 : ratio <= 2 / 3 ? 2 : 3;
           const c = document.createElement(vs.length ? "button" : "div");
           if (vs.length) c.type = "button";
-          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (h === 4 ? " h4" : "") + (vs.length && load >= heavy && ratio >= 0.7 ? " hot" : "");
+          c.className = "cal-d" + (vs.length ? "" : " z") + (placeholder ? " sk" : "") + (off < 0 ? " past" : "") + (off === 0 ? " today" : "") + (vs.length && load >= heavy && ratio >= 0.7 ? " hot" : "");
           c.style.setProperty("--h", h);
           const first = d.getDate() === 1;
           if (first) c.classList.add("first");
@@ -1974,8 +1974,8 @@
         tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
       };
       row([[2, false, "12", "3"]], "The badge", "how many references are due that day");
-      row([[1, false], [3, false]], "The shade", "how much there is to learn; darker is a heavier day");
-      row([[0, true]], "Amber", "the heaviest days");
+      row([[1, false], [2, false], [3, false]], "The shade", "how much there is to learn; darker is a heavier day");
+      row([[3, true]], "Amber", "the heaviest days");
       document.body.appendChild(b);
     }
     // Tap a day: its tile lifts over a dimmed calendar and a card lists the day's references.
@@ -2675,7 +2675,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-211';
+    const CLIENT_BUILD = 'sync-212';
 
     let queue = [];
     let currentIndex = 0;
