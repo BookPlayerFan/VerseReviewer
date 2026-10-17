@@ -365,8 +365,8 @@
     #treasuryView.open { animation: trIn 0.25s ease-out; }
     #treasuryView.closing { animation: trOut 0.2s ease-in forwards; }
     /* a book opens as a nearly full-screen card that fades in right over the map, and fades back out to it */
-    #bookView.open, #upcomingView.open { animation: bkIn 0.2s ease-out; }
-    #bookView.closing, #upcomingView.closing { animation: bkOut 0.16s ease-in forwards; }
+    #upcomingView.open { animation: bkIn 0.2s ease-out; }
+    #upcomingView.closing { animation: bkOut 0.16s ease-in forwards; }
     #searchView.open { animation: pkFade 0.18s ease-out; }
     #searchView.closing { animation: skOut 0.15s ease-in forwards; }
     @keyframes skOut { from { opacity: 1; } to { opacity: 0; } }
@@ -439,6 +439,8 @@
     .pk-day .pk-h { padding: 18px 20px 12px; }
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
     .pk-day .pk-r:last-child { padding-bottom: 14px; }
+    .pk-book .vl-verses { border-top: 1px solid var(--border-card); border-bottom: 0; }
+    .pk-book .vl-verse { padding: 12px 20px; font-size: 15.5px; }
     .pk-day .pk-v { color: var(--text-accent); font-weight: 800; }
     .pk-day .pk-v.neg { color: var(--btn-fail-text); }
     .pk-day .pk-v.tot { color: var(--text-primary); }
@@ -450,7 +452,7 @@
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
-    #verseListView, #upcomingView, #treasuryView, #bookView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #verseListView, #upcomingView, #treasuryView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -1004,12 +1006,9 @@
     #verseListView .vl-titleblock { flex: 1; min-width: 0; }
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
-    #upcomingView, #treasuryView, #bookView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
+    #upcomingView, #treasuryView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
     #upcomingView { inset: max(env(safe-area-inset-top, 0px), 8px) max(env(safe-area-inset-right, 0px), 12px) calc(var(--tab-h) + 6px) max(env(safe-area-inset-left, 0px), 12px); }   /* exactly the card behind it */
-    #bookView { inset: max(env(safe-area-inset-top, 0px), 10px) 10px calc(var(--tab-h) + 10px) 10px; }   /* full size, over the map's headings; openBook shrinks it to fit and centres it */
-    #bookView, #upcomingView { padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
-    #bookView .vl-titleblock { flex: 1; min-width: 0; }
-    #bookView .vl-total { display: block; margin: 1px 0 0; }
+    #upcomingView { padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
     #searchView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; overflow-x: hidden; }
     .vl-searchbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .vl-searchbar .picker-search { flex: 1; min-width: 0; margin-bottom: 0; }
@@ -1152,7 +1151,7 @@
       color: var(--text-primary); margin-bottom: 8px; }
     .picker-list { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
-    #treasuryView, #bookView, #searchView, #upcomingView { touch-action: pan-y; }
+    #treasuryView, #searchView, #upcomingView { touch-action: pan-y; }
     .picker-item { display: block; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0;
       box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
       color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
@@ -1281,16 +1280,6 @@
   </div>
 
   <div class="bk-dim" id="bookDim" onclick="tapCardDim()"></div>
-  <div class="picker" id="bookView">
-    <div class="picker-head">
-      <div class="vl-titleblock">
-        <span class="picker-title" id="bkTitle"></span>
-        <span class="vl-total" id="bkMeta"></span>
-      </div>
-      <button type="button" class="picker-close" onclick="backBook()">Close</button>
-    </div>
-    <div class="picker-list" id="bkList"></div>
-  </div>
 
   <nav class="tabbar" id="tabbar">
     <div class="progress-track"><div class="progress-fill" id="sessionProgressFill"></div></div>
@@ -1702,8 +1691,7 @@
     function goTab(t) {
       closeUpcoming();
       closeTreasury();
-      closeBook();
-      closeSearch();
+      closeSearch(); closePeek();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       if (t === "verses") {
         if (!listOpen) openVerseList();
@@ -1837,8 +1825,7 @@
 
     function closeVerseList() {
       hideVerseTip();
-      closeTreasury();
-      closeBook();
+      closeTreasury(); closePeek();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
     }
@@ -2031,7 +2018,7 @@
     }
     // Tapping the dimmed area behind a card closes whichever card is open.
     function tapCardDim() {
-      if (document.getElementById("upcomingView").classList.contains("open")) backUpcoming(); else backBook();
+      if (document.getElementById("upcomingView").classList.contains("open")) backUpcoming();
     }
 
     // ── Treasury: every rank with its references; a rank opens in place on this screen ──
@@ -2525,9 +2512,9 @@
             const ct = document.createElement("span"); ct.className = "vm-ct"; ct.textContent = g.n;
             t.appendChild(ab); t.appendChild(ct);
             t.setAttribute("aria-label", g.name + ", " + g.n + (g.n === 1 ? " verse" : " verses"));
-            // tap: the book opens as its own screen. hold: a quick preview.
+            // tap (or hold): the book's tile lifts over the dimmed map and a card beside it lists its references
             const heldTile = attachLongPress(t, function() { peekBook(g.key, t); heldTile(); });
-            t.onclick = function() { if (heldTile()) return; openBook(g.key); };
+            t.onclick = function() { if (heldTile()) return; peekBook(g.key, t); };
           } else t.textContent = b.abbr;
           grid.appendChild(t);
         });
@@ -2543,59 +2530,8 @@
       box.textContent = "";
     }
 
-    // One book's references as a nearly full-screen card over the map: fades in, swipe left (or Close, or tap outside it) to fade back to the map.
-    function openBook(key) {
-      hideVerseTip(); closePeek();
-      const vs = vlVerses.filter(function(v) { return vlBookKey(v) === key; });
-      if (!vs.length) return;
-      document.getElementById("bkTitle").textContent = vs[0].p.name;
-      document.getElementById("bkMeta").textContent = vs.length + (vs.length === 1 ? " reference" : " references");
-      const list = document.getElementById("bkList");
-      list.textContent = "";
-      const wrap = document.createElement("div");
-      wrap.className = "vl-verses";
-      vs.forEach(function(v) { wrap.appendChild(vlItem(v, true)); });
-      list.appendChild(wrap);
-      const view = document.getElementById("bookView");
-      clearTimeout(bkCloseTimer);
-      view.classList.remove("closing");
-      view.classList.add("open");
-      document.getElementById("bookDim").classList.add("on");
-      list.scrollTop = 0;
-      fitBookCard(view, list);
-    }
-    // The card is as tall as its references need (at least BOOK_MIN_ROWS rows), centred over the map, and fills the page once there are too many for it.
-    const BOOK_MIN_ROWS = 4;
-    function fitBookCard(view, list) {
-      view.style.top = ""; view.style.bottom = ""; view.style.height = "";   // back to full size to measure
-      const top = Math.max(parseFloat(getComputedStyle(view).top) || 10, 10);
-      const tabH = document.getElementById("tabbar").offsetHeight || 54;
-      const availH = window.innerHeight - tabH - 10 - top;
-      const row = list.querySelector(".vl-verse");
-      const rowH = row ? row.offsetHeight : 40;
-      const rows = list.querySelectorAll(".vl-verse").length;
-      view.style.bottom = "auto"; view.style.height = "auto"; view.style.maxHeight = availH + "px";
-      const natural = view.offsetHeight;
-      const h = Math.min(availH, natural + Math.max(0, (BOOK_MIN_ROWS - rows) * rowH));
-      view.style.height = h + "px"; view.style.top = (top + (availH - h) / 2) + "px";
-    }
-    let bkCloseTimer = null;
-    function backBook() {
-      const view = document.getElementById("bookView");
-      if (!view.classList.contains("open") || view.classList.contains("closing")) return;
-      view.classList.add("closing");
-      document.getElementById("bookDim").classList.remove("on");
-      bkCloseTimer = setTimeout(closeBook, 170);
-    }
-    function closeBook() {
-      hideVerseTip(); closePeek();
-      clearTimeout(bkCloseTimer);
-      const view = document.getElementById("bookView");
-      view.classList.remove("closing");
-      view.classList.remove("open");
-      document.getElementById("bookDim").classList.remove("on");
-    }
-    // The hold preview: the book's tile lifts over a dimmed map and a bubble lists its first references, with a button to open it.
+    // Tap a book: its tile lifts over the dimmed map, and a card beside it lists its references. The card is only as tall as they need, below the tile
+    // or above it (whichever has room), and scrolls when the list is long. Tap a reference for its first words, hold it for the whole verse.
     function peekBook(key, tile) {
       hideVerseTip(); closePeek();
       const vs = vlVerses.filter(function(v) { return vlBookKey(v) === key; });
@@ -2603,8 +2539,8 @@
       const name = vs[0].p.name;
       const born = Date.now();
       const dim = document.createElement("div");
-      dim.className = "pk-dim"; dim.id = "pkDim";
-      dim.onclick = function(e) { e.stopPropagation(); if (Date.now() - born > 450) closePeek(); };   // the lift-off of the hold is not a tap
+      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
+      dim.onclick = function(e) { e.stopPropagation(); if (Date.now() - born > 450) closePeek(); };   // the lift-off of a hold is not a tap
       document.body.appendChild(dim);
       const r = tile.getBoundingClientRect();
       const lift = tile.cloneNode(true);
@@ -2612,26 +2548,24 @@
       lift.style.left = r.left + "px"; lift.style.top = r.top + "px"; lift.style.width = r.width + "px"; lift.style.height = r.height + "px";
       document.body.appendChild(lift);
       const b = document.createElement("div");
-      b.className = "pk-bubble"; b.id = "pkBubble";
+      b.className = "pk-bubble pk-day pk-book"; b.id = "pkBubble";
       const h = document.createElement("div"); h.className = "pk-h";
       const hn = document.createElement("div"); hn.textContent = name;
       const hm = document.createElement("span"); hm.textContent = vs.length + (vs.length === 1 ? " reference" : " references");
       h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
-      vs.slice(0, 6).forEach(function(v) {
-        const row = document.createElement("div"); row.className = "pk-r";
-        const rf = document.createElement("span"); rf.textContent = v.f;
-        row.appendChild(rf); row.appendChild(makePill(v.g)); b.appendChild(row);
-      });
-      if (vs.length > 6) { const m = document.createElement("div"); m.className = "pk-more"; m.textContent = "+ " + (vs.length - 6) + " more"; b.appendChild(m); }
-      const open = document.createElement("button");
-      open.type = "button"; open.className = "pk-open"; open.textContent = "Open " + name;
-      open.onclick = function(e) { e.stopPropagation(); closePeek(); openBook(key); };
-      b.appendChild(open);
+      const wrap = document.createElement("div"); wrap.className = "vl-verses";
+      vs.forEach(function(v) { wrap.appendChild(vlItem(v, true)); });
+      b.appendChild(wrap);
       document.body.appendChild(b);
-      // below the tile, or above it when there is no room
-      const room = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
-      let top = r.bottom + 10;
-      if (top + b.offsetHeight > room) top = Math.max(10, r.top - 10 - b.offsetHeight);
+      // below the tile, or above it, whichever has room (the card scrolls if the list is long)
+      const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
+      const below = bottomLimit - (r.bottom + 10), above = r.top - 10 - 10;
+      let top, maxH = 0;
+      if (b.offsetHeight <= below) top = r.bottom + 12;
+      else if (b.offsetHeight <= above) top = r.top - 12 - b.offsetHeight;
+      else if (below >= above) { top = r.bottom + 12; maxH = below - 2; }
+      else { top = 10; maxH = above - 2; }
+      if (maxH) b.style.maxHeight = maxH + "px";
       b.style.top = top + "px";
     }
     function closePeek() {
@@ -2661,7 +2595,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-230';
+    const CLIENT_BUILD = 'sync-231';
 
     let queue = [];
     let currentIndex = 0;
@@ -2744,7 +2678,6 @@
       attachSwipeBack("verseListView", openTreasury, "right");      // swipe right on the Verses tab or on Review Complete opens the Treasury
       attachSwipeBack("summaryView", openTreasury, "right");
       ptsHeld = attachLongPress(document.getElementById("statGradBox"), openPtsPeek);
-      attachSwipeBack("bookView", backBook, "left");
       attachSwipeBack("upcomingView", backUpcoming, "left");
       attachSwipeBack("searchView", backSearch, "left");
       attachRevealHold();
