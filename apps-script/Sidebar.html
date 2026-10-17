@@ -226,22 +226,26 @@
     }
     @keyframes luSettle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
     .lu-settle { animation: luSettle 0.55s ease-out 0.45s both; }
-    /* Rank-up extras, by rank: a pulse of the rank colour around the card (Silver+), a light sweep (Platinum+),
+    /* Rank-up extras, by rank: a glow of the rank colour around the card (Silver+), a light sweep (Platinum+),
        drifting sparkles (Emerald+) and a second sweep (Diamond). The button fills with the rank colour at the start. */
     @keyframes luPulse {
       0%   { box-shadow: 0 0 0 0 transparent; }
       35%  { box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc) 70%, transparent), 0 0 34px 8px color-mix(in srgb, var(--rc) 42%, transparent); }
       100% { box-shadow: 0 0 0 0 transparent; }
     }
-    .lu-settle.lu-pulse { animation: luSettle 0.55s ease-out 0.45s both, luPulse 1.2s ease-out 0.3s both; }
-    .lu-sweepbox { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 9; }
-    .lu-sweepbox i { position: absolute; top: -10%; bottom: -10%; left: 0; width: 38%; transform: translateX(-130%) skewX(-18deg);
-      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.75), transparent); mix-blend-mode: soft-light;
-      animation: luSweep 0.95s ease-in-out both; animation-delay: var(--sw, 0.45s); }
-    @media (prefers-color-scheme: dark) { .lu-sweepbox i { opacity: 0.4; } }
-    :root[data-theme="dark"] .lu-sweepbox i { opacity: 0.4; }
-    :root[data-theme="light"] .lu-sweepbox i { opacity: 1; }
-    @keyframes luSweep { 0% { transform: translateX(-130%) skewX(-18deg); } 100% { transform: translateX(330%) skewX(-18deg); } }
+    .lu-glow { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 8; opacity: 0; will-change: opacity;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc) 70%, transparent), 0 0 34px 8px color-mix(in srgb, var(--rc) 42%, transparent);
+      animation: luGlow 1.2s ease-out 0.3s both; }
+    @keyframes luGlow { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+    .lu-sweepbox { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 9; transform: translateZ(0); }
+    .lu-sweepbox i { position: absolute; top: -10%; bottom: -10%; left: 0; width: 38%; opacity: 0.8; will-change: transform; backface-visibility: hidden;
+      transform: translate3d(-110%, 0, 0) skewX(-18deg);
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent);
+      animation: luSweep 0.9s cubic-bezier(0.3, 0.1, 0.4, 1) both; animation-delay: var(--sw, 0.6s); }
+    @media (prefers-color-scheme: dark) { .lu-sweepbox i { opacity: 0.35; } }
+    :root[data-theme="dark"] .lu-sweepbox i { opacity: 0.35; }
+    :root[data-theme="light"] .lu-sweepbox i { opacity: 0.8; }
+    @keyframes luSweep { 0% { transform: translate3d(-110%, 0, 0) skewX(-18deg); } 100% { transform: translate3d(310%, 0, 0) skewX(-18deg); } }
     .lu-twk { position: absolute; color: var(--rc); pointer-events: none; z-index: 9; opacity: 0; animation: luTwk 1.2s ease-in-out both; }
     @keyframes luTwk { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
     .lu-btnmorph { transition: background 0.35s ease, color 0.35s ease; background: var(--rc) !important; color: #fff !important; }
@@ -437,6 +441,9 @@
     .pk-day .pk-h { padding: 18px 20px 12px; }
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
     .pk-day .pk-r:last-child { padding-bottom: 14px; }
+    .pk-day .pk-v { color: var(--text-accent); font-weight: 800; }
+    .pk-day .pk-v.neg { color: var(--btn-fail-text); }
+    .pk-day .pk-v.tot { color: var(--text-primary); }
     .vl-row.zero .vl-count { color: var(--text-meta); font-weight: 500; }
     .vl-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
     .vl-row.open .chev { transform: rotate(90deg); }
@@ -530,6 +537,8 @@
       transition: background-color 0.2s ease, transform 0.2s ease;
     }
 
+    /* the rep you are on: a ring; it fills when the rep is done */
+    .pip.cur { background: transparent; border-color: var(--text-accent); transform: scale(1.25); box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.22); }
     .pip.filled {
       background: var(--text-accent);
       border-color: var(--text-accent);
@@ -846,6 +855,7 @@
     .card.ranked { --rc: var(--rl); }
     @media (prefers-color-scheme: dark) { .card.ranked { --rc: var(--rd); } }
     .card.ranked .pip.filled { background: var(--rc); border-color: var(--rc); }
+    .card.ranked .pip.cur { border-color: var(--rc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc) 28%, transparent); }
     .dia-mark { color: var(--rc, var(--text-accent)); font-size: 13px; line-height: 14px; font-weight: 800; text-shadow: 0 0 7px var(--rc, var(--text-accent)); }
     /* Strength grows with rank: --rb outline, --rt top tint, --rg outer glow (Silver and Platinum are greys, so they get a little extra). */
     .rank-1 { --rb: 20%; --rt: 3%;   --rg: 0%; }
@@ -1005,7 +1015,9 @@
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
     #upcomingView, #treasuryView, #bookView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
-    #bookView, #upcomingView { inset: calc(max(14px, env(safe-area-inset-top)) + 22px) 10px calc(var(--tab-h) + 10px) 10px; padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
+    #upcomingView { inset: max(env(safe-area-inset-top, 0px), 8px) max(env(safe-area-inset-right, 0px), 12px) calc(var(--tab-h) + 6px) max(env(safe-area-inset-left, 0px), 12px); }   /* exactly the card behind it */
+    #bookView { inset: calc(max(14px, env(safe-area-inset-top)) + 22px) 10px calc(var(--tab-h) + 10px) 10px; }
+    #bookView, #upcomingView { padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
     #bookView .vl-titleblock { flex: 1; min-width: 0; }
     #bookView .vl-total { display: block; margin: 1px 0 0; }
     #searchView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; overflow-x: hidden; }
@@ -1509,7 +1521,7 @@
           const filled = rep >= 1 && rep <= cfg.repsNeeded ? rep : 1;
           for (let i = 1; i <= cfg.repsNeeded; i++) {
             const p = document.createElement("div");
-            p.className = "pip" + (i <= filled ? " filled" : "");
+            p.className = "pip" + (i < filled ? " filled" : i === filled ? " cur" : "");
             pips.appendChild(p);
           }
           if (toG === 1) pips.classList.remove("lock-chips");
@@ -1546,11 +1558,11 @@
       }
       const passBtn = clone.querySelector(".btn-pass");
       if (passBtn) setTimeout(function() { passBtn.textContent = label || "Level Up \u2713"; passBtn.classList.add("lu-btnmorph"); }, 450);
-      if (toG >= 2) clone.classList.add("lu-pulse");
+      if (toG >= 2) { const gl = document.createElement("div"); gl.className = "lu-glow"; clone.appendChild(gl); }
       if (toG >= 4) {
         const sw = document.createElement("div");
         sw.className = "lu-sweepbox";
-        sw.innerHTML = "<i></i>" + (toG >= 8 ? '<i style="--sw:1.7s"></i>' : "");
+        sw.innerHTML = "<i></i>" + (toG >= 8 ? '<i style="--sw:1.8s"></i>' : "");
         clone.appendChild(sw);
       }
       if (toG >= 6) {
@@ -1761,7 +1773,13 @@
     let learnHintTimer = null;
     function nowSrv() { return Date.now() + srvSkew; }
     function isLocked(c) { return !!(c && c.unlockAt && c.unlockAt > nowSrv()); }
+    // A Lock / Promote card that is not open yet stays out of the New tab until its time comes (it waits in learningHeld).
+    let learningHeld = [];
+    function hiddenLock(c) { return !!(c && c.stage === 'lock' && isLocked(c)); }
     function sortLearning() {
+      const all = learningCards.concat(learningHeld);
+      learningCards = all.filter(function(c) { return !hiddenLock(c); });
+      learningHeld = all.filter(hiddenLock);
       learningCards.sort(function(a, b) {
         return ((a.unlockAt > nowSrv() ? 1 : 0) - (b.unlockAt > nowSrv() ? 1 : 0)) ||
           ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
@@ -1774,8 +1792,12 @@
       if (badgeTimer) { clearTimeout(badgeTimer); badgeTimer = null; }
       const now = nowSrv();
       let next = Infinity;
-      learningCards.forEach(function(c) { if (c.unlockAt > now && c.unlockAt < next) next = c.unlockAt; });
-      if (next < Infinity) badgeTimer = setTimeout(function() { sortLearning(); updateTabs(); }, Math.min(next - now + 500, 2147483000));
+      learningCards.concat(learningHeld).forEach(function(c) { if (c.unlockAt > now && c.unlockAt < next) next = c.unlockAt; });
+      if (next < Infinity) badgeTimer = setTimeout(function() {
+        const wasEmpty = !learningCards.length;
+        sortLearning(); updateTabs();
+        if (wasEmpty && learningCards.length && mode === 'learning' && !isScoring) { learningIndex = 0; render(); }   // its time came while the New tab sat empty
+      }, Math.min(next - now + 500, 2147483000));
     }
     document.addEventListener("visibilitychange", function() {
       if (!document.hidden) {
@@ -2627,7 +2649,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-225';
+    const CLIENT_BUILD = 'sync-226';
 
     let queue = [];
     let currentIndex = 0;
@@ -2709,6 +2731,7 @@
       attachSwipeBack("treasuryView", backTreasury, "left");
       attachSwipeBack("verseListView", openTreasury, "right");      // swipe right on the Verses tab or on Review Complete opens the Treasury
       attachSwipeBack("summaryView", openTreasury, "right");
+      ptsHeld = attachLongPress(document.getElementById("statGradBox"), openPtsPeek);
       attachSwipeBack("bookView", backBook, "left");
       attachSwipeBack("upcomingView", backUpcoming, "left");
       attachSwipeBack("searchView", backSearch, "left");
@@ -2836,6 +2859,7 @@
       queue = session.cards || [];
       srvSkew = typeof session.serverNow === 'number' ? session.serverNow - Date.now() : 0;
       learningCards = session.learning || [];
+      learningHeld = [];
       learningSeen = {};
       learnPending = false;
       sortLearning();
@@ -3427,6 +3451,86 @@
       }, function() { trPillBusy = false; });
     }
 
+    // ── Hold the Treasury box on Review Complete: net points today, over 7 days and over 30 days, and the total ──
+    const monthStatCache = {}, monthStatWait = {};   // "year-month" -> { at, data } from getMonthStats; callbacks waiting on a request in flight
+    function monthStatFor(y, m, cb) {
+      const k = y + "-" + m, hit = monthStatCache[k];
+      if (hit && Date.now() - hit.at < 60000) { cb(hit.data); return; }
+      if (monthStatWait[k]) { monthStatWait[k].push(cb); return; }
+      monthStatWait[k] = [cb];
+      const settle = function(data) { const list = monthStatWait[k] || []; delete monthStatWait[k]; list.forEach(function(f) { f(data); }); };
+      try {
+        google.script.run
+          .withSuccessHandler(function(res) { if (res && res.days) { monthStatCache[k] = { at: Date.now(), data: res }; settle(res); } else settle(null); })
+          .withFailureHandler(function() { settle(null); })
+          .getMonthStats(y, m);
+      } catch (e) { settle(null); }   // an older Code.gs has no getMonthStats
+    }
+    // Net points over the last n days: the days before today come from the sheet's daily log, today from this session.
+    function netPointsOver(n, done) {
+      const t = new Date(); t.setHours(12, 0, 0, 0);
+      const need = [], want = [];
+      for (let i = 1; i < n; i++) {
+        const d = new Date(t); d.setDate(d.getDate() - i);
+        want.push([d.getFullYear(), d.getMonth() + 1, d.getDate()]);
+        const k = d.getFullYear() + "-" + (d.getMonth() + 1);
+        if (need.indexOf(k) < 0) need.push(k);
+      }
+      const got = {}; let left = need.length, bad = false;
+      const finish = function() {
+        if (bad) { done(null); return; }
+        let sum = sessionStats.pts || 0;
+        want.forEach(function(w) { const md = got[w[0] + "-" + w[1]]; const row = md && md.days && md.days[w[2]]; if (row) sum += row[4] || 0; });
+        done(sum);
+      };
+      if (!left) { finish(); return; }
+      need.forEach(function(k) {
+        const y = +k.split("-")[0], m = +k.split("-")[1];
+        monthStatFor(y, m, function(data) { if (data) got[k] = data; else bad = true; if (--left === 0) finish(); });
+      });
+    }
+    let ptsHeld = null;
+    function openPtsPeek() {
+      hideVerseTip(); closePeek();
+      const box = document.getElementById("statGradBox");
+      const dim = document.createElement("div");
+      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
+      dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
+      document.body.appendChild(dim);
+      const r = box.getBoundingClientRect();
+      const lift = box.cloneNode(true);
+      lift.removeAttribute("id"); lift.removeAttribute("onclick");
+      lift.className += " pk-tile"; lift.id = "pkTile";
+      lift.style.left = r.left + "px"; lift.style.top = r.top + "px"; lift.style.width = r.width + "px"; lift.style.height = r.height + "px";
+      document.body.appendChild(lift);
+      const b = document.createElement("div");
+      b.className = "pk-bubble pk-day"; b.id = "pkBubble";
+      const h = document.createElement("div"); h.className = "pk-h";
+      const hn = document.createElement("div"); hn.textContent = "Treasury points";
+      const hm = document.createElement("span"); hm.textContent = "net";
+      h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
+      const val = {};
+      [["today", "Today"], ["w", "Last 7 days"], ["m", "Last 30 days"], ["tot", "Total"]].forEach(function(x) {
+        const row = document.createElement("div"); row.className = "pk-r";
+        const l = document.createElement("span"); l.textContent = x[1];
+        const v = document.createElement("b"); v.textContent = "\u2026"; v.className = "pk-v";
+        row.appendChild(l); row.appendChild(v); b.appendChild(row); val[x[0]] = v;
+      });
+      const setNet = function(el, n) { el.textContent = n === null ? "\u2014" : fmtPts(n); el.classList.toggle("neg", n !== null && n < 0); };
+      setNet(val.today, sessionStats.pts || 0);
+      let tot = vlVerses.length ? treasuryTotal() : null;
+      if (tot === null) { try { const sv = JSON.parse(localStorage.getItem("vr_trpts") || "null"); if (typeof sv === "number") tot = sv; } catch (e) {} }
+      val.tot.textContent = tot === null ? "\u2014" : tot.toLocaleString("en-US");
+      val.tot.classList.add("tot");
+      netPointsOver(7, function(n) { if (document.getElementById("pkBubble") === b) setNet(val.w, n); });
+      netPointsOver(30, function(n) { if (document.getElementById("pkBubble") === b) setNet(val.m, n); });
+      document.body.appendChild(b);
+      const room = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
+      let top = r.bottom + 14;
+      if (top + b.offsetHeight > room) top = Math.max(10, r.top - 14 - b.offsetHeight);
+      b.style.top = top + "px";
+    }
+
     function renderTomorrowNote() {
       const el = document.getElementById("tomorrowNote");
       if (!el) return;
@@ -3644,6 +3748,7 @@
     // Learning screen with no Level 0 verses: offer to add one.
     function renderEmptyLearning() {
       isScoring = false;
+      const held = learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; })[0];
       document.getElementById("activeCard").style.display = "none";
       document.getElementById("summaryView").style.display = "flex";
       document.getElementById("sessionProgressFill").style.width = "0%";
@@ -3651,13 +3756,13 @@
       const icon = document.getElementById("summaryIcon");
       icon.textContent = "";
       icon.style.display = "none";
-      document.getElementById("summaryTitle").textContent = "No New Verse";
-      document.getElementById("summarySubtitle").textContent = "Would you like to add a new verse?";
+      document.getElementById("summaryTitle").textContent = held ? "Nothing to learn now" : "No New Verse";
+      document.getElementById("summarySubtitle").textContent = held ? lockedText(held) : "Would you like to add a new verse?";
       document.getElementById("summaryStats").style.display = "none";
       document.getElementById("flawlessBadge").style.display = "none";
       countUpToken++;
       updateStatLists(); // an open Repeats / Leveled Up list from the Review screen must not follow you here
-      setSummaryButtons(true, false);
+      setSummaryButtons(!held, false);
       renderTomorrowNote();
     }
 
@@ -3776,9 +3881,11 @@
     // Puts the server's version of a card on screen. Stays on the same card (keeping what you have revealed) unless another card is now due.
     function applyLearnCard(c) {
       const shown = learningCards[learningIndex] ? learningCards[learningIndex].reference : null;
-      const at = learningCards.findIndex(function(x) { return x.reference === c.reference; });
-      const oldVerse = at >= 0 ? learningCards[at].verseIndex : 0;
-      if (at >= 0) learningCards[at] = c; else learningCards.push(c);
+      const prev = learningCards.concat(learningHeld).find(function(x) { return x.reference === c.reference; });
+      const oldVerse = prev ? prev.verseIndex : 0;
+      learningCards = learningCards.filter(function(x) { return x.reference !== c.reference; });
+      learningHeld = learningHeld.filter(function(x) { return x.reference !== c.reference; });
+      learningCards.push(c);
       sortLearning();
       learningIndex = 0;
       if (mode === 'learning' && !isScoring) {
@@ -3921,7 +4028,7 @@
         } else {
           for (let i = 1; i <= card.repsNeeded; i++) {
             const pip = document.createElement("div");
-            pip.className = "pip" + (i <= card.rep ? " filled" : "");
+            pip.className = "pip" + (i < card.rep ? " filled" : i === card.rep ? " cur" : "");
             pipsContainer.appendChild(pip);
           }
         }
@@ -4425,9 +4532,15 @@
         animateOut();
         advanceAfter(REPEAT_SWAP_MS);
       } else {
+        if (action === "Pass") fillCurrentPip();
         animateOut();
         advanceAfter(PASS_SWAP_MS);
       }
+    }
+    // The rep just passed: its ring fills in before the card goes.
+    function fillCurrentPip() {
+      const cur = document.querySelector("#cardPips .pip.cur");
+      if (cur) { cur.classList.remove("cur"); cur.classList.add("filled"); }
     }
 
     // The Treasury bar on the Review Complete screen: total points and the rank bar; tapping it opens the Treasury.
@@ -4674,6 +4787,7 @@
     }
 
     function toggleStatList(kind) {
+      if (kind === "grad" && ptsHeld && ptsHeld()) return;   // the hold just opened the points peek
       const cfg = STAT_LISTS[kind];
       const items = statItems(kind);
       const list = document.getElementById("failList");
@@ -5112,7 +5226,7 @@
       const addBtn = document.getElementById("pvAdd");
       addBtn.style.display = (noAdd || canDelete) ? "none" : "";
       // one new verse at a time: while one is on the New tab, the final Add button is off (the list itself still opens)
-      const haveNew = learningCards.length > 0;
+      const haveNew = learningCards.length > 0 || learningHeld.length > 0;
       addBtn.disabled = haveNew;
       addBtn.onclick = function() { if (haveNew) return; closePreview(); chooseVerse(it); };
       const del = document.getElementById("pvDel"), note = document.getElementById("pvNote");
