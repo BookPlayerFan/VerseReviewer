@@ -445,7 +445,7 @@
     .scrolls.more::after { opacity: 1; }
     .fail-inner { --fade: var(--bg-body); }
     .pk-bubble.pk-day { left: 14px; right: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 20px; }
-    .pk-day .pk-h { padding: 18px 20px 12px; }
+    .pk-day .pk-h { padding: 18px 20px 12px; flex-direction: column; align-items: flex-start; gap: 3px; }   /* the date on one line, its reviews and load under it */
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
     .pk-day .pk-r:last-child { padding-bottom: 14px; }
     .pk-book .vl-verses { border-top: 1px solid var(--border-card); border-bottom: 0; }
@@ -1980,8 +1980,10 @@
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
     // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
     // (amber is a very heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
-    // Three colours for a day's word load (about a point per 30 words, at least 1 per verse): light up to 5, medium up to 10, heavy above.
-    function loadStep(load) { return load <= 5 ? 1 : load <= 10 ? 2 : 3; }
+    // Three colours for a day's word load (about a point per 30 words, at least 1 per verse), judged on the load rounded to a whole number:
+    // light up to 5, medium up to 10, heavy above (so 10.4 shows as 10, medium; 10.5 shows as 11, heavy).
+    const LOAD_LIGHT_MAX = 5, LOAD_MEDIUM_MAX = 10;
+    function loadStep(load) { const n = Math.round(load); return n <= LOAD_LIGHT_MAX ? 1 : n <= LOAD_MEDIUM_MAX ? 2 : 3; }
     function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
       const keepTop = box.scrollTop;
@@ -2084,7 +2086,7 @@
         tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
       };
       row([[1], [2], [3]], "The color", "how much there is to learn that day: green is light, blue medium, amber heavy");
-      row([[2, "12"]], "Tap a day", "to see its verses and exact load");
+      row([[2, "12"]], "Tap a day", "to see its verses and load");
       document.body.appendChild(b);
     }
     // Tap a day: its tile lifts over a dimmed calendar and a card lists the day's references.
@@ -2111,7 +2113,7 @@
       b.className = "pk-bubble pk-day"; b.id = "pkBubble";
       const h = document.createElement("div"); h.className = "pk-h";
       const hn = document.createElement("div"); hn.textContent = label;
-      const hm = document.createElement("span"); hm.textContent = vs.length + (vs.length === 1 ? " review" : " reviews") + " \u00b7 load " + (Math.round(vs.reduce(function(a, v) { return a + (v.l || 1); }, 0) * 10) / 10);
+      const hm = document.createElement("span"); hm.textContent = vs.length + (vs.length === 1 ? " review" : " reviews") + " \u00b7 load " + Math.round(vs.reduce(function(a, v) { return a + (v.l || 1); }, 0));
       h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
       vs.forEach(function(v) {
         const row = document.createElement("div"); row.className = "pk-r";
@@ -3063,7 +3065,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-257';
+    const CLIENT_BUILD = 'sync-258';
 
     let queue = [];
     let currentIndex = 0;
