@@ -484,7 +484,8 @@
     .vp-box { background: var(--bg-body); border: 1px solid var(--border-body); border-radius: 14px; padding: 12px 14px; box-sizing: border-box; }
     .vp-box .passage-toolbar { min-height: 15px; }
     .vp-box .vp-flag { display: inline-flex; align-items: center; min-height: 15px; }
-    .vp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); opacity: .75; }
+    .vp-dot { display: inline-block; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); opacity: .75; border: 1.5px solid var(--text-muted); transition: background .25s; }
+    .vp-dot.empty { background: transparent; opacity: .6; }
     .vp-dot.pop { animation: vpDot .45s ease; }
     @keyframes vpDot { 0% { transform: scale(0); } 60% { transform: scale(1.7); } 100% { transform: scale(1); } }
     .vp-pane.in { animation: vpIn .22s ease; }
@@ -1407,7 +1408,7 @@
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
-        <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
+        <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Tap the verse, or hold its reference</kbd></div>
         <div class="help-row"><span>Close an open verse</span><kbd>Pull it down</kbd></div>
         <div class="help-row"><span>This panel: status and gestures</span><kbd>Two-finger tap</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
@@ -2408,11 +2409,10 @@
     }
     function markHasBackground(f) {
       vlVerses.forEach(function(v) { if (v.f === f) v.c = 1; });
-      if (vpState && vpState.ref === f && !vpState.dot && vpState.flag) {
-        const d = document.createElement("i");
-        d.className = "vp-dot pop";
-        vpState.flag.appendChild(d);
-        vpState.dot = d;
+      if (vpState && vpState.ref === f && vpState.flag) {
+        let d = vpState.dot;
+        if (!d) { d = document.createElement("i"); vpState.flag.appendChild(d); vpState.dot = d; }
+        d.className = "vp-dot pop";   // the hollow ring fills in
       }
     }
     function fillVerseText(box, it) {
@@ -2548,10 +2548,11 @@
       document.body.appendChild(dim); document.body.appendChild(wrap);
       const st = { dim: dim, wrap: wrap, pop: pop, body: body, row: row, ref: it.f, flag: flag, dot: null, loaded: false, showing: "verse" };
       vpState = st;
-      function setDot() {
+      function setDot() {   // a filled dot once a Background exists, a hollow ring until then
         flag.textContent = "";
-        st.dot = null;
-        if (hasBackground(it.f)) { const d = document.createElement("i"); d.className = "vp-dot"; flag.appendChild(d); st.dot = d; }
+        const d = document.createElement("i");
+        d.className = "vp-dot" + (hasBackground(it.f) ? "" : " empty");
+        flag.appendChild(d); st.dot = d;
       }
       // sized to fit, near the row it came from
       const top0 = Math.max(50, Math.round(window.innerHeight * 0.12));
@@ -2582,6 +2583,15 @@
       }
       st.show = show;
       setDot();
+      // tap the verse (or the dot) to flip between the verse and its Background; taps on the buttons inside it keep their own job
+      box.addEventListener("click", function(e) {
+        e.stopPropagation();
+        if (Date.now() - born < 450) return;   // the lift-off of the hold that opened it is not a tap
+        if (e.target.closest && e.target.closest("button")) return;
+        const sel = window.getSelection && window.getSelection();
+        if (sel && String(sel).length > 0) return;   // someone selecting text is not asking to flip
+        show(st.showing === "bg" ? "verse" : "bg");
+      });
       // hold the reference to flip between the verse and its Background (the same gesture as on a review card)
       const heldTitle = attachLongPress(rrow, function() { show(st.showing === "bg" ? "verse" : "bg"); });
       rrow.addEventListener("click", function(e) { e.stopPropagation(); heldTitle(); });
@@ -2924,7 +2934,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-237';
+    const CLIENT_BUILD = 'sync-238';
 
     let queue = [];
     let currentIndex = 0;
