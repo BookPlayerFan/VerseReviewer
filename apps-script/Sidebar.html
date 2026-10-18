@@ -1223,6 +1223,10 @@
     .tr-pill b { color: var(--text-primary); font-weight: 800; }
     .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
     .tr-pill:active { opacity: 0.6; }
+    .pts-fly { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; will-change: transform; }
+    .pts-fly.chip { font-size: 20px; font-weight: 800; color: var(--text-accent); text-shadow: 0 0 10px color-mix(in srgb, var(--text-accent) 55%, transparent), 0 1px 2px rgba(0,0,0,.18); }
+    .pts-fly.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-accent); box-shadow: 0 0 8px color-mix(in srgb, var(--text-accent) 60%, transparent); }
+    .pts-fly.neg { color: var(--btn-fail-text); } .pts-fly.dot.neg { background: var(--btn-fail-text); box-shadow: 0 0 8px color-mix(in srgb, var(--btn-fail-text) 60%, transparent); }
     .tr-pill.fade-in { animation: noteFadeIn .35s ease-out both; }
     .tomorrow-note.fade-in { animation: noteFadeIn .35s ease-out both; }
     @keyframes noteFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1455,6 +1459,7 @@
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse</kbd></div>
         <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
         <div class="help-row"><span>Close an open verse</span><kbd>Tap it, or pull it down</kbd></div>
+        <div class="help-row"><span>Close a list card</span><kbd>Pull past its top or end</kbd></div>
         <div class="help-row"><span>This sheet</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
@@ -2106,6 +2111,7 @@
         row.appendChild(rf); row.appendChild(makePill(v.g)); b.appendChild(row);
       });
       document.body.appendChild(b);
+      attachEdgeClose(b);
       endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " review" : " reviews"));   // before measuring, so the marker's room is counted
       // below the tile, or above it, whichever has room (the card scrolls if the list is long)
       const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
@@ -2958,6 +2964,24 @@
     }
     ["svList", "upList", "trList", "pickerList"].forEach(watchEndCue);
 
+    // Pull past the top of a list card (a swipe down that starts with the list already at its top), or push past its end (a swipe up that starts at the
+    // end), and the card closes, like pulling down an open verse. A swipe that starts mid-list just scrolls.
+    function attachEdgeClose(b) {
+      let y0 = null, x0 = 0, edge = 0;
+      b.addEventListener("touchstart", function(e) {
+        if (e.touches.length !== 1) { y0 = null; return; }
+        y0 = e.touches[0].clientY; x0 = e.touches[0].clientX;
+        edge = (b.scrollTop <= 0 ? 1 : 0) | (b.scrollTop + b.clientHeight >= b.scrollHeight - 1 ? 2 : 0);   // 1: at the top, 2: at the end
+      }, { passive: true });
+      b.addEventListener("touchmove", function(e) {
+        if (y0 === null || !edge) return;
+        const t = e.touches[0], dy = t.clientY - y0, dx = t.clientX - x0;
+        if (Math.abs(dy) < 20 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+        if ((dy > 0 && (edge & 1)) || (dy < 0 && (edge & 2))) { y0 = null; if (e.cancelable) e.preventDefault(); closePeek(); }
+      }, { passive: false });
+      b.addEventListener("touchend", function() { y0 = null; });
+      b.addEventListener("touchcancel", function() { y0 = null; });
+    }
     // Tap a book: its tile lifts over the dimmed map, and a card beside it lists its references. The card is only as tall as they need, below the tile
     // or above it (whichever has room), and scrolls when the list is long. Tap a reference for its first words, hold it for the whole verse.
     function peekBook(key, tile) {
@@ -2990,6 +3014,7 @@
       vs.forEach(function(v) { wrap.appendChild(vlItem(v, true)); });
       b.appendChild(wrap);
       document.body.appendChild(b);
+      attachEdgeClose(b);
       endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " reference" : " references"));   // before measuring, so the marker's room is counted
       // below the tile, or above it, whichever has room (the card scrolls if the list is long)
       const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
@@ -3029,7 +3054,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-252';
+    const CLIENT_BUILD = 'sync-253';
 
     let queue = [];
     let currentIndex = 0;
@@ -3816,6 +3841,7 @@
 
     // ── Treasury pill on Review Complete: total points and a way in ──
     let trPillAt = 0, trPillBusy = false;
+    let trFreeze = null;   // today's points held back from the pill's total until the Treasury count has flown into it (see runCountUp)
     let trTotal = null;   // the Treasury's total as the server last said (sent with the session and with every review), so the pill never waits for the verse list
     function setTreasury(n) {
       if (typeof n !== "number" || isNaN(n)) return;
@@ -3834,6 +3860,7 @@
       return pts;
     }
     function paintTreasuryPill(pts) {
+      if (trFreeze !== null && typeof pts === "number") pts -= trFreeze;   // today's points are held back until they have flown in
       const el = document.getElementById("trPill");
       const wasHidden = el.style.display === "none";
       const key = typeof pts === "number" ? String(pts) : "";
@@ -5124,49 +5151,101 @@
       el.classList.toggle("neg", v < 0);
       document.getElementById("statGradBox").classList.toggle("gold", v >= 10);
     }
-    const SUMMARY_SETTLE_MS = 800;
+    const SUMMARY_SETTLE_MS = 800, FLY_MS = 950, PILL_COUNT_MS = 750, BADGE_DELAY_MS = 1200;
+    function pillRepaint() { const p = document.getElementById("trPill"); if (p && p.style.display !== "none") paintTreasuryPill(knownTreasury()); }
+    // The counted points lift off the Treasury box and fly up into the pill at the top; the pill's total then counts up (or down) by that amount.
+    function flyPoints(pts, token, landed) {
+      const from = document.getElementById("statGraduated"), pill = document.getElementById("trPill");
+      const target = pill && pill.style.display !== "none" ? (pill.querySelector("b") || pill) : null;
+      if (!from || !target || !from.animate) { landed(); return; }
+      const a = from.getBoundingClientRect(), z = target.getBoundingClientRect();
+      const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = z.left + z.width / 2, y1 = z.top + z.height / 2;
+      const neg = pts < 0, nodes = [];
+      const mk = function(cls, text, delay) {
+        const n = document.createElement("div");
+        n.className = "pts-fly " + cls + (neg ? " neg" : ""); n.textContent = text;
+        document.body.appendChild(n); nodes.push(n);
+        const bow = (x0 < window.innerWidth / 2 ? 1 : -1) * 46;
+        const mid = "translate(" + Math.round((x0 + x1) / 2 + bow) + "px, " + Math.round((y0 + y1) / 2 - 20) + "px)";
+        const first = "translate(" + Math.round(x0) + "px, " + Math.round(y0) + "px)", last = "translate(" + Math.round(x1) + "px, " + Math.round(y1) + "px)";
+        return n.animate([
+          { transform: first + " translate(-50%, -50%) scale(1)", opacity: 1 },
+          { transform: mid + " translate(-50%, -50%) scale(1.25)", opacity: 1, offset: 0.45 },
+          { transform: last + " translate(-50%, -50%) scale(0.55)", opacity: cls === "dot" ? 0.2 : 0.9 }
+        ], { duration: FLY_MS, delay: delay, easing: "cubic-bezier(.45,.05,.55,.95)", fill: "both" });
+      };
+      for (let k = 4; k >= 1; k--) mk("dot", "", k * 55);
+      const main = mk("chip", fmtPts(pts), 0);
+      main.onfinish = function() { nodes.forEach(function(n) { n.remove(); }); landed(); };
+      main.oncancel = function() { nodes.forEach(function(n) { n.remove(); }); };
+      setTimeout(function() { if (token !== countUpToken) nodes.forEach(function(n) { n.remove(); }); }, FLY_MS + 400);
+    }
+    // The pill takes the points: its total counts to the new number with a small pulse.
+    function landPoints(pts, token) {
+      trFreeze = null;
+      const pill = document.getElementById("trPill"), total = knownTreasury();
+      const b = pill && pill.style.display !== "none" ? pill.querySelector("b") : null;
+      if (!b || typeof total !== "number") { pillRepaint(); return; }
+      const base = total - pts, t0 = Date.now();
+      if (pill.animate) pill.animate([{ transform: "translateX(-50%) scale(1)" }, { transform: "translateX(-50%) scale(1.14)", offset: 0.3 }, { transform: "translateX(-50%) scale(1)" }], { duration: 650, easing: "ease-out" });
+      (function step() {
+        if (token !== countUpToken) { pillRepaint(); return; }
+        const x = Math.min(1, (Date.now() - t0) / PILL_COUNT_MS);
+        b.textContent = Math.round(base + pts * (1 - Math.pow(1 - x, 3))).toLocaleString("en-US");
+        if (x < 1) setTimeout(step, 33); else pillRepaint();
+      })();
+    }
     function runCountUp() {
+      const pts = sessionStats.pts || 0;
       const items = [
         ["statReviewed", sessionStats.reviewed],
-        ["statGraduated", sessionStats.pts || 0], ["statFailed", sessionStats.failed]
+        ["statGraduated", pts], ["statFailed", sessionStats.failed]
       ];
       const show = function(id, v) { document.getElementById(id).textContent = id === "statGraduated" ? fmtPts(v) : v; };
       const gold = document.getElementById("statGradBox");
       const token = ++countUpToken;
       // The numbers wait (showing 0) until the screen has fully settled, then count up a little slower; a big number does not drag on (capped at 1.8 s).
+      // Order: Reviewed, then Treasury points; those fly into the pill at the top and the pill's total moves; only then do the Missed count and the badge come.
       const GAP = 200, start = Date.now() + SUMMARY_SETTLE_MS;
-      const plan = []; let t = 0;
+      const flyOn = pts !== 0 && typeof knownTreasury() === "number";
+      const plan = []; let t = 0, flyAt = -1, endAt = 0;
       items.forEach(function(it) {
-        const d = it[1] > 0 ? Math.min(1800, 1000 + it[1] * 50) : 0;
+        const d = it[1] > 0 ? Math.min(1800, 1000 + it[1] * 50) : (it[0] === "statGraduated" && it[1] < 0 ? 900 : 0);
         plan.push({ id: it[0], v: it[1], from: t, d: d });
-        t += d + (it[1] > 0 ? GAP : 0);
+        t += d + (d > 0 ? GAP : 0);
+        if (it[0] === "statGraduated" && flyOn) { flyAt = t; t += FLY_MS + PILL_COUNT_MS + 250; }
       });
+      endAt = t;
+      if (flyOn) { trFreeze = pts; pillRepaint(); }
       plan.forEach(function(p) { show(p.id, 0); });
-      document.getElementById("statGraduated").classList.toggle("neg", (sessionStats.pts || 0) < 0);
+      document.getElementById("statGraduated").classList.toggle("neg", pts < 0);
       gold.classList.remove("gold");
       const flawlessEl = document.getElementById("flawlessBadge");
       flawlessEl.classList.remove("pop");
       flawlessEl.style.display = "none";
+      let flown = false;
       function finish() {
         plan.forEach(function(p) { show(p.id, p.v); });
-        gold.classList.toggle("gold", (sessionStats.pts || 0) >= 10);
+        gold.classList.toggle("gold", pts >= 10);
+        document.querySelectorAll(".pts-fly").forEach(function(n) { n.remove(); });
+        if (trFreeze !== null) { trFreeze = null; pillRepaint(); }
         if (token === countUpToken) showFlawlessBadge(false);
       }
       (function tick() {
         const summary = document.getElementById("summaryView");
         if (token !== countUpToken || summary.style.display === "none") { finish(); return; }
         const now = Date.now() - start;
-        let done = true;
         plan.forEach(function(p) {
           let v;
-          if (now < p.from) { v = 0; done = false; }
-          else if (p.d === 0 || now >= p.from + p.d) { v = p.v; }
-          else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); done = false; }
+          if (now < p.from) v = 0;
+          else if (p.d === 0 || now >= p.from + p.d) v = p.v;
+          else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); }
           show(p.id, v);
         });
+        if (flyOn && !flown && now >= flyAt) { flown = true; flyPoints(pts, token, function() { landPoints(pts, token); }); }
         gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 10);
-        if (!done) setTimeout(tick, 33);
-        else showFlawlessBadge(true);
+        if (now < endAt) { setTimeout(tick, 33); return; }
+        setTimeout(function() { if (token === countUpToken && summary.style.display !== "none") showFlawlessBadge(true); }, BADGE_DELAY_MS);   // a beat before the badge pops in
       })();
     }
 
