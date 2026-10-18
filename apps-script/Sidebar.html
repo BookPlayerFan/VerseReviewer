@@ -445,7 +445,8 @@
     .scrolls.more::after { opacity: 1; }
     .fail-inner { --fade: var(--bg-body); }
     .pk-bubble.pk-day { left: 14px; right: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 20px; }
-    .pk-day .pk-h { padding: 18px 20px 12px; flex-direction: column; align-items: flex-start; gap: 3px; }   /* the date on one line, its reviews and load under it */
+    .pk-day .pk-h { padding: 18px 20px 12px; align-items: center; gap: 12px; }
+    .pk-day .pk-h span { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.25; text-align: right; }   /* reviews and load: two small rows on the right, level with the date */
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
     .pk-day .pk-r:last-child { padding-bottom: 14px; }
     .pk-book .vl-verses { border-top: 1px solid var(--border-card); border-bottom: 0; }
@@ -1981,8 +1982,8 @@
     // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
     // (amber is a very heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
     // Three colours for a day's word load (about a point per 30 words, at least 1 per verse), judged on the load rounded to a whole number:
-    // light up to 5, medium up to 10, heavy above (so 10.4 shows as 10, medium; 10.5 shows as 11, heavy).
-    const LOAD_LIGHT_MAX = 5, LOAD_MEDIUM_MAX = 10;
+    // light 1-7, medium 8-14, heavy 15 and up (so 7.4 shows as 7, light; 7.5 shows as 8, medium).
+    const LOAD_LIGHT_MAX = 7, LOAD_MEDIUM_MAX = 14;
     function loadStep(load) { const n = Math.round(load); return n <= LOAD_LIGHT_MAX ? 1 : n <= LOAD_MEDIUM_MAX ? 2 : 3; }
     function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
@@ -2113,7 +2114,10 @@
       b.className = "pk-bubble pk-day"; b.id = "pkBubble";
       const h = document.createElement("div"); h.className = "pk-h";
       const hn = document.createElement("div"); hn.textContent = label;
-      const hm = document.createElement("span"); hm.textContent = vs.length + (vs.length === 1 ? " review" : " reviews") + " \u00b7 load " + Math.round(vs.reduce(function(a, v) { return a + (v.l || 1); }, 0));
+      const hm = document.createElement("span");
+      const hm1 = document.createElement("div"); hm1.textContent = vs.length + (vs.length === 1 ? " review" : " reviews");
+      const hm2 = document.createElement("div"); hm2.textContent = "load " + Math.round(vs.reduce(function(a, v) { return a + (v.l || 1); }, 0));
+      hm.appendChild(hm1); hm.appendChild(hm2);
       h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
       vs.forEach(function(v) {
         const row = document.createElement("div"); row.className = "pk-r";
@@ -3065,7 +3069,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-258';
+    const CLIENT_BUILD = 'sync-259';
 
     let queue = [];
     let currentIndex = 0;
@@ -4625,11 +4629,11 @@
     function hintFlagTap(e) { if (e) { e.stopPropagation(); e.preventDefault(); } toggleHintMode(); }
     let shellHintApplied = false;   // the saved hint choice is applied once per page load, then your own taps rule
 
-    // Press and hold in the verse box (New tab): while hints are on, the full words show for as long as you hold, then hide again.
-    // Still holding, slide up to switch hints on / off (the bulb at the top right of the box does the same with a tap).
+    // Press and hold in the verse box (New tab): with hints off, the hold turns them on. With hints on, the full words show for as long as you
+    // hold, then hide again; still holding, slide down to turn hints off (the bulb at the top right of the box also switches them with a tap).
     // The click that ends a hold must not also reveal a piece.
     let heldBody = null, peeking = false, peekY0 = 0, peekFlipped = false, peekCapTimer = null;
-    const PEEK_SLIDE = 45;   // px up
+    const PEEK_SLIDE = 45;   // px down
     function peekCaption(text, y) {
       let c = document.getElementById("peekCap");
       if (!c) { c = document.createElement("div"); c.id = "peekCap"; c.className = "peek-cap"; document.body.appendChild(c); }
@@ -4641,7 +4645,12 @@
       peeking = true; peekFlipped = false; peekY0 = e.clientY;
       document.body.classList.add("peek");
       try { document.getElementById("cardBody").setPointerCapture(e.pointerId); } catch (x) {}   // the box is redrawn when hints flip; the finger keeps reporting
-      peekCaption(hintMode ? "Slide up to turn hints off" : "Slide up to turn hints on", peekY0 - 66);
+      if (!hintMode) {   // hints off: the hold itself turns them on (and shows the full words until you lift, like any hold)
+        toggleHintMode(); peekFlipped = true;
+        peekCaption("Hints on", peekY0 - 66);
+        return;
+      }
+      peekCaption("Slide down to turn hints off", peekY0 - 66);
     }
     function endPeek() {
       if (!peeking) return;
@@ -4653,7 +4662,7 @@
       const body = document.getElementById("cardBody");
       heldBody = attachLongPress(body, startPeek, function(e) { return mode === 'learning' && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
       window.addEventListener("pointermove", function(e) {
-        if (!peeking || peekFlipped || peekY0 - e.clientY < PEEK_SLIDE) return;
+        if (!peeking || peekFlipped || e.clientY - peekY0 < PEEK_SLIDE) return;
         peekFlipped = true;
         toggleHintMode();
         peekCaption(hintMode ? "Hints on" : "Hints off", peekY0 - 66);
