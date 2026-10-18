@@ -1118,7 +1118,7 @@
     .help-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
     .help-note { font-size: 12px; color: var(--text-muted); margin: 2px 0 4px; line-height: 1.35; }
     .help-row span { padding-right: 12px; }
-    .help-row kbd { white-space: nowrap; flex-shrink: 0; font: 600 13px -apple-system, Helvetica, Arial, sans-serif; min-width: 26px; text-align: center; padding: 3px 8px; border-radius: 6px;
+    .help-row kbd { white-space: normal; text-align: right; max-width: 62%; flex-shrink: 0; font: 600 13px -apple-system, Helvetica, Arial, sans-serif; min-width: 26px; text-align: center; padding: 3px 8px; border-radius: 6px;
       background: var(--bg-body); border: 1px solid var(--border-card); border-bottom-width: 2px; color: var(--text-primary); }
     .pv-card { background: var(--bg-card); color: var(--text-primary); border-radius: 18px; width: 100%; max-width: 420px;
       max-height: 78%; display: flex; flex-direction: column; padding: 18px 18px 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
@@ -1170,7 +1170,7 @@
     .sync-warning.is-saving { pointer-events: none; }
     /* Status readout */
     .pv-card.help-card { height: 78%; max-height: 600px; }
-    .help-card .help-scroll { flex: 1 1 auto; display: none; }
+    .help-card .help-scroll { flex: 1 1 auto; display: none; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; }
     .help-card .help-scroll.on { display: block; }
     .help-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 11px; background: var(--bg-body); border: 1px solid var(--border-card); margin: 0 0 12px; flex: none; }
     .help-tabs button { flex: 1; min-height: 0; width: auto; padding: 8px 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); font-size: 14px; font-weight: 700; box-shadow: none; }
@@ -1182,6 +1182,12 @@
     .st-row b.ok { color: #1e8e3e; } .st-row b.bad { color: var(--badge-fail); }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .st-row b.ok { color: #81c995; } }
     :root[data-theme="dark"] .st-row b.ok { color: #81c995; }
+    .st-tap { cursor: pointer; }
+    .st-tap:active { opacity: .6; }
+    .st-caret { display: inline-block; font-style: normal; font-size: 18px; line-height: 1; margin-left: 6px; vertical-align: -1px; transition: transform .18s; }
+    .st-caret.open { transform: rotate(90deg); }
+    .st-sub { padding: 6px 0 6px 14px; font-size: 13.5px; border-top: 0; }
+    #notifList { padding: 0 0 4px; border-top: 1px solid var(--border-card); }
     .st-note { font-size: 12.5px; color: var(--text-muted); padding: 4px 0; }
     .st-btns { display: flex; gap: 10px; margin-top: 12px; }
     .st-btns button { flex: 1; min-height: 0; width: auto; padding: 9px 0; font-size: 13px; font-weight: 600; border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); box-shadow: none; }
@@ -1403,9 +1409,9 @@
   <div class="pv" id="helpModal" onclick="if (event.target === this) toggleHelp(false)">
     <div class="pv-card help-card">
       <div class="help-tabs" role="tablist">
+        <button type="button" role="tab" id="helpTabSt" onclick="showHelpTab('st')">Status</button>
         <button type="button" role="tab" id="helpTabInfo" onclick="showHelpTab('info')">Info</button>
         <button type="button" role="tab" id="helpTabCtl" onclick="showHelpTab('ctl')">Controls</button>
-        <button type="button" role="tab" id="helpTabSt" onclick="showHelpTab('st')">Status</button>
       </div>
       <div class="help-scroll" id="helpPaneInfo">
         <div class="help-sub">A new day starts at 4 AM</div>
@@ -1418,8 +1424,6 @@
         <div class="help-row"><span>Learn, as each one opens</span><kbd>8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
         <div class="help-row"><span>The 6 PM Learn and Lock PM</span><kbd>8:00 PM</kbd></div>
         <div class="help-note">The 4 AM and 6 PM Learn do not notify when they open: the 4 AM ones ride the 6 AM notification and the 6 PM ones go out at 8 PM. Only sent when something is waiting; finishing early cancels what is left.</div>
-        <div class="help-sub">Still to come today</div>
-        <div id="notifList"></div>
       </div>
       <div class="help-scroll" id="helpPaneCtl">
         <div class="help-sub">Verse box</div>
@@ -1438,8 +1442,8 @@
         <div class="help-sub">Verse lists</div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
-        <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Tap the verse, or hold its reference</kbd></div>
-        <div class="help-row"><span>Close an open verse</span><kbd>Pull it down</kbd></div>
+        <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
+        <div class="help-row"><span>Close an open verse</span><kbd>Tap it, or pull it down</kbd></div>
         <div class="help-row"><span>This sheet</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
@@ -2499,39 +2503,27 @@
       }
       setTimeout(done, 270);
     }
-    // Pull the open card down to dismiss it (only when the text is scrolled to the top).
+    // Pull the open card down to dismiss it (only when the text is scrolled to the top). It starts closing the moment the pull is recognised,
+    // folding back into its row, rather than following the finger down the screen first.
     function attachPopupSwipe(st) {
       const wrap = st.wrap, body = st.body;
-      let y0 = null, x0 = 0, dragging = false, t0 = 0, lastY = 0, lastT = 0, vel = 0;
+      let y0 = null, x0 = 0;
       wrap.addEventListener("touchstart", function(e) {
         if (e.touches.length !== 1) { y0 = null; return; }
-        const t = e.touches[0];
-        y0 = t.clientY; x0 = t.clientX; dragging = false; t0 = lastT = Date.now(); lastY = y0; vel = 0;
+        y0 = e.touches[0].clientY; x0 = e.touches[0].clientX;
         st.startedAtTop = !body.contains(e.target) || body.scrollTop <= 0;
       }, { passive: true });
       wrap.addEventListener("touchmove", function(e) {
         if (y0 === null || !st.startedAtTop) return;
         const t = e.touches[0], dy = t.clientY - y0;
-        if (!dragging) {
-          if (dy > 10 && dy > Math.abs(t.clientX - x0) * 1.5 && (body.scrollTop <= 0)) dragging = true;
-          else return;
+        if (dy > 12 && dy > Math.abs(t.clientX - x0) * 1.5 && body.scrollTop <= 0) {
+          y0 = null;
+          if (e.cancelable) e.preventDefault();
+          st.swipedAt = Date.now();
+          closeVersePopup();
         }
-        if (e.cancelable) e.preventDefault();
-        st.dragY = Math.max(0, dy);
-        wrap.style.transform = "translateY(" + st.dragY + "px)";
-        st.dim.style.opacity = String(Math.max(0.15, 1 - st.dragY / 420));
-        const now = Date.now();
-        if (now > lastT) { vel = (t.clientY - lastY) / (now - lastT); lastY = t.clientY; lastT = now; }
       }, { passive: false });
-      function end() {
-        if (!dragging) { y0 = null; return; }
-        dragging = false; y0 = null;
-        st.swipedAt = Date.now();
-        if (st.dragY > 90 || vel > 0.7) { closeVersePopup(); return; }   // closes the same way as a tap outside: the card folds back into its row
-        st.dragY = 0;
-        if (wrap.animate) wrap.animate([{ transform: wrap.style.transform }, { transform: "translateY(0px)" }], { duration: 220, easing: "cubic-bezier(.2,.9,.3,1.2)" });
-        wrap.style.transform = ""; st.dim.style.opacity = "";
-      }
+      function end() { y0 = null; }
       wrap.addEventListener("touchend", end);
       wrap.addEventListener("touchcancel", end);
     }
@@ -2626,18 +2618,19 @@
       }
       st.show = show;
       setDot();
-      // tap the verse (or the dot) to flip between the verse and its Background; taps on the buttons inside it keep their own job
-      box.addEventListener("click", function(e) {
-        e.stopPropagation();
-        if (Date.now() - born < 450) return;   // the lift-off of the hold that opened it is not a tap
-        if (e.target.closest && e.target.closest("button")) return;
-        const sel = window.getSelection && window.getSelection();
-        if (sel && String(sel).length > 0) return;   // someone selecting text is not asking to flip
-        show(st.showing === "bg" ? "verse" : "bg");
-      });
       // hold the reference to flip between the verse and its Background (the same gesture as on a review card)
       const heldTitle = attachLongPress(rrow, function() { show(st.showing === "bg" ? "verse" : "bg"); });
-      rrow.addEventListener("click", function(e) { e.stopPropagation(); heldTitle(); });
+      // a tap anywhere else on the card closes it, like pulling it down (taps on buttons inside keep their own job; selecting text is not a tap)
+      function tapClose(e) {
+        e.stopPropagation();
+        if (Date.now() - born < 450 || (st.swipedAt && Date.now() - st.swipedAt < 400)) return;   // the lift-off of the hold that opened it is not a tap
+        if (e.target.closest && e.target.closest("button")) return;
+        const sel = window.getSelection && window.getSelection();
+        if (sel && String(sel).length > 0) return;
+        closeVersePopup();
+      }
+      wrap.addEventListener("click", tapClose);
+      rrow.addEventListener("click", function(e) { if (heldTitle()) { e.stopPropagation(); return; } tapClose(e); });   // the lift-off of a hold on the reference is not a tap
       attachPopupSwipe(st);
       // opens out of the row it came from: the card starts as the row's own shape and grows
       const pr = pop.getBoundingClientRect();
@@ -2983,7 +2976,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-244';
+    const CLIENT_BUILD = 'sync-246';
 
     let queue = [];
     let currentIndex = 0;
@@ -5761,11 +5754,11 @@
       }
     });
 
-    // One sheet with three panels: Info (the day's schedule and what notifications are still to come), Controls (the gestures) and Status
-    // (the readout, with the test and reload buttons). The \u24d8 cell on the Verses map (or the ? key) shows or hides it.
-    let helpTab = "info", notif = null;
+    // One sheet with three panels: Status (the readout, with the test and reload buttons; opens first), Info (the day's schedule and when
+    // notifications go out) and Controls (the gestures). The \u24d8 cell on the Verses map (or the ? key) shows or hides it.
+    let helpTab = "st", notif = null, notifOpen = false;
     function showHelpTab(which) {
-      helpTab = which === "ctl" || which === "st" ? which : "info";
+      helpTab = which === "ctl" || which === "info" ? which : "st";
       [["info", "Info"], ["ctl", "Ctl"], ["st", "St"]].forEach(function(p) {
         const on = p[0] === helpTab;
         document.getElementById("helpTab" + p[1]).classList.toggle("on", on);
@@ -5778,14 +5771,14 @@
       open = !!open;
       diagOn = open;
       document.getElementById("helpModal").classList.toggle("open", open);
-      if (open) { showHelpTab(helpTab); renderDiag(); loadNotif(); }
+      if (open) { showHelpTab("st"); renderDiag(); loadNotif(); }   // always opens on Status
     }
     // What the server has set to go out today, and whether the pieces that send it are in place (so the phone can say it, not the spreadsheet).
     function loadNotif() {
-      notif = null; renderNotif(); renderDiag();
+      notif = null; renderDiag();
       google.script.run
-        .withSuccessHandler(function(r) { notif = r && r.ok ? r : { failed: true }; renderNotif(); renderDiag(); })
-        .withFailureHandler(function() { notif = { failed: true }; renderNotif(); renderDiag(); })
+        .withSuccessHandler(function(r) { notif = r && r.ok ? r : { failed: true }; renderDiag(); })
+        .withFailureHandler(function() { notif = { failed: true }; renderDiag(); })
         .notifStatus();
     }
     function renderNotif() {
@@ -5799,7 +5792,7 @@
         return;
       }
       notif.pending.forEach(function(p) {
-        const r = document.createElement("div"); r.className = "st-row";
+        const r = document.createElement("div"); r.className = "st-row st-sub";
         const t = document.createElement("span"); t.textContent = new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
         const b = document.createElement("b"); b.textContent = p.text;
         r.appendChild(t); r.appendChild(b); el.appendChild(r);
@@ -5833,11 +5826,15 @@
         row("This icon since", shellInfo.first ? new Date(shellInfo.first).toLocaleDateString([], { month: "short", day: "numeric" }) + ", " + new Date(shellInfo.first).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?");
         row("Access key", (shellInfo.key ? "saved" : "not saved") + (shellInfo.works ? "" : " (storage blocked)"), shellInfo.key ? "ok" : "bad");
       }
-      if (!notif) row("Notifications", "checking\u2026");
-      else if (notif.failed) row("Notifications", "couldn't check", "bad");
-      else if (!notif.key) row("Notifications", "push key not set", "bad");
-      else if (notif.trigger === false) row("Notifications", "daily trigger missing", "bad");
-      else row("Notifications", "on \u00b7 " + notif.pending.length + " waiting today", "ok");
+      const nr = !notif ? ["checking\u2026", ""] : notif.failed ? ["couldn't check", "bad"] : !notif.key ? ["push key not set", "bad"] :
+        notif.trigger === false ? ["daily trigger missing", "bad"] : ["on \u00b7 " + notif.pending.length + " waiting today", "ok"];
+      row("Notifications", nr[0], nr[1]);
+      const last = el.lastChild;
+      last.classList.add("st-tap"); last.setAttribute("role", "button"); last.setAttribute("aria-expanded", notifOpen ? "true" : "false");
+      const caret = document.createElement("i"); caret.className = "st-caret" + (notifOpen ? " open" : ""); caret.textContent = "\u203a";
+      last.firstChild.appendChild(caret);
+      last.onclick = function() { notifOpen = !notifOpen; renderDiag(); };
+      if (notifOpen) { const nl = document.createElement("div"); nl.id = "notifList"; el.appendChild(nl); renderNotif(); }
     }
 
     // Sends a test push through the server (from the status panel).
