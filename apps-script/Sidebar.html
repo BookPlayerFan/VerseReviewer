@@ -297,6 +297,9 @@
     .vm-tile.empty { background: color-mix(in srgb, var(--rc) 5%, transparent); border: 1px dashed color-mix(in srgb, var(--rc) 38%, transparent); color: color-mix(in srgb, var(--rc) 50%, var(--text-meta)); opacity: 0.75; pointer-events: none; }
     .vm-tile.empty .vm-ab { font-size: 12px; font-weight: 600; }
     .vm-tile.skel { opacity: 0.55; }
+    .vm-info { grid-column: 8; grid-row: 4; box-sizing: border-box; min-height: 0; width: auto; padding: 0; margin: 0; border: 0; border-radius: 8px; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+    .vm-info svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    .vm-info:active { transform: none; filter: none; opacity: 0.6; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
     /* Hold a book: a small preview bubble over a dimmed map. */
@@ -1165,7 +1168,7 @@
     .sync-warning { position: fixed; bottom: calc(var(--tab-h) + 14px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
       z-index: 60; white-space: normal; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.22); } /* same spot on every screen, centered just above the tab bar */
     .sync-warning.is-saving { pointer-events: none; }
-    /* Status readout (two-finger tap) */
+    /* Status readout */
     .diag-test { display: block; margin: 8px 0 0; padding: 7px 12px; min-height: 0; width: auto; font-size: 13px; font-weight: 600;
       border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); }
     .diag-box { font-size: 11px; line-height: 1.4; color: var(--text-muted); word-break: break-all; padding: 8px 10px 10px; margin: 4px 0 6px;
@@ -1410,7 +1413,7 @@
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
         <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Tap the verse, or hold its reference</kbd></div>
         <div class="help-row"><span>Close an open verse</span><kbd>Pull it down</kbd></div>
-        <div class="help-row"><span>This panel: status and gestures</span><kbd>Two-finger tap</kbd></div>
+        <div class="help-row"><span>This panel: status and gestures</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
         <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
@@ -2873,6 +2876,12 @@
       Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3) }); });
       section("Old Testament", ot, "ot");
       section("New Testament", nt, "nt");
+      // the status and gestures panel lives in the empty cell under 2 John, in step with the book tiles
+      const infoBtn = document.createElement("button");
+      infoBtn.type = "button"; infoBtn.className = "vm-info"; infoBtn.setAttribute("aria-label", "Status and gestures");
+      infoBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></svg>';
+      infoBtn.onclick = function() { toggleHelp(true); };
+      map.lastChild.appendChild(infoBtn);
       if (other.length) section("Other", other);
 
       box.textContent = "";
@@ -2943,7 +2952,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-242';
+    const CLIENT_BUILD = 'sync-243';
 
     let queue = [];
     let currentIndex = 0;
@@ -5721,10 +5730,9 @@
       }
     });
 
-    // One panel: the status readout and the gesture list. Two fingers tapped anywhere (or the ? key) show or hide it.
+    // One panel: the status readout and the gesture list. The ⓘ cell on the Verses map (or the ? key) shows or hides it.
     function toggleHelp(open) {
       open = !!open;
-      if (diagOn && !open) diagClosedAt = Date.now();
       diagOn = open;
       document.getElementById("helpModal").classList.toggle("open", open);
       if (open) renderDiag();
@@ -5750,7 +5758,7 @@
           " · access key " + (shellInfo.key ? "saved" : "not saved") + (shellInfo.works ? "" : " (storage blocked)") : "");
     }
 
-    // Sends a test push through the server (two-finger tap, then the button).
+    // Sends a test push through the server (from the status panel).
     function sendTestPush() {
       const b = document.getElementById("diagTest");
       if (!b || b.disabled) return;
@@ -5769,33 +5777,6 @@
       goTab("verses");
     }
     versesTabHeld = attachLongPress(document.getElementById("tabVerses"), function() { openSearch(true); });
-    let diagClosedAt = 0;
-    function toggleDiag() { toggleHelp(!diagOn); }
-
-    // Two fingers tapped together anywhere show or hide the status and gestures panel.
-    (function() {
-      let t1 = 0, t2 = 0, start = null, bad = false;
-      document.addEventListener("touchstart", function(e) {
-        const n = e.touches.length, now = Date.now();
-        if (n === 1) { t1 = now; t2 = 0; bad = false; start = null; return; }
-        if (n === 2 && now - t1 < 300 && !bad) { t2 = now; start = [e.touches[0].clientX, e.touches[0].clientY, e.touches[1].clientX, e.touches[1].clientY]; return; }
-        bad = true;
-      }, true);
-      document.addEventListener("touchmove", function(e) {
-        if (!start || e.touches.length !== 2) return;
-        const m = Math.abs(e.touches[0].clientX - start[0]) + Math.abs(e.touches[0].clientY - start[1]) + Math.abs(e.touches[1].clientX - start[2]) + Math.abs(e.touches[1].clientY - start[3]);
-        if (m > 40) bad = true;
-      }, true);
-      document.addEventListener("touchend", function(e) {
-        if (!start || bad) { if (e.touches.length === 0) { start = null; bad = false; } return; }
-        const quick = Date.now() - t2 < 500;
-        start = null;
-        if (!quick || e.touches.length > 1) return;
-        bad = true;                                   // once per tap, not again as the second finger lifts
-        if (!diagOn && Date.now() - diagClosedAt < 800) return;
-        toggleDiag();
-      }, true);
-    })();
 
     function noteCheck(result, error) {
       diag.checkedAt = new Date().toLocaleTimeString();
