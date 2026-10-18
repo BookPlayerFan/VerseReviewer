@@ -468,31 +468,42 @@
     .vl-peek { position: absolute; z-index: 9; top: 50%; margin-top: -15px; height: 30px; display: flex; align-items: center; box-sizing: border-box; padding: 0 2px; overflow: hidden; pointer-events: none;
       white-space: nowrap; font-weight: 700; font-style: italic; color: var(--text-accent); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
     .vl-peek span { -webkit-mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); padding-right: 6px; }
-    /* Full verse popup: the row opens into a card with a Verse tab and a Background tab */
+    /* Full verse popup: the row opens into a card that looks like a review card (rank colours, same header, same verse box).
+       Hold the reference to flip the box to the verse's Background. */
     .vp-dim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.4); }
     .vp-wrap { position: fixed; z-index: 91; left: 20px; right: 20px; max-width: 460px; margin: 0 auto; filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.38)); }
-    .vp-pop { position: relative; display: flex; flex-direction: column; background: var(--bg-card); color: var(--text-primary); border-radius: 22px; overflow: hidden; }
+    .vp-pop { position: relative; display: flex; flex-direction: column; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-card); border-radius: 20px; overflow: hidden; }
     .vp-pop button { border: 0; background: none; color: inherit; font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
     .vp-pop button:active { opacity: .6; }
-    .vp-h { display: flex; align-items: center; gap: 10px; padding: 16px 6px 4px 20px; }
-    .vp-h b { font-size: 20px; font-weight: 800; flex: none; }
-    .vp-h .vp-sp { flex: 1; }
-    .vp-x { font-size: 19px !important; line-height: 1 !important; padding: 8px 14px !important; color: var(--text-muted) !important; }
-    .vp-tabs { display: flex; position: relative; margin: 4px 20px 0; border-bottom: 1px solid var(--border-card); }
-    .vp-tab { flex: 1; text-align: center; padding: 10px 0 !important; font-size: 14px !important; font-weight: 700 !important; color: var(--text-muted) !important; transition: color .2s; }
-    .vp-tab.on { color: var(--text-accent) !important; }
-    .vp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-accent); margin-left: 6px; vertical-align: middle; position: relative; top: -1px; }
+    .vp-h { position: relative; text-align: center; padding: 16px 54px 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .vp-h .ref-header-row { margin-bottom: 5px; }
+    .vp-h .vp-pill { display: flex; justify-content: center; }
+    .vp-x { position: absolute; right: 4px; top: 22px; font-size: 19px !important; line-height: 1 !important; padding: 10px 14px !important; color: var(--text-muted) !important; }
+    .vp-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 14px 14px; min-height: 120px; }
+    .vp-box { background: var(--bg-body); border: 1px solid var(--border-body); border-radius: 14px; padding: 12px 14px; box-sizing: border-box; }
+    .vp-box .passage-toolbar { min-height: 15px; }
+    .vp-box .vp-flag { display: inline-flex; align-items: center; min-height: 15px; }
+    .vp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); opacity: .75; }
     .vp-dot.pop { animation: vpDot .45s ease; }
     @keyframes vpDot { 0% { transform: scale(0); } 60% { transform: scale(1.7); } 100% { transform: scale(1); } }
-    .vp-ul { position: absolute; left: 0; bottom: -1px; width: 50%; height: 3px; border-radius: 3px; background: var(--text-accent); transition: transform .28s cubic-bezier(.3, .8, .3, 1); }
-    .vp-ul.bg { transform: translateX(100%); }
-    .vp-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 16px 20px 20px; min-height: 160px; }
+    .vp-pop .vp-back { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; line-height: 15px; color: var(--text-muted) !important; padding: 0 !important; font-family: inherit; }
     .vp-pane.in { animation: vpIn .22s ease; }
     @keyframes vpIn { from { opacity: 0; } to { opacity: 1; } }
-    .vp-body .pv-text { overflow: visible; padding: 0; }
+    .vp-box .pv-text { overflow: visible; padding: 0; }
+    .vp-box .pv-text .pv-n { font-size: 11px; font-weight: 800; vertical-align: super; margin: 0 3px; user-select: none; display: inline-block; }   /* same as the card's verse numbers */
     .vp-bgp .ctx-scroll { overflow: visible; padding: 0; }
     .vp-bgp button { border: 0; background: none; color: var(--text-accent); font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
     .vp-bgp { font-size: 15px; line-height: 1.5; }
+    /* rank colours, the same recipe as .card.ranked (the glow sits on the wrapper because the popup's own clip would cut it) */
+    .vp-pop.ranked, .vp-wrap.ranked { --rc: var(--rl); }
+    @media (prefers-color-scheme: dark) { .vp-pop.ranked, .vp-wrap.ranked { --rc: var(--rd); } }
+    @supports (color: color-mix(in srgb, red 50%, blue)) {
+      .vp-pop.ranked {
+        border-color: color-mix(in srgb, var(--rc) var(--rb), var(--border-card));
+        background: linear-gradient(180deg, color-mix(in srgb, var(--rc) var(--rt), var(--bg-card)), var(--bg-card) 38%);
+      }
+      .vp-wrap.ranked { filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.40)) drop-shadow(0 4px 10px var(--card-shadow)) drop-shadow(0 0 16px color-mix(in srgb, var(--rc) var(--rg), transparent)); }
+    }
     .vl-verse + .vl-verse { border-top: 1px solid var(--border-card); }
 
     .rank-1 { --rl: #a8643a; --rd: #d9945f; }
@@ -1394,6 +1405,8 @@
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
+        <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
+        <div class="help-row"><span>Close an open verse</span><kbd>Pull it down</kbd></div>
         <div class="help-row"><span>This panel: status and gestures</span><kbd>Two-finger tap</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
@@ -2241,12 +2254,12 @@
       if (due) { const du = document.createElement("span"); du.className = "vl-due" + (due.now ? " now" : ""); du.textContent = due.text; item.appendChild(du); }
       const heldRow = attachLongPress(item, function() {
         hideVerseTip();
-        openVersePopup({ f: v.f, v: v.v, t: v.t || v.x }, item);
+        openVersePopup({ f: v.f, g: v.g, v: v.v, t: v.t || v.x }, item);
       });
       item.onclick = function(ev) {
         ev.stopPropagation();
         if (heldRow()) return; // the hold already opened the full verse
-        if (item.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: v.f, v: v.v, t: v.t || v.x }, item); return; } // a second tap while the peek shows opens it
+        if (item.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: v.f, g: v.g, v: v.v, t: v.t || v.x }, item); return; } // a second tap while the peek shows opens it
         showVerseTip(item, v.w);
       };
       return item;
@@ -2393,10 +2406,10 @@
     }
     function markHasBackground(f) {
       vlVerses.forEach(function(v) { if (v.f === f) v.c = 1; });
-      if (vpState && vpState.ref === f && !vpState.dot) {
+      if (vpState && vpState.ref === f && !vpState.dot && vpState.flag) {
         const d = document.createElement("i");
         d.className = "vp-dot pop";
-        vpState.tabBg.appendChild(d);
+        vpState.flag.appendChild(d);
         vpState.dot = d;
       }
     }
@@ -2414,7 +2427,7 @@
         box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
       });
     }
-    function closeVersePopup(instant) {
+    function closeVersePopup(instant, swiped) {
       const st = vpState;
       if (!st) return;
       vpState = null;
@@ -2422,12 +2435,18 @@
       const done = function() { if (st.dim.parentNode) st.dim.parentNode.removeChild(st.dim); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap); };
       if (instant || !st.pop.animate) { done(); return; }
       st.dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
+      if (swiped) {   // dragged down: it carries on off the bottom of the screen
+        const y = st.dragY || 0;
+        st.wrap.animate([{ transform: "translateY(" + y + "px)" }, { transform: "translateY(" + (window.innerHeight - st.wrap.getBoundingClientRect().top + 40) + "px)" }], { duration: 220, easing: "ease-in", fill: "forwards" });
+        setTimeout(done, 230);
+        return;
+      }
       Array.prototype.forEach.call(st.pop.children, function(c) { c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" }); });
       const pr = st.pop.getBoundingClientRect();
       const sr = st.row && st.row.isConnected ? st.row.getBoundingClientRect() : null;
       if (sr) {
         st.pop.animate([
-          { clipPath: "inset(0px 0px 0px 0px round 22px)" },
+          { clipPath: "inset(0px 0px 0px 0px round 20px)" },
           { clipPath: "inset(" + (sr.top - pr.top) + "px " + (pr.right - sr.right) + "px " + (pr.bottom - sr.bottom) + "px " + (sr.left - pr.left) + "px round 0px)" }
         ], { duration: 260, easing: "cubic-bezier(.5,0,.75,.4)", fill: "forwards" });
       } else {
@@ -2435,56 +2454,116 @@
       }
       setTimeout(done, 270);
     }
+    // Pull the open card down to dismiss it (only when the text is scrolled to the top).
+    function attachPopupSwipe(st) {
+      const wrap = st.wrap, body = st.body;
+      let y0 = null, x0 = 0, dragging = false, t0 = 0, lastY = 0, lastT = 0, vel = 0;
+      wrap.addEventListener("touchstart", function(e) {
+        if (e.touches.length !== 1) { y0 = null; return; }
+        const t = e.touches[0];
+        y0 = t.clientY; x0 = t.clientX; dragging = false; t0 = lastT = Date.now(); lastY = y0; vel = 0;
+        st.startedAtTop = !body.contains(e.target) || body.scrollTop <= 0;
+      }, { passive: true });
+      wrap.addEventListener("touchmove", function(e) {
+        if (y0 === null || !st.startedAtTop) return;
+        const t = e.touches[0], dy = t.clientY - y0;
+        if (!dragging) {
+          if (dy > 10 && dy > Math.abs(t.clientX - x0) * 1.5 && (body.scrollTop <= 0)) dragging = true;
+          else return;
+        }
+        if (e.cancelable) e.preventDefault();
+        st.dragY = Math.max(0, dy);
+        wrap.style.transform = "translateY(" + st.dragY + "px)";
+        st.dim.style.opacity = String(Math.max(0.15, 1 - st.dragY / 420));
+        const now = Date.now();
+        if (now > lastT) { vel = (t.clientY - lastY) / (now - lastT); lastY = t.clientY; lastT = now; }
+      }, { passive: false });
+      function end() {
+        if (!dragging) { y0 = null; return; }
+        dragging = false; y0 = null;
+        st.swipedAt = Date.now();
+        if (st.dragY > 90 || vel > 0.7) { closeVersePopup(false, true); return; }
+        st.dragY = 0;
+        if (wrap.animate) wrap.animate([{ transform: wrap.style.transform }, { transform: "translateY(0px)" }], { duration: 220, easing: "cubic-bezier(.2,.9,.3,1.2)" });
+        wrap.style.transform = ""; st.dim.style.opacity = "";
+      }
+      wrap.addEventListener("touchend", end);
+      wrap.addEventListener("touchcancel", end);
+    }
     function openVersePopup(it, row) {
       closeVersePopup(true);
       hideVerseTip();
+      let g = it.g == null ? -1 : Number(it.g);
+      if (!(g >= 0)) { g = 0; for (let i = 0; i < vlVerses.length; i++) if (vlVerses[i].f === it.f) { g = vlVerses[i].g | 0; break; } }
       const dim = document.createElement("div");
       dim.className = "vp-dim";
       const born = Date.now();
-      dim.onclick = function(e) { e.stopPropagation(); if (Date.now() - born > 350) closeVersePopup(); };   // the lift-off of a hold is not a tap
+      dim.onclick = function(e) { e.stopPropagation(); if (Date.now() - born > 350 && !(vpState && vpState.swipedAt && Date.now() - vpState.swipedAt < 400)) closeVersePopup(); };   // the lift-off of a hold is not a tap
       const wrap = document.createElement("div");
       wrap.className = "vp-wrap";
       wrap.setAttribute("role", "dialog");
       wrap.setAttribute("aria-label", it.f);
       const pop = document.createElement("div");
       pop.className = "vp-pop";
+      if (g >= 1 && g <= 8) { pop.classList.add("ranked", "rank-" + g); wrap.classList.add("ranked", "rank-" + g); }
+      // header like a review card's: the reference (with its version tag), the rank pill under it, the close button at the right
       const head = document.createElement("div");
       head.className = "vp-h";
-      const title = document.createElement("b");
+      const rrow = document.createElement("div");
+      rrow.className = "ref-header-row";
+      const title = document.createElement("span");
+      title.className = "ref-header";
       title.textContent = it.f;
-      head.appendChild(title);
+      rrow.appendChild(title);
       const ver = (it.v || "").trim();
-      if (ver && ver.toUpperCase() !== "ESV") { const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = ver; head.appendChild(vb); }
-      const sp = document.createElement("span"); sp.className = "vp-sp"; head.appendChild(sp);
+      if (ver && ver.toUpperCase() !== "ESV") { const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = ver; rrow.appendChild(vb); }
+      head.appendChild(rrow);
+      const pillRow = document.createElement("div");
+      pillRow.className = "vp-pill";
+      pillRow.appendChild(makePill(g));
+      head.appendChild(pillRow);
       const x = document.createElement("button");
-      x.type = "button"; x.className = "vp-x"; x.textContent = "\u2715"; x.setAttribute("aria-label", "Close");
+      x.type = "button"; x.className = "vp-x"; x.textContent = "✕"; x.setAttribute("aria-label", "Close");
       x.onclick = function(e) { e.stopPropagation(); closeVersePopup(); };
       head.appendChild(x);
-      const tabs = document.createElement("div");
-      tabs.className = "vp-tabs";
-      const tabV = document.createElement("button"); tabV.type = "button"; tabV.className = "vp-tab on"; tabV.textContent = "Verse";
-      const tabB = document.createElement("button"); tabB.type = "button"; tabB.className = "vp-tab"; tabB.appendChild(document.createTextNode("Background"));
-      const ul = document.createElement("i"); ul.className = "vp-ul";
-      tabs.appendChild(tabV); tabs.appendChild(tabB); tabs.appendChild(ul);
+      // the verse box: a small label row (left: what is showing, right: a grey dot once a Background exists), then the text
       const body = document.createElement("div");
       body.className = "vp-body";
-      const paneV = document.createElement("div"); paneV.className = "vp-pane vp-verse pv-text";
+      const box = document.createElement("div");
+      box.className = "vp-box";
+      const bar = document.createElement("div");
+      bar.className = "passage-toolbar";
+      const label = document.createElement("span"); label.className = "passage-status"; label.textContent = "Verse";
+      const flag = document.createElement("span"); flag.className = "vp-flag";
+      bar.appendChild(label); bar.appendChild(flag);
+      const paneV = document.createElement("div"); paneV.className = "vp-pane vp-verse pv-text passage-stream";
       fillVerseText(paneV, it);
       const paneB = document.createElement("div"); paneB.className = "vp-pane vp-bgp"; paneB.style.display = "none";
       const scroll = document.createElement("div"); scroll.className = "ctx-scroll"; paneB.appendChild(scroll);
-      body.appendChild(paneV); body.appendChild(paneB);
-      pop.appendChild(head); pop.appendChild(tabs); pop.appendChild(body);
+      box.appendChild(bar); box.appendChild(paneV); box.appendChild(paneB);
+      body.appendChild(box);
+      pop.appendChild(head); pop.appendChild(body);
       wrap.appendChild(pop);
       document.body.appendChild(dim); document.body.appendChild(wrap);
-      const st = { dim: dim, wrap: wrap, pop: pop, row: row, ref: it.f, tabBg: tabB, dot: null, loaded: false };
+      const st = { dim: dim, wrap: wrap, pop: pop, body: body, row: row, ref: it.f, flag: flag, dot: null, loaded: false, showing: "verse" };
       vpState = st;
-      if (hasBackground(it.f)) { const d = document.createElement("i"); d.className = "vp-dot"; tabB.appendChild(d); st.dot = d; }
+      function setDot() {
+        flag.textContent = "";
+        st.dot = null;
+        if (st.showing === "verse") {
+          if (hasBackground(it.f)) { const d = document.createElement("i"); d.className = "vp-dot"; flag.appendChild(d); st.dot = d; }
+        } else {
+          const bk = document.createElement("button"); bk.type = "button"; bk.className = "vp-back"; bk.textContent = "Verse";
+          bk.onclick = function(e) { e.stopPropagation(); show("verse"); };
+          flag.appendChild(bk);
+        }
+      }
       // sized to fit, near the row it came from
       const top0 = Math.max(50, Math.round(window.innerHeight * 0.12));
       wrap.style.top = top0 + "px";
       const tabH = (document.getElementById("tabbar") || {}).offsetHeight || 54;
       const room = window.innerHeight - tabH - 24;
-      body.style.maxHeight = Math.max(160, room - top0 - head.offsetHeight - tabs.offsetHeight) + "px";
+      body.style.maxHeight = Math.max(160, room - top0 - head.offsetHeight) + "px";
       const rr = row && row.isConnected ? row.getBoundingClientRect() : null;
       if (rr) {
         const h = wrap.offsetHeight;
@@ -2492,9 +2571,11 @@
       }
       function show(which) {
         const bg = which === "bg";
-        tabV.classList.toggle("on", !bg); tabB.classList.toggle("on", bg);
-        ul.classList.toggle("bg", bg);
+        if ((st.showing === "bg") === bg) return;
+        st.showing = bg ? "bg" : "verse";
+        label.textContent = bg ? "Background" : "Verse";
         paneV.style.display = bg ? "none" : ""; paneB.style.display = bg ? "" : "none";
+        setDot();
         const p = bg ? paneB : paneV;
         p.classList.remove("in"); void p.offsetWidth; p.classList.add("in");
         body.scrollTop = 0;
@@ -2504,17 +2585,21 @@
           if (ctxCache[it.f]) ctxRender(paneB, card, { text: ctxCache[it.f] }, false); else ctxLoad(paneB, card, false);
         }
       }
-      tabV.onclick = function(e) { e.stopPropagation(); show("verse"); };
-      tabB.onclick = function(e) { e.stopPropagation(); show("bg"); };
+      st.show = show;
+      setDot();
+      // hold the reference to flip between the verse and its Background (the same gesture as on a review card)
+      const heldTitle = attachLongPress(rrow, function() { show(st.showing === "bg" ? "verse" : "bg"); });
+      rrow.addEventListener("click", function(e) { e.stopPropagation(); heldTitle(); });
+      attachPopupSwipe(st);
       // opens out of the row it came from: the card starts as the row's own shape and grows
       const pr = pop.getBoundingClientRect();
       if (pop.animate && rr) {
         dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, fill: "both" });
         pop.animate([
           { clipPath: "inset(" + (rr.top - pr.top) + "px " + (pr.right - rr.right) + "px " + (pr.bottom - rr.bottom) + "px " + (rr.left - pr.left) + "px round 0px)" },
-          { clipPath: "inset(0px 0px 0px 0px round 22px)" }
+          { clipPath: "inset(0px 0px 0px 0px round 20px)" }
         ], { duration: 500, easing: "cubic-bezier(.25,.85,.25,1)", fill: "both" });
-        [head, tabs, body].forEach(function(e) { e.animate([{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }], { duration: 550, easing: "ease", fill: "both" }); });
+        [head, body].forEach(function(e) { e.animate([{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }], { duration: 550, easing: "ease", fill: "both" }); });
       }
     }
     function showVerseTip(item, words) {
@@ -2664,7 +2749,7 @@
         let snip = vlSnippet(v.x || "", res.raw, false);
         let isFull = false;
         item.appendChild(snip);
-        const heldHit = attachLongPress(item, function() { hideVerseTip(); openVersePopup({ f: v.f, v: v.v, t: v.t || v.x }, item); });   // hold: the full verse and its Background
+        const heldHit = attachLongPress(item, function() { hideVerseTip(); openVersePopup({ f: v.f, g: v.g, v: v.v, t: v.t || v.x }, item); });   // hold: the full verse and its Background
         item.onclick = function() { // tap to read the whole verse, tap again to collapse
           if (heldHit()) return;
           isFull = !isFull;
@@ -2844,7 +2929,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-234';
+    const CLIENT_BUILD = 'sync-235';
 
     let queue = [];
     let currentIndex = 0;
@@ -5138,13 +5223,13 @@
         const heldStat = attachLongPress(row, function() {
           hideVerseTip();
           const info = verseInfoFor(it.f);
-          openVersePopup({ f: it.f, v: info.v, t: info.t }, row);
+          openVersePopup({ f: it.f, g: it.g, v: info.v, t: info.t }, row);
         });
         row.onclick = function(ev) {
           ev.stopPropagation();
           if (heldStat()) return;
           const info = verseInfoFor(it.f);
-          if (row.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: it.f, v: info.v, t: info.t }, row); return; }   // a second tap while the peek shows opens it
+          if (row.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: it.f, g: it.g, v: info.v, t: info.t }, row); return; }   // a second tap while the peek shows opens it
           showVerseTip(row, info.w);
         };
         inner.appendChild(row);
