@@ -1868,14 +1868,22 @@
     });
 
     // Fetches the verse list and keeps it in vlVerses (sorted in Bible order); the Verses tab and the Upcoming sheet both use it.
+    // The searchable form of a verse's text: verse markers and extra spacing removed (the server no longer sends it a second time).
+    function plainVerse(t) { return String(t || "").replace(/\[\d+\]/g, " ").replace(/\s+/g, " ").trim(); }
+    let vlSig = "", vlSigCount = -1;
+    // done(changed): changed is false when the list from the server is the same as the one already on screen, so callers can skip a second draw.
     function loadVlVerses(done, failed) {
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { failed(); return; }
-          vlVerses = res.verses.map(function(v) { return { f: v.f, g: v.g, p: parseRef(v.f), n: textVerses(v.t, v.f), pn: textVerses(v.t, v.f), v: v.v || "", w: v.w || "", x: v.x || "", t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0 }; });
+          const sig = JSON.stringify(res.verses);
+          if (sig === vlSig && vlVerses.length === vlSigCount) { done(false); return; }
+          vlSig = sig;
+          vlVerses = res.verses.map(function(v) { const nv = textVerses(v.t, v.f); return { f: v.f, g: v.g, p: parseRef(v.f), n: nv, pn: nv, v: v.v || "", w: v.w || "", x: v.x || plainVerse(v.t), t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0 }; });
           vlVerses.sort(compareVerses);
+          vlSigCount = vlVerses.length;
           setTreasury(treasuryTotal());
-          done();
+          done(true);
         })
         .withFailureHandler(failed)
         .getVerseList();
@@ -1889,7 +1897,7 @@
       updateVlControls();
       // the map is on screen at once: the list from last time, or empty tiles that fill in when the list arrives (so nothing jumps)
       if (vlVerses.length) renderVerseList(); else renderVerseList(true);
-      loadVlVerses(function() { renderVerseList(); }, function() { if (!vlVerses.length) vlListNote("Couldn't load."); });
+      loadVlVerses(function(changed) { if (changed) renderVerseList(); }, function() { if (!vlVerses.length) vlListNote("Couldn't load."); });
     }
     function vlListNote(msg) {
       const box = document.getElementById("vlList");
@@ -2324,6 +2332,14 @@
       } catch (x) {}
     }
     const LONG_PRESS_MS = 350;
+    // keep selection blocked until the finger is fully up (the popup opens under it). One pair of window listeners serves every element:
+    // adding a pair per row made them pile up each time a list was drawn.
+    let lpWindowBound = false;
+    function bindLongPressWindow() {
+      if (lpWindowBound) return;
+      lpWindowBound = true;
+      ["pointerup", "pointercancel"].forEach(function(n) { window.addEventListener(n, function() { setTimeout(function() { document.body.classList.remove("lp-active"); clearPageSelection(); }, 400); }); });
+    }
     function attachLongPress(el, onHold, canStart) {
       let timer = null, sx = 0, sy = 0, fired = false;
       function cancel() { if (timer) { clearTimeout(timer); timer = null; } el.classList.remove("lp-down"); }
@@ -2339,8 +2355,7 @@
         if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
       });
       ["pointerup", "pointercancel", "pointerleave"].forEach(function(n) { el.addEventListener(n, cancel); });
-      // keep selection blocked until the finger is fully up (the popup opens under it)
-      ["pointerup", "pointercancel"].forEach(function(n) { window.addEventListener(n, function() { setTimeout(function() { document.body.classList.remove("lp-active"); clearPageSelection(); }, 400); }); });
+      bindLongPressWindow();
       el.addEventListener("selectstart", function(e) { if (timer || fired) e.preventDefault(); });
       el.addEventListener("contextmenu", function(e) { if (timer || fired) e.preventDefault(); });
       return function held() { const f = fired; fired = false; return f; };
@@ -2934,7 +2949,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-238';
+    const CLIENT_BUILD = 'sync-239';
 
     let queue = [];
     let currentIndex = 0;
