@@ -3081,7 +3081,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-261';
+    const CLIENT_BUILD = 'sync-262';
 
     let queue = [];
     let currentIndex = 0;
@@ -3574,6 +3574,7 @@
 
     // "Saving…" appears only when a save is taking longer than a few seconds, so you know not to close the app yet.
     // "Update ready" appears when the server says a newer copy of this page exists than the one the phone is showing.
+    const SAVING_SHOW_MS = 12000;   // "Saving…" only appears when a save is really stuck; a normal save (a second or two, even a slow one) stays silent
     let savingTimer = null, savingShown = false, updateReady = false, reloadFailed = false;
     function noteClientBuild(n) {
       diag.expects = Number(n) || 0;
@@ -3601,7 +3602,7 @@
       const el = document.getElementById("syncWarning");
       if (!el) return;
       if (!submitFailed && problemCount === 0 && pendingCount() > 0) {
-        if (!savingTimer && !savingShown) savingTimer = setTimeout(function() { savingTimer = null; savingShown = true; updateSyncWarning(); }, 3000);
+        if (!savingTimer && !savingShown) savingTimer = setTimeout(function() { savingTimer = null; savingShown = true; updateSyncWarning(); }, SAVING_SHOW_MS);
       } else {
         if (savingTimer) { clearTimeout(savingTimer); savingTimer = null; }
         savingShown = false;
