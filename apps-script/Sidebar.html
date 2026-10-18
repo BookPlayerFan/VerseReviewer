@@ -583,7 +583,7 @@
     .card.ranked .pip { color: var(--rc); }
     .pips-container.late-1 .pip { color: #f59e0b; }
     .pip.pop { animation: pipPop 0.42s ease-out both; }
-    .pip.grow { animation: pipGrow 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.4) both; animation-delay: calc(var(--k, 0) * 0.1s); }
+    .pip.grow { animation: pipGrow 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.4) both; animation-delay: calc(var(--k, 0) * 0.14s); }
     @keyframes pipGrow { from { transform: scale(0); opacity: 0; } }
     @keyframes pipPop {
       0% { transform: scale(1.25); background: transparent; border-color: currentColor; }
@@ -1528,8 +1528,8 @@
       luSkipFn = null;
       if (luOverlay) { luOverlay.remove(); luOverlay = null; }
     }
-    // Higher ranks get a longer moment: Bronze-Gold 2.0 s, Platinum/Sapphire 2.6 s, Emerald/Ruby 3.2 s, Diamond 4.0 s.
-    function luMs(g) { return g >= 8 ? 4000 : g >= 6 ? 3200 : g >= 4 ? 2600 : LEVELUP_MS; }
+    // Higher ranks get a longer moment: Bronze-Gold 2.6 s, Platinum/Sapphire 3.2 s, Emerald/Ruby 3.8 s, Diamond 4.6 s (a tap skips it).
+    function luMs(g) { return g >= 8 ? 4600 : g >= 6 ? 3800 : g >= 4 ? 3200 : LEVELUP_MS; }
     // Runs the fade-out and then finish() after ms; a tap (after the first 0.4 s) fades out at once and finishes right after.
     function levelUpThen(ms, finish) {
       const born = Date.now();
@@ -2943,7 +2943,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-241';
+    const CLIENT_BUILD = 'sync-242';
 
     let queue = [];
     let currentIndex = 0;
@@ -4570,7 +4570,8 @@
     function animateOut() { fadeCardContent(); }
 
     let practicing = false; // a practice round started from the Review Complete screen is running
-    const LEVELUP_MS = 2000; // how long the card shows its new rank before moving on
+    const LEVELUP_MS = 2600; // how long the card shows its new rank before moving on
+    const PROMOTE_MS = 3400; // a New verse promoted to Bronze gets the longest Bronze moment
     const LU_FADE_MS = 350;  // the rank-up overlay fades away over this long at the end
 
     function advanceAfter(ms) {
@@ -4617,14 +4618,14 @@
         const go = function() {
           if (startedIn !== epoch) return;
           playLevelUp(1, 1, "Promoted \u2713");
-          levelUpThen(luMs(1), function() {
+          levelUpThen(PROMOTE_MS, function() {
             if (startedIn !== epoch) return;
             document.getElementById("toastNotice").textContent = "";
             render();
           });
         };
         // the PM ring fills in, then both dots turn green as the rank-up fades in over them
-        if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(go, PIP_FILL_MS + 450); } else go();
+        if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(go, PIP_FILL_MS + 900); } else go();
       } else if (kind !== 'skip' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
         // The seventh rep: its dot fills, every dot turns green in a wave, then the card moves on (to the next verse, or to Lock).
         const startedIn = epoch;
@@ -4898,7 +4899,7 @@
       if (!pips.length || !pips[0].animate) { done(); return; }
       const mid = (pips.length - 1) / 2;
       pips.forEach(function(p, i) {
-        p.animate([{ transform: "scale(1.15)", opacity: 1 }, { transform: "scale(0)", opacity: 0 }], { duration: 300, delay: Math.round(Math.abs(i - mid) * 50), easing: "ease-in", fill: "forwards" });
+        p.animate([{ transform: "scale(1.15)", opacity: 1 }, { transform: "scale(0)", opacity: 0 }], { duration: 450, delay: Math.round(Math.abs(i - mid) * 75), easing: "ease-in", fill: "forwards" });
       });
       if (toLock && pill) {
         const accent = (getComputedStyle(document.documentElement).getPropertyValue("--text-accent") || "").trim() || "#1a73e8";
@@ -4907,15 +4908,15 @@
         const span = document.createElement("span");
         span.style.display = "inline-block";
         span.textContent = pill.textContent; pill.textContent = ""; pill.appendChild(span);
-        span.animate([{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(-5px)" }], { duration: 200, easing: "ease-in", fill: "forwards" });
+        span.animate([{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(-5px)" }], { duration: 300, easing: "ease-in", fill: "forwards" });
         setTimeout(function() {
           span.innerHTML = LOCK_SVG + "Lock";
-          span.animate([{ opacity: 0, transform: "translateY(5px)" }, { opacity: 1, transform: "none" }], { duration: 200, easing: "ease-out", fill: "both" });
-        }, 200);
-        pill.animate([{ transform: "scale(1)" }, { transform: "scale(1.14)", offset: 0.45 }, { transform: "scale(1)" }], { duration: 500, easing: "ease-out" });
-        pill.animate([from, { color: accent, borderColor: "color-mix(in srgb, " + accent + " 45%, transparent)", backgroundColor: "color-mix(in srgb, " + accent + " 12%, transparent)" }], { duration: 500, easing: "ease-out", fill: "forwards" });
+          span.animate([{ opacity: 0, transform: "translateY(5px)" }, { opacity: 1, transform: "none" }], { duration: 300, easing: "ease-out", fill: "both" });
+        }, 300);
+        pill.animate([{ transform: "scale(1)" }, { transform: "scale(1.14)", offset: 0.45 }, { transform: "scale(1)" }], { duration: 750, easing: "ease-out" });
+        pill.animate([from, { color: accent, borderColor: "color-mix(in srgb, " + accent + " 45%, transparent)", backgroundColor: "color-mix(in srgb, " + accent + " 12%, transparent)" }], { duration: 750, easing: "ease-out", fill: "forwards" });
       }
-      setTimeout(done, 420);
+      setTimeout(done, 640);
     }
     // A review card's last rep: the full dots lift into the rank badge and disappear; then the rank-up plays.
     function pipsIntoBadge(done) {
@@ -4930,8 +4931,8 @@
       });
       setTimeout(done, 300 + (pips.length - 1) * 70 + 40);
     }
-    // Every dot is full: they turn green one after another in a wave, the pill flashes green, then it all settles back. Runs about 1.3 seconds.
-    const PIP_FINALE_MS = 1300;
+    // Every dot is full: they turn green one after another in a wave, the pill flashes green, then it all settles back. Runs about 1.7 seconds.
+    const PIP_FINALE_MS = 1700;
     function pipFinale() {
       const pips = document.getElementById("cardPips");
       const list = pips.querySelectorAll(".pip");
