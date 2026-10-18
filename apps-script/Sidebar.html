@@ -438,10 +438,9 @@
     .pk-x .cal-d { width: 30px; height: 30px; font-size: 13px; border-radius: 8px; pointer-events: none; }
     .pk-x b { font-weight: 700; }
     .pk-x small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 1px; }
-    /* End of a scrolling list: a soft fade at the bottom edge while there is more below, and a divider with "End" after the last row. Neither shows when the list fits. */
-    .end-mark { display: none; align-items: center; gap: 10px; padding: 12px 14px 14px; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
+    /* End of a list: a divider with "End" after the last row, always, so every list ends the same way; and a soft fade at the bottom edge while a scrolling list has more below. */
+    .end-mark { display: flex; align-items: center; gap: 10px; padding: 12px 14px 14px; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
     .end-mark i { flex: 1; height: 1px; background: var(--border-card); }
-    .scrolls > .end-mark { display: flex; }
     .scrolls::after { content: ""; display: block; position: sticky; bottom: 0; height: 30px; margin-top: -30px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--fade, var(--bg-card))); opacity: 0; transition: opacity .15s; }
     .scrolls.more::after { opacity: 1; }
     .fail-inner { --fade: var(--bg-body); }
@@ -2104,6 +2103,7 @@
         row.appendChild(rf); row.appendChild(makePill(v.g)); b.appendChild(row);
       });
       document.body.appendChild(b);
+      endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " review" : " reviews"));   // before measuring, so the marker's room is counted
       // below the tile, or above it, whichever has room (the card scrolls if the list is long)
       const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
       const below = bottomLimit - (r.bottom + 10), above = r.top - 10 - 10;
@@ -2114,7 +2114,6 @@
       else { top = 10; maxH = above - 2; }
       if (maxH) b.style.maxHeight = maxH + "px";
       b.style.top = top + "px";
-      endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " review" : " reviews"));
     }
     // The days and their dates show at once; the counts and bars fill in when the numbers arrive (shown straight away if they were loaded already).
     function openUpcoming() {
@@ -2948,7 +2947,7 @@
       if (!el || !window.MutationObserver) return;
       const obs = new MutationObserver(function() {
         obs.takeRecords();
-        const n = Array.prototype.filter.call(el.children, function(c) { return !c.classList.contains("end-mark"); }).length;
+        const n = Array.prototype.filter.call(el.children, function(c) { return !c.classList.contains("end-mark") && !c.classList.contains("picker-empty"); }).length;
         endCue(el, n ? "End of list" : null);
         obs.takeRecords();
       });
@@ -2988,6 +2987,7 @@
       vs.forEach(function(v) { wrap.appendChild(vlItem(v, true)); });
       b.appendChild(wrap);
       document.body.appendChild(b);
+      endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " reference" : " references"));   // before measuring, so the marker's room is counted
       // below the tile, or above it, whichever has room (the card scrolls if the list is long)
       const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
       const below = bottomLimit - (r.bottom + 10), above = r.top - 10 - 10;
@@ -2998,7 +2998,6 @@
       else { top = 10; maxH = above - 2; }
       if (maxH) b.style.maxHeight = maxH + "px";
       b.style.top = top + "px";
-      endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " reference" : " references"));
     }
     function closePeek() {
       ["pkDim", "pkTile", "pkBubble"].forEach(function(id) { const n = document.getElementById(id); if (n) n.remove(); });
@@ -3027,7 +3026,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-249';
+    const CLIENT_BUILD = 'sync-250';
 
     let queue = [];
     let currentIndex = 0;
