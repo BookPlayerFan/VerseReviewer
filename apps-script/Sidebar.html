@@ -438,6 +438,13 @@
     .pk-x .cal-d { width: 30px; height: 30px; font-size: 13px; border-radius: 8px; pointer-events: none; }
     .pk-x b { font-weight: 700; }
     .pk-x small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+    /* End of a scrolling list: a soft fade at the bottom edge while there is more below, and a divider with "End" after the last row. Neither shows when the list fits. */
+    .end-mark { display: none; align-items: center; gap: 10px; padding: 12px 14px 14px; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
+    .end-mark i { flex: 1; height: 1px; background: var(--border-card); }
+    .scrolls > .end-mark { display: flex; }
+    .scrolls::after { content: ""; display: block; position: sticky; bottom: 0; height: 30px; margin-top: -30px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--fade, var(--bg-card))); opacity: 0; transition: opacity .15s; }
+    .scrolls.more::after { opacity: 1; }
+    .fail-inner { --fade: var(--bg-body); }
     .pk-bubble.pk-day { left: 14px; right: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 20px; }
     .pk-day .pk-h { padding: 18px 20px 12px; }
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
@@ -1233,7 +1240,7 @@
     .picker-search { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px;
       border: 1px solid var(--border-card); border-radius: 10px; background: transparent;
       color: var(--text-primary); margin-bottom: 8px; }
-    .picker-list { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+    .picker-list { --fade: var(--bg-card); flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
     #treasuryView, #searchView, #upcomingView { touch-action: pan-y; }
     .picker-item { display: block; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0;
@@ -1441,6 +1448,7 @@
         <div class="help-row"><span>Press early, or skip ahead (New tab)</span><kbd>Hold the button</kbd></div>
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
         <div class="help-sub">Verse lists</div>
+        <div class="help-row"><span>Open a book on the map; switch books while one is open</span><kbd>Tap its tile</kbd></div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse</kbd></div>
         <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
@@ -2106,6 +2114,7 @@
       else { top = 10; maxH = above - 2; }
       if (maxH) b.style.maxHeight = maxH + "px";
       b.style.top = top + "px";
+      endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " review" : " reviews"));
     }
     // The days and their dates show at once; the counts and bars fill in when the numbers arrive (shown straight away if they were loaded already).
     function openUpcoming() {
@@ -2890,6 +2899,7 @@
             // tap (or hold): the book's tile lifts over the dimmed map and a card beside it lists its references
             const heldTile = attachLongPress(t, function() { peekBook(g.key, t); heldTile(); });
             t.onclick = function() { if (heldTile()) return; peekBook(g.key, t); };
+            t._openBook = function() { peekBook(g.key, t); };   // so a tap on this tile through an open book's dimmer switches to it
           } else t.textContent = b.abbr;
           grid.appendChild(t);
         });
@@ -2911,6 +2921,41 @@
       box.textContent = "";
     }
 
+    // The end-of-list cues (see .end-mark): marks a scrolling element as scrolling or not, and fades its bottom edge while there is more below.
+    // label: the text after the last row ("End \u00b7 14 references"); null for only the fade.
+    function endCue(el, label) {
+      if (!el) return;
+      let m = null;
+      for (let i = el.children.length - 1; i >= 0 && !m; i--) if (el.children[i].classList.contains("end-mark")) m = el.children[i];
+      if (label === null) { if (m) m.remove(); }
+      else {
+        if (!m) { m = document.createElement("div"); m.className = "end-mark"; m.appendChild(document.createElement("i")); m.appendChild(document.createElement("span")); m.appendChild(document.createElement("i")); }
+        m.children[1].textContent = label;
+        if (el.lastElementChild !== m) el.appendChild(m);
+      }
+      const upd = function() {
+        const sc = el.scrollHeight - el.clientHeight > 4;
+        el.classList.toggle("scrolls", sc);
+        el.classList.toggle("more", sc && el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+      };
+      if (!el._endBound) { el._endBound = true; el.addEventListener("scroll", upd, { passive: true }); }
+      if (!el._endRO && window.ResizeObserver) { el._endRO = new ResizeObserver(upd); el._endRO.observe(el); }   // a list shown after it was filled
+      upd(); requestAnimationFrame(upd); setTimeout(upd, 350);
+    }
+    // The page-level lists are rebuilt by several renderers, so one watcher puts the end marker back after each rebuild.
+    function watchEndCue(id) {
+      const el = document.getElementById(id);
+      if (!el || !window.MutationObserver) return;
+      const obs = new MutationObserver(function() {
+        obs.takeRecords();
+        const n = Array.prototype.filter.call(el.children, function(c) { return !c.classList.contains("end-mark"); }).length;
+        endCue(el, n ? "End of list" : null);
+        obs.takeRecords();
+      });
+      obs.observe(el, { childList: true });
+    }
+    ["svList", "upList", "trList", "pickerList"].forEach(watchEndCue);
+
     // Tap a book: its tile lifts over the dimmed map, and a card beside it lists its references. The card is only as tall as they need, below the tile
     // or above it (whichever has room), and scrolls when the list is long. Tap a reference for its first words, hold it for the whole verse.
     function peekBook(key, tile) {
@@ -2921,7 +2966,12 @@
       const born = Date.now();
       const dim = document.createElement("div");
       dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
-      dim.onclick = function(e) { e.stopPropagation(); if (Date.now() - born > 450) closePeek(); };   // the lift-off of a hold is not a tap
+      dim.onclick = function(e) {   // a tap on another book's tile switches straight to it; anywhere else closes
+        e.stopPropagation();
+        if (Date.now() - born <= 450) return;   // the lift-off of a hold is not a tap
+        const hit = (document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : []).find(function(n) { return n._openBook && n.id !== "pkTile"; });
+        if (hit && hit !== tile) hit._openBook(); else closePeek();   // the open book's own tile closes it
+      };
       document.body.appendChild(dim);
       const r = tile.getBoundingClientRect();
       const lift = tile.cloneNode(true);
@@ -2948,6 +2998,7 @@
       else { top = 10; maxH = above - 2; }
       if (maxH) b.style.maxHeight = maxH + "px";
       b.style.top = top + "px";
+      endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " reference" : " references"));
     }
     function closePeek() {
       ["pkDim", "pkTile", "pkBubble"].forEach(function(id) { const n = document.getElementById(id); if (n) n.remove(); });
@@ -2976,7 +3027,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-248';
+    const CLIENT_BUILD = 'sync-249';
 
     let queue = [];
     let currentIndex = 0;
@@ -5306,6 +5357,7 @@
       list.appendChild(head);
       list.appendChild(inner);
       list.style.display = "block";
+      endCue(inner, "End \u00b7 " + items.length + (items.length === 1 ? " verse" : " verses"));
     }
 
     // Refresh: saves anything pending, then asks the server for the current session.
@@ -5764,7 +5816,8 @@
         document.getElementById("helpTab" + p[1]).setAttribute("aria-selected", on ? "true" : "false");
         document.getElementById("helpPane" + p[1]).classList.toggle("on", on);
       });
-      document.getElementById("helpPane" + (helpTab === "info" ? "Info" : helpTab === "ctl" ? "Ctl" : "St")).scrollTop = 0;
+      const pane = document.getElementById("helpPane" + (helpTab === "info" ? "Info" : helpTab === "ctl" ? "Ctl" : "St"));
+      pane.scrollTop = 0; endCue(pane, null);
     }
     function toggleHelp(open) {
       open = !!open;
