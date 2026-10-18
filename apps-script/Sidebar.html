@@ -1118,6 +1118,7 @@
     .help-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
     .help-note { font-size: 12px; color: var(--text-muted); margin: 2px 0 4px; line-height: 1.35; }
     .help-row span { padding-right: 12px; }
+    .help-row kbd.nw { white-space: nowrap; max-width: none; }
     .help-row kbd { white-space: normal; text-align: right; max-width: 62%; flex-shrink: 0; font: 600 13px -apple-system, Helvetica, Arial, sans-serif; min-width: 26px; text-align: center; padding: 3px 8px; border-radius: 6px;
       background: var(--bg-body); border: 1px solid var(--border-card); border-bottom-width: 2px; color: var(--text-primary); }
     .pv-card { background: var(--bg-card); color: var(--text-primary); border-radius: 18px; width: 100%; max-width: 420px;
@@ -1415,13 +1416,13 @@
       </div>
       <div class="help-scroll" id="helpPaneInfo">
         <div class="help-sub">A new day starts at 4 AM</div>
-        <div class="help-row"><span>Learn opens</span><kbd>4 · 8 · 10 AM · 12 · 2 · 4 · 6 PM</kbd></div>
+        <div class="help-row"><span>Learn opens</span><kbd class="nw">4 · 8 · 10 AM · 12 · 2 · 4 · 6 PM</kbd></div>
         <div class="help-row"><span>Lock AM opens</span><kbd>4 AM</kbd></div>
         <div class="help-row"><span>Lock PM opens</span><kbd>6 PM</kbd></div>
         <div class="help-note">A verse added before noon starts today; after noon it waits for 4 AM tomorrow. A rep left an hour past opening is marked late (amber, then red) and is not made up.</div>
         <div class="help-sub">Notifications</div>
         <div class="help-row"><span>Reviews, plus the 4 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
-        <div class="help-row"><span>Learn, as each one opens</span><kbd>8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
+        <div class="help-row"><span>Learn at open</span><kbd class="nw">8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
         <div class="help-row"><span>The 6 PM Learn and Lock PM</span><kbd>8:00 PM</kbd></div>
         <div class="help-note">The 4 AM and 6 PM Learn do not notify when they open: the 4 AM ones ride the 6 AM notification and the 6 PM ones go out at 8 PM. Only sent when something is waiting; finishing early cancels what is left.</div>
       </div>
@@ -2975,7 +2976,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-247';
+    const CLIENT_BUILD = 'sync-248';
 
     let queue = [];
     let currentIndex = 0;
