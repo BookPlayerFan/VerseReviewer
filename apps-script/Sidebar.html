@@ -1223,10 +1223,6 @@
     .tr-pill b { color: var(--text-primary); font-weight: 800; }
     .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
     .tr-pill:active { opacity: 0.6; }
-    .pts-fly { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; will-change: transform; }
-    .pts-fly.chip { font-size: 20px; font-weight: 800; color: var(--text-accent); text-shadow: 0 0 10px color-mix(in srgb, var(--text-accent) 55%, transparent), 0 1px 2px rgba(0,0,0,.18); }
-    .pts-fly.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-accent); box-shadow: 0 0 8px color-mix(in srgb, var(--text-accent) 60%, transparent); }
-    .pts-fly.neg { color: var(--btn-fail-text); } .pts-fly.dot.neg { background: var(--btn-fail-text); box-shadow: 0 0 8px color-mix(in srgb, var(--btn-fail-text) 60%, transparent); }
     .tr-pill.fade-in { animation: noteFadeIn .35s ease-out both; }
     .tomorrow-note.fade-in { animation: noteFadeIn .35s ease-out both; }
     @keyframes noteFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -3060,7 +3056,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-254';
+    const CLIENT_BUILD = 'sync-255';
 
     let queue = [];
     let currentIndex = 0;
@@ -3847,7 +3843,7 @@
 
     // ── Treasury pill on Review Complete: total points and a way in ──
     let trPillAt = 0, trPillBusy = false;
-    let trFreeze = null;   // today's points held back from the pill's total until the Treasury count has flown into it (see runCountUp)
+    let trFreeze = null;   // today's points held back from the pill's total until the pill pumps (see runCountUp)
     let trTotal = null;   // the Treasury's total as the server last said (sent with the session and with every review), so the pill never waits for the verse list
     function setTreasury(n) {
       if (typeof n !== "number" || isNaN(n)) return;
@@ -3866,7 +3862,7 @@
       return pts;
     }
     function paintTreasuryPill(pts) {
-      if (trFreeze !== null && typeof pts === "number") pts -= trFreeze;   // today's points are held back until they have flown in
+      if (trFreeze !== null && typeof pts === "number") pts -= trFreeze;   // today's points are held back until the pill takes them
       const el = document.getElementById("trPill");
       const wasHidden = el.style.display === "none";
       const key = typeof pts === "number" ? String(pts) : "";
@@ -4867,9 +4863,12 @@
       const part = card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7";
       const late = lateNow(card).late, missed = card.missed || 0;
       let text, lv;
-      if (!late) { text = "on track"; lv = 0; }   // caught up: back to normal, whatever was waiting earlier
-      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is ready"; lv = 1; }
-      else { text = late + " reps ready"; lv = 1; }
+      // Reps pressed late earlier today are not made up, so the line says how far behind the day's schedule this verse is
+      // (the dots still go back to normal once nothing is waiting).
+      const behind = missed ? missed + " behind" : "";
+      if (!late) { text = behind || "on track"; lv = 0; }
+      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is ready" + (behind ? " · " + behind : ""); lv = 1; }
+      else { text = late + " reps ready" + (behind ? " · " + behind : ""); lv = 1; }
       return { text: part + " \u00b7 " + text, level: lv };
     }
     function predictLearn(card, kind) {
@@ -5157,48 +5156,31 @@
       el.classList.toggle("neg", v < 0);
       document.getElementById("statGradBox").classList.toggle("gold", v >= 10);
     }
-    const SUMMARY_SETTLE_MS = 800, FLY_MS = 950, PILL_COUNT_MS = 750, BADGE_DELAY_MS = 1200;
+    const SUMMARY_SETTLE_MS = 800, PUMP_MS = 2000, PILL_COUNT_MS = 1500, BADGE_DELAY_MS = 1200;
     function pillRepaint() { const p = document.getElementById("trPill"); if (p && p.style.display !== "none") paintTreasuryPill(knownTreasury()); }
-    // The counted points lift off the Treasury box and fly up into the pill at the top; the pill's total then counts up (or down) by that amount.
-    function flyPoints(pts, token, landed) {
-      const from = document.getElementById("statGraduated"), pill = document.getElementById("trPill");
-      const target = pill && pill.style.display !== "none" ? (pill.querySelector("b") || pill) : null;
-      if (!from || !target || !from.animate) { landed(); return; }
-      const a = from.getBoundingClientRect(), z = target.getBoundingClientRect();
-      const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = z.left + z.width / 2, y1 = z.top + z.height / 2;
-      const neg = pts < 0, nodes = [];
-      const mk = function(cls, text, delay) {
-        const n = document.createElement("div");
-        n.className = "pts-fly " + cls + (neg ? " neg" : ""); n.textContent = text;
-        document.body.appendChild(n); nodes.push(n);
-        const bow = (x0 < window.innerWidth / 2 ? 1 : -1) * 46;
-        const mid = "translate(" + Math.round((x0 + x1) / 2 + bow) + "px, " + Math.round((y0 + y1) / 2 - 20) + "px)";
-        const first = "translate(" + Math.round(x0) + "px, " + Math.round(y0) + "px)", last = "translate(" + Math.round(x1) + "px, " + Math.round(y1) + "px)";
-        return n.animate([
-          { transform: first + " translate(-50%, -50%) scale(1)", opacity: 1 },
-          { transform: mid + " translate(-50%, -50%) scale(1.25)", opacity: 1, offset: 0.45 },
-          { transform: last + " translate(-50%, -50%) scale(0.55)", opacity: cls === "dot" ? 0.2 : 0.9 }
-        ], { duration: FLY_MS, delay: delay, easing: "cubic-bezier(.45,.05,.55,.95)", fill: "both" });
-      };
-      for (let k = 4; k >= 1; k--) mk("dot", "", k * 55);
-      const main = mk("chip", fmtPts(pts), 0);
-      main.onfinish = function() { nodes.forEach(function(n) { n.remove(); }); landed(); };
-      main.oncancel = function() { nodes.forEach(function(n) { n.remove(); }); };
-      setTimeout(function() { if (token !== countUpToken) nodes.forEach(function(n) { n.remove(); }); }, FLY_MS + 400);
-    }
-    // The pill takes the points: its total counts to the new number with a small pulse.
-    function landPoints(pts, token) {
+    // The pill takes today's points: it swells gently with a soft glow while its total counts to the new number, then settles back.
+    function pumpPoints(pts, token) {
       trFreeze = null;
       const pill = document.getElementById("trPill"), total = knownTreasury();
       const b = pill && pill.style.display !== "none" ? pill.querySelector("b") : null;
       if (!b || typeof total !== "number") { pillRepaint(); return; }
-      const base = total - pts, t0 = Date.now();
-      if (pill.animate) pill.animate([{ transform: "translateX(-50%) scale(1)" }, { transform: "translateX(-50%) scale(1.14)", offset: 0.3 }, { transform: "translateX(-50%) scale(1)" }], { duration: 650, easing: "ease-out" });
+      const base = total - pts, t0 = Date.now(), up = pts > 0;
+      const glow = up ? "0 0 10px 1px color-mix(in srgb, var(--text-accent) 22%, transparent)" : "0 0 0 0 transparent", none = "0 0 0 0 transparent";
+      const sc = up ? 1.08 : 1.04;
+      if (pill.animate) pill.animate([
+        { transform: "translateX(-50%) scale(1)", boxShadow: none },
+        { transform: "translateX(-50%) scale(" + sc + ")", boxShadow: glow, offset: 0.25 },
+        { transform: "translateX(-50%) scale(" + sc + ")", boxShadow: glow, offset: 0.75 },
+        { transform: "translateX(-50%) scale(1)", boxShadow: none }
+      ], { duration: PUMP_MS, easing: "ease-in-out" });
+      if (up) { b.style.transition = "color .3s"; b.style.color = "var(--text-accent)"; }
       (function step() {
-        if (token !== countUpToken) { pillRepaint(); return; }
+        if (token !== countUpToken) { b.style.color = ""; pillRepaint(); return; }
         const x = Math.min(1, (Date.now() - t0) / PILL_COUNT_MS);
         b.textContent = Math.round(base + pts * (1 - Math.pow(1 - x, 3))).toLocaleString("en-US");
-        if (x < 1) setTimeout(step, 33); else pillRepaint();
+        if (x < 1) { setTimeout(step, 33); return; }
+        b.style.color = "";
+        pillRepaint();
       })();
     }
     function runCountUp() {
@@ -5211,29 +5193,28 @@
       const gold = document.getElementById("statGradBox");
       const token = ++countUpToken;
       // The numbers wait (showing 0) until the screen has fully settled, then count up a little slower; a big number does not drag on (capped at 1.8 s).
-      // Order: Reviewed, then Treasury points; those fly into the pill at the top and the pill's total moves; only then do the Missed count and the badge come.
+      // Order: Reviewed, then Treasury points; then the pill at the top pumps and its total counts up (or down) by those points; only then do the Missed count and the badge come.
       const GAP = 200, start = Date.now() + SUMMARY_SETTLE_MS;
-      const flyOn = pts !== 0 && typeof knownTreasury() === "number";
-      const plan = []; let t = 0, flyAt = -1, endAt = 0;
+      const pumpOn = pts !== 0 && typeof knownTreasury() === "number";
+      const plan = []; let t = 0, pumpAt = -1, endAt = 0;
       items.forEach(function(it) {
         const d = it[1] > 0 ? Math.min(1800, 1000 + it[1] * 50) : (it[0] === "statGraduated" && it[1] < 0 ? 900 : 0);
         plan.push({ id: it[0], v: it[1], from: t, d: d });
         t += d + (d > 0 ? GAP : 0);
-        if (it[0] === "statGraduated" && flyOn) { flyAt = t; t += FLY_MS + PILL_COUNT_MS + 250; }
+        if (it[0] === "statGraduated" && pumpOn) { pumpAt = t; t += PUMP_MS + 250; }
       });
       endAt = t;
-      if (flyOn) { trFreeze = pts; pillRepaint(); }
+      if (pumpOn) { trFreeze = pts; pillRepaint(); }
       plan.forEach(function(p) { show(p.id, 0); });
       document.getElementById("statGraduated").classList.toggle("neg", pts < 0);
       gold.classList.remove("gold");
       const flawlessEl = document.getElementById("flawlessBadge");
       flawlessEl.classList.remove("pop");
       flawlessEl.style.display = "none";
-      let flown = false;
+      let pumped = false;
       function finish() {
         plan.forEach(function(p) { show(p.id, p.v); });
         gold.classList.toggle("gold", pts >= 10);
-        document.querySelectorAll(".pts-fly").forEach(function(n) { n.remove(); });
         if (trFreeze !== null) { trFreeze = null; pillRepaint(); }
         if (token === countUpToken) showFlawlessBadge(false);
       }
@@ -5248,7 +5229,7 @@
           else { const x = (now - p.from) / p.d; v = Math.round(p.v * (1 - Math.pow(1 - x, 3))); }
           show(p.id, v);
         });
-        if (flyOn && !flown && now >= flyAt) { flown = true; flyPoints(pts, token, function() { landPoints(pts, token); }); }
+        if (pumpOn && !pumped && now >= pumpAt) { pumped = true; pumpPoints(pts, token); }
         gold.classList.toggle("gold", (parseInt(document.getElementById("statGraduated").textContent, 10) || 0) >= 10);
         if (now < endAt) { setTimeout(tick, 33); return; }
         setTimeout(function() { if (token === countUpToken && summary.style.display !== "none") showFlawlessBadge(true); }, BADGE_DELAY_MS);   // a beat before the badge pops in
