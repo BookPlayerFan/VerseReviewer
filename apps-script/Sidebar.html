@@ -1223,6 +1223,9 @@
     .tr-pill b { color: var(--text-primary); font-weight: 800; }
     .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
     .tr-pill:active { opacity: 0.6; }
+    .tr-pill.fade-in { animation: noteFadeIn .35s ease-out both; }
+    .tomorrow-note.fade-in { animation: noteFadeIn .35s ease-out both; }
+    @keyframes noteFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     /* Simple "pick a verse" sheet */
     .picker {
@@ -3026,7 +3029,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-251';
+    const CLIENT_BUILD = 'sync-252';
 
     let queue = [];
     let currentIndex = 0;
@@ -3407,8 +3410,9 @@
           learnPending = false;
           if (res && res.ok) {
             if (typeof res.version === 'number') sessionVersion = res.version;
-            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); renderTomorrowNote(); }
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); }
             outbox.shift();
+            renderTomorrowNote();
             schedulePushSync("learn");
             if (res.promoted) {
               // Normally the card is already gone (the Promote animation). After a resend it is still on screen, so take it off.
@@ -3468,8 +3472,9 @@
           inFlight = false;
           if (res && res.ok) {
             sessionVersion = res.version;
-            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); renderTomorrowNote(); }
+            if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); }
             outbox.shift();
+            renderTomorrowNote();
             if (item.review) schedulePushSync("review");
             if (res.undoId && outbox.length === 0) showUndo(res.undoId);
             pumpOutbox();
@@ -3830,11 +3835,17 @@
     }
     function paintTreasuryPill(pts) {
       const el = document.getElementById("trPill");
-      el.textContent = "";
-      if (typeof pts === "number") { const a = document.createElement("span"); a.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> pts"; el.appendChild(a); }
-      const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury \u203A"; el.appendChild(g);
-      el.setAttribute("aria-label", (typeof pts === "number" ? "Treasury, " + pts + " points. " : "Treasury. ") + "Open");
+      const wasHidden = el.style.display === "none";
+      const key = typeof pts === "number" ? String(pts) : "";
+      if (wasHidden || el.getAttribute("data-pts") !== key) {   // rebuilt only when the number changes, so a refresh with the same total does not blink
+        el.textContent = "";
+        if (typeof pts === "number") { const a = document.createElement("span"); a.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> pts"; el.appendChild(a); }
+        const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury \u203A"; el.appendChild(g);
+        el.setAttribute("aria-label", (typeof pts === "number" ? "Treasury, " + pts + " points. " : "Treasury. ") + "Open");
+        el.setAttribute("data-pts", key);
+      }
       el.style.display = "inline-flex";
+      if (wasHidden) { el.classList.remove("fade-in"); void el.offsetWidth; el.classList.add("fade-in"); }
     }
     function renderTreasuryPill(show) {
       const el = document.getElementById("trPill");
@@ -3938,12 +3949,22 @@
         document.getElementById("btnAddVerse").style.display === "none" &&
         document.getElementById("btnRestart").style.display === "none" &&
         mode !== 'learning';
-      renderTreasuryPill(onComplete);
-      if (!onComplete || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
-      el.textContent = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
-      el.className = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
+      // The pill and the note wait for the last review's answer (it carries the new Treasury total and tomorrow's load), so they appear once,
+      // already right, instead of showing old numbers and changing colour a moment later. A slow answer does not hold them past 4 seconds.
+      if (!onComplete) { noteHoldOver = false; clearTimeout(noteHoldTimer); noteHoldTimer = null; }
+      else if (pendingCount() > 0 && !noteHoldOver && !noteHoldTimer) noteHoldTimer = setTimeout(function() { noteHoldTimer = null; noteHoldOver = true; renderTomorrowNote(); }, 4000);
+      const ready = onComplete && (pendingCount() === 0 || noteHoldOver);
+      renderTreasuryPill(ready);
+      if (!ready || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
+      const wasHidden = el.style.display === "none";
+      const label = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
+      const cls = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
+      if (el.textContent !== label) el.textContent = label;
+      if (el.className.replace(" fade-in", "") !== cls) el.className = cls;
       el.style.display = "block";
+      if (wasHidden) { el.classList.remove("fade-in"); void el.offsetWidth; el.classList.add("fade-in"); }
     }
+    let noteHoldOver = false, noteHoldTimer = null;
 
     // Short message that works on both the card and summary screens.
     function flashNotice(msg) {
@@ -4971,13 +4992,14 @@
         animateOut();
         advanceAfter(REPEAT_SWAP_MS);
       } else {
-        if (action === "Pass") fillCurrentPip();
-        animateOut();
-        advanceAfter(PASS_SWAP_MS);
+        // a Pass that is not a level-up: the rep's ring fills in and stays a moment before the card goes
+        const startedIn = epoch;
+        const leave = function() { if (startedIn !== epoch) return; animateOut(); advanceAfter(PASS_SWAP_MS); };
+        if (action === "Pass" && fillCurrentPip()) setTimeout(leave, PASS_FILL_HOLD_MS); else leave();
       }
     }
     // The rep just passed: its ring fills in before the card goes.
-    const PIP_FILL_MS = 380;
+    const PIP_FILL_MS = 380, PASS_FILL_HOLD_MS = 650;
     function fillCurrentPip() {
       const cur = document.querySelector("#cardPips .pip.cur");
       if (!cur) return false;
@@ -5102,6 +5124,7 @@
       el.classList.toggle("neg", v < 0);
       document.getElementById("statGradBox").classList.toggle("gold", v >= 10);
     }
+    const SUMMARY_SETTLE_MS = 800;
     function runCountUp() {
       const items = [
         ["statReviewed", sessionStats.reviewed],
@@ -5110,11 +5133,11 @@
       const show = function(id, v) { document.getElementById(id).textContent = id === "statGraduated" ? fmtPts(v) : v; };
       const gold = document.getElementById("statGradBox");
       const token = ++countUpToken;
-      const DUR = 900, GAP = 100;
-      let start = Date.now();
+      // The numbers wait (showing 0) until the screen has fully settled, then count up a little slower; a big number does not drag on (capped at 1.8 s).
+      const GAP = 200, start = Date.now() + SUMMARY_SETTLE_MS;
       const plan = []; let t = 0;
       items.forEach(function(it) {
-        const d = it[1] > 0 ? DUR : 0;
+        const d = it[1] > 0 ? Math.min(1800, 1000 + it[1] * 50) : 0;
         plan.push({ id: it[0], v: it[1], from: t, d: d });
         t += d + (it[1] > 0 ? GAP : 0);
       });
