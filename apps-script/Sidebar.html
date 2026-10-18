@@ -681,8 +681,14 @@
       letter-spacing: 0.5px;
       line-height: 15px;
     }
-    .hint-flag { display: inline-flex; align-items: center; color: var(--text-accent); pointer-events: none; }
-    .hint-flag.off { visibility: hidden; }                  /* keeps its place so "Verse x of y" never shifts */
+    .hint-flag { display: inline-flex; align-items: center; color: var(--text-accent); cursor: pointer; padding: 8px; margin: -8px; transition: opacity .25s; -webkit-tap-highlight-color: transparent; }   /* the bulb is the hints switch; the padding is its tap area, the margin keeps the layout the same */
+    .hint-flag.off { opacity: .3; }
+    .hint-flag.pulse svg { animation: bulbPulse .5s ease-out; }
+    @keyframes bulbPulse { 40% { transform: scale(1.45); } }
+    .peek-cap { position: fixed; left: 50%; transform: translateX(-50%); z-index: 95; font: 600 12px/1 var(--font-ui, -apple-system, system-ui, sans-serif); color: #fff; background: rgba(40,40,40,.88); padding: 7px 12px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap; }
+    .peek-cap.on { opacity: 1; }
+    .v-text.hinted .hz { transition: color .22s ease; }
+    body.peek .v-text.hinted .hz { color: var(--text-primary); }   /* holding the verse: the full words fade in, in place */
     .hint-flag svg { width: 15px; height: 15px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     .btn-reveal-all {
@@ -2402,8 +2408,9 @@
       function cancel() { if (timer) { clearTimeout(timer); timer = null; } el.classList.remove("lp-down"); }
       el.addEventListener("pointerdown", function(e) {
         if (e.pointerType === "mouse" && e.button !== 0) return;
+        fired = false;   // a new press always starts a new gesture (a hold that ended in a slide has no click to clear it)
         if (canStart && !canStart(e)) return;
-        fired = false; sx = e.clientX; sy = e.clientY; cancel();
+        sx = e.clientX; sy = e.clientY; cancel();
         el.classList.add("lp-down");
         document.body.classList.add("lp-active");
         timer = setTimeout(function() { timer = null; fired = true; el.classList.remove("lp-down"); clearPageSelection(); onHold(e); }, LONG_PRESS_MS);
@@ -3056,7 +3063,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-255';
+    const CLIENT_BUILD = 'sync-256';
 
     let queue = [];
     let currentIndex = 0;
@@ -4495,9 +4502,9 @@
       const allRevealed = revealedCount === parsedSegments.length;
       const isNew = mode === 'learning';
 
-      // A small bulb at the end of the status line while hint mode is on (New tab only). It is not a button.
+      // A small bulb at the end of the status line (New tab only): blue while hints are on, faint while off. Tapping it switches hints.
       const flag = isNew
-        ? '<span class="hint-flag' + (hintMode ? '' : ' off') + '" aria-label="Hints on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z"/></svg></span>'
+        ? '<span class="hint-flag' + (hintMode ? '' : ' off') + '" role="button" aria-label="Hints" onclick="hintFlagTap(event)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z"/></svg></span>'
         : '';
       const status = parsedSegments.length > 1
         ? `${revealedCount} of ${parsedSegments.length} revealed`
@@ -4611,14 +4618,47 @@
       shellHintApplied = true;
       try { window.top.postMessage({ type: 'VR_HINT', on: hintMode }, '*'); } catch (e) {}
       renderCardBody();
+      const fl = document.querySelector(".hint-flag"); if (fl) fl.classList.add("pulse");
     }
+    function hintFlagTap(e) { if (e) { e.stopPropagation(); e.preventDefault(); } toggleHintMode(); }
     let shellHintApplied = false;   // the saved hint choice is applied once per page load, then your own taps rule
 
-    // Press and hold in the verse box (New tab): hints on / off. The click that ends a hold must not also reveal a piece.
-    let heldBody = null;
+    // Press and hold in the verse box (New tab): while hints are on, the full words show for as long as you hold, then hide again.
+    // Still holding, slide up to switch hints on / off (the bulb at the top right of the box does the same with a tap).
+    // The click that ends a hold must not also reveal a piece.
+    let heldBody = null, peeking = false, peekY0 = 0, peekFlipped = false, peekCapTimer = null;
+    const PEEK_SLIDE = 45;   // px up
+    function peekCaption(text, y) {
+      let c = document.getElementById("peekCap");
+      if (!c) { c = document.createElement("div"); c.id = "peekCap"; c.className = "peek-cap"; document.body.appendChild(c); }
+      clearTimeout(peekCapTimer);
+      if (text) { c.textContent = text; c.style.top = Math.max(8, y) + "px"; c.classList.add("on"); } else c.classList.remove("on");
+    }
+    function startPeek(e) {
+      if (mode !== 'learning' || !hasActiveCard()) return;
+      peeking = true; peekFlipped = false; peekY0 = e.clientY;
+      document.body.classList.add("peek");
+      try { document.getElementById("cardBody").setPointerCapture(e.pointerId); } catch (x) {}   // the box is redrawn when hints flip; the finger keeps reporting
+      peekCaption(hintMode ? "Slide up to turn hints off" : "Slide up to turn hints on", peekY0 - 66);
+    }
+    function endPeek() {
+      if (!peeking) return;
+      peeking = false;
+      document.body.classList.remove("peek");
+      peekCaption("");
+    }
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
-      heldBody = attachLongPress(body, function() { toggleHintMode(); }, function(e) { return mode === 'learning' && !e.target.closest("button"); });
+      heldBody = attachLongPress(body, startPeek, function(e) { return mode === 'learning' && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
+      window.addEventListener("pointermove", function(e) {
+        if (!peeking || peekFlipped || peekY0 - e.clientY < PEEK_SLIDE) return;
+        peekFlipped = true;
+        toggleHintMode();
+        peekCaption(hintMode ? "Hints on" : "Hints off", peekY0 - 66);
+      });
+      window.addEventListener("pointerup", endPeek);
+      window.addEventListener("pointercancel", endPeek);
+      body.addEventListener("touchmove", function(e) { if (peeking && e.cancelable) e.preventDefault(); }, { passive: false });   // the slide must not scroll the verse
       body.addEventListener("click", function(e) {
         if (heldBody()) { e.stopImmediatePropagation(); e.preventDefault(); }
       }, true);
@@ -4636,12 +4676,13 @@
       body.addEventListener("pointerdown", function(e) {
         tracking = false; swipeFired = false;
         if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
-        if (e.target.closest("button")) return;
+        if (e.target.closest("button") || e.target.closest(".hint-flag")) return;
         if (e.pointerType === "touch" && (e.clientX < 14 || e.clientX > window.innerWidth - 14)) return;
         tracking = true; sx = e.clientX; sy = e.clientY;
       });
       body.addEventListener("pointermove", function(e) {
         if (!tracking) return;
+        if (peeking) { tracking = false; return; }
         const dx = e.clientX - sx, dy = e.clientY - sy;
         if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }   // a vertical scroll
         if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
