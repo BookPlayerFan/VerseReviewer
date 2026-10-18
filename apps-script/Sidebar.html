@@ -1441,7 +1441,7 @@
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
         <div class="help-sub">Verse lists</div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
-        <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
+        <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse</kbd></div>
         <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
         <div class="help-row"><span>Close an open verse</span><kbd>Tap it, or pull it down</kbd></div>
         <div class="help-row"><span>This sheet</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
@@ -2308,7 +2308,6 @@
       item.onclick = function(ev) {
         ev.stopPropagation();
         if (heldRow()) return; // the hold already opened the full verse
-        if (item.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: v.f, g: v.g, v: v.v, t: v.t || v.x }, item); return; } // a second tap while the peek shows opens it
         showVerseTip(item, v.w);
       };
       return item;
@@ -2976,7 +2975,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-246';
+    const CLIENT_BUILD = 'sync-247';
 
     let queue = [];
     let currentIndex = 0;
@@ -5281,7 +5280,7 @@
           bd.textContent = fmtPts(it.d);
           row.appendChild(bd);
         }
-        // tap: quick three-word peek; hold: the full verse (same as the Verses list)
+        // tap: quick peek of the first words; hold: the full verse (same as the Verses list)
         const heldStat = attachLongPress(row, function() {
           hideVerseTip();
           const info = verseInfoFor(it.f);
@@ -5291,7 +5290,6 @@
           ev.stopPropagation();
           if (heldStat()) return;
           const info = verseInfoFor(it.f);
-          if (row.querySelector(".vl-peek")) { hideVerseTip(); openVersePopup({ f: it.f, g: it.g, v: info.v, t: info.t }, row); return; }   // a second tap while the peek shows opens it
           showVerseTip(row, info.w);
         };
         inner.appendChild(row);
