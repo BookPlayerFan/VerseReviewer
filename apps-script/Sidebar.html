@@ -705,7 +705,7 @@
 
     /* 1. Mobile Default Typography (Touchscreens) */
     .passage-stream, .pv-text {
-      font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;   /* the verse popup and the cards share one face */
       font-size: 17.5px;
       line-height: 1.7;
       letter-spacing: 0.1px;
@@ -3063,7 +3063,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-256';
+    const CLIENT_BUILD = 'sync-257';
 
     let queue = [];
     let currentIndex = 0;
