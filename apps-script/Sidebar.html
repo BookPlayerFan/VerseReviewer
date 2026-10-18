@@ -475,10 +475,11 @@
     .vp-pop { position: relative; display: flex; flex-direction: column; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-card); border-radius: 20px; overflow: hidden; }
     .vp-pop button { border: 0; background: none; color: inherit; font: inherit; margin: 0; min-height: 0; width: auto; box-shadow: none; flex-direction: row; }
     .vp-pop button:active { opacity: .6; }
-    .vp-h { position: relative; text-align: center; padding: 16px 54px 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .vp-h { position: relative; text-align: center; padding: 16px 20px 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .vp-h .ref-header-row { margin-bottom: 5px; }
     .vp-h .vp-pill { display: flex; justify-content: center; }
-    .vp-x { position: absolute; right: 4px; top: 22px; font-size: 19px !important; line-height: 1 !important; padding: 10px 14px !important; color: var(--text-muted) !important; }
+    .vp-refwrap { position: relative; display: inline-block; }   /* the version tag hangs off the right, so the reference itself stays centred */
+    .vp-refwrap .version-badge { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; white-space: nowrap; }
     .vp-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 14px 14px; min-height: 120px; }
     .vp-box { background: var(--bg-body); border: 1px solid var(--border-body); border-radius: 14px; padding: 12px 14px; box-sizing: border-box; }
     .vp-box .passage-toolbar { min-height: 15px; }
@@ -2511,21 +2512,20 @@
       head.className = "vp-h";
       const rrow = document.createElement("div");
       rrow.className = "ref-header-row";
+      const refwrap = document.createElement("span");
+      refwrap.className = "vp-refwrap";
       const title = document.createElement("span");
       title.className = "ref-header";
       title.textContent = it.f;
-      rrow.appendChild(title);
+      refwrap.appendChild(title);
       const ver = (it.v || "").trim();
-      if (ver && ver.toUpperCase() !== "ESV") { const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = ver; rrow.appendChild(vb); }
+      if (ver && ver.toUpperCase() !== "ESV") { const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = ver; refwrap.appendChild(vb); }
+      rrow.appendChild(refwrap);
       head.appendChild(rrow);
       const pillRow = document.createElement("div");
       pillRow.className = "vp-pill";
       pillRow.appendChild(makePill(g));
       head.appendChild(pillRow);
-      const x = document.createElement("button");
-      x.type = "button"; x.className = "vp-x"; x.textContent = "✕"; x.setAttribute("aria-label", "Close");
-      x.onclick = function(e) { e.stopPropagation(); closeVersePopup(); };
-      head.appendChild(x);
       // the verse box: a small label row (left: what is showing, right: a grey dot once a Background exists), then the text
       const body = document.createElement("div");
       body.className = "vp-body";
@@ -2929,7 +2929,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-235';
+    const CLIENT_BUILD = 'sync-236';
 
     let queue = [];
     let currentIndex = 0;
