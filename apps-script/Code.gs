@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-88'; // shown in the app's status readout
+const BUILD = 'sync-89'; // shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -508,6 +508,7 @@ function newCardCounts_(data, now) {
  *   action 'press'  - the button (refused with 'locked' until its unlock time)
  *   action 'now'    - the same step, ignoring the lock (hold menu)
  *   action 'skip'   - Skip Verse / Skip to Lock (Learn cards only)
+ *   action 'again'  - Keep in Lock another day (Lock cards that are open): back to Lock AM, opening at 4 AM tomorrow
  * expectedRep is the rep the screen showed, so a second phone that is behind gets 'stale' and the current card.
  * Lock PM is Promote: the verse becomes Bronze rep 1, due tomorrow.
  */
@@ -522,7 +523,7 @@ function learnAction(reference, action, expectedRep) {
     if (!row) return { ok: false, reason: 'moved', message: 'That verse is no longer in the sheet.' };
     const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
     if (!isLevelZero_(vals[4])) return { ok: false, reason: 'notnew', message: 'That verse is not in Learn or Lock.' };
-    if (action !== 'press' && action !== 'now' && action !== 'skip') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
+    if (action !== 'press' && action !== 'now' && action !== 'skip' && action !== 'again') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
 
     const now = nowMs_();
     const n = verseCount_(vals[7]);
@@ -536,6 +537,12 @@ function learnAction(reference, action, expectedRep) {
     if (action === 'skip') {
       if (info.stage !== 'learn') return { ok: false, reason: 'noskip', card: learningCard_(vals, row - 1, now) };
       step = skipStep_(info, n, now);
+    } else if (action === 'again') {
+      // The rep number stays the same when this is pressed on Lock AM, so a press that arrives twice is caught by the lock instead: once kept,
+      // the card is not open until 4 AM and a second 'again' is refused.
+      if (info.stage !== 'lock') return { ok: false, reason: 'nolock', card: learningCard_(vals, row - 1, now) };
+      if (info.unlockAt) return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
+      step = { rep: REPS_PER_VERSE * n + 1, unlock: nextDayStart_(now) };
     } else {
       if (action === 'press' && info.unlockAt) {
         return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
@@ -545,7 +552,7 @@ function learnAction(reference, action, expectedRep) {
 
     // A rep pressed after its grace time is remembered for the rest of the day (the dots stay amber / red).
     try {
-      if (action !== 'skip') {
+      if (action !== 'skip' && action !== 'again') {
         const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now);
         if (li.late > 0 && !step.promote) addMissed_(ref, li.late, now);
       }
@@ -564,7 +571,7 @@ function learnAction(reference, action, expectedRep) {
       sheet.getRange(row, 4).setValue(step.rep);
       vals[1] = step.unlock ? new Date(step.unlock) : '';
       vals[3] = step.rep;
-      logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : 'Dot', lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
+      logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : (action === 'again' ? 'Keep' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
       card = learningCard_(vals, row - 1, now);
     }
 

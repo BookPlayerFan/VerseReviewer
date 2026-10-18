@@ -851,6 +851,13 @@
       background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .lm-item.go { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
     .lm-item.alt { background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border-card); }
+    .lm-item.lm-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; text-align: left; font-weight: 600; }
+    .lm-row .lm-l { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+    .lm-row .lm-ref { font-weight: 700; }
+    .lm-row small { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .lm-row .lm-r { font-size: 12px; font-weight: 700; color: var(--text-accent); flex: none; text-align: right; }
+    #lmList.lm-scroll { max-height: 52vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .vp-note { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-align: center; }
     .lm-note { font-size: 13px; color: var(--text-muted); text-align: center; margin: 0 0 8px; }
     .shortcut-hint { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 2px; }
     @media (max-width: 480px) {
@@ -1488,7 +1495,7 @@
       <div class="pv-head" id="lmTitle" style="color: var(--text-primary); font-size: 16px;">Options</div>
       <div class="lm-note" id="lmNote"></div>
       <div id="lmList"></div>
-      <div class="pv-btns"><button type="button" class="pv-close" onclick="closeLearnMenu()">Cancel</button></div>
+      <div class="pv-btns"><button type="button" class="pv-close" id="lmCancel" onclick="closeLearnMenu()">Cancel</button></div>
     </div>
   </div>
 
@@ -2521,6 +2528,7 @@
       const st = vpState;
       if (!st) return;
       vpState = null;
+      if (st.fromProgress && !instant) setTimeout(function() { if (!vpState) openProgressList(); }, 220);   // the peek came from the Cards in progress list: back to it
       ctxToken++; // an answer still on its way is kept, but not drawn
       const done = function() { if (st.dim.parentNode) st.dim.parentNode.removeChild(st.dim); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap); };
       if (instant || !st.pop.animate) { done(); return; }
@@ -2597,6 +2605,7 @@
       pillRow.className = "vp-pill";
       pillRow.appendChild(makePill(g));
       head.appendChild(pillRow);
+      if (it.note) { const nt = document.createElement("div"); nt.className = "vp-note"; nt.textContent = it.note; head.appendChild(nt); }
       // the verse box: a small label row (left: what is showing, right: a grey dot once a Background exists), then the text
       const body = document.createElement("div");
       body.className = "vp-body";
@@ -3072,7 +3081,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-260';
+    const CLIENT_BUILD = 'sync-261';
 
     let queue = [];
     let currentIndex = 0;
@@ -3434,7 +3443,7 @@
       let added = 0;
       items.slice(0, 20).forEach(function(it) {
         if (!it || typeof it.ref !== 'string' || !it.ref || !it.id || have[it.id]) return;
-        if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip') return;
+        if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip' && it.action !== 'again') return;
         if (!(Number(it.rep) >= 1) || !(Date.now() - Number(it.at) < 6 * 3600 * 1000)) return;
         outbox.push({ learn: { ref: it.ref, action: it.action, rep: Number(it.rep), promote: !!it.promote, id: String(it.id), at: Number(it.at) } });
         have[it.id] = 1; added++;
@@ -4387,7 +4396,9 @@
         const last = !(card.verseIndex < card.verseCount);
         add(last ? "Skip to Lock" : "Skip Verse", "alt", function() { pressLearning("skip"); });
       }
-      if (!list.children.length) return;
+      if (card.stage === 'lock' && !isLocked(card)) add("Keep in Lock another day", "alt", function() { pressLearning("again"); });
+      add("Cards in progress \u203a", "alt", function() { openProgressList(); });
+      lmShowCancel("Cancel");
       document.getElementById("lmTitle").textContent = card.reference;
       const note = document.getElementById("lmNote"), st = repStatus(card);
       note.className = "lm-note";
@@ -4400,6 +4411,43 @@
       document.getElementById("learnMenu").classList.add("open");
     }
     function closeLearnMenu() { document.getElementById("learnMenu").classList.remove("open"); }
+    function lmShowCancel(t) { const b = document.getElementById("lmCancel"); if (b) b.textContent = t; document.getElementById("lmList").classList.remove("lm-scroll"); }
+
+    // Cards in progress: every verse in Learn or Lock, in the order the New tab shows them, each with when it opens. Read only: tapping one peeks at its verse
+    // (a Lock card that is not open yet stays out of the tab until its time) and closing the peek returns to the list.
+    function progressWhen(c) {
+      if (!isLocked(c)) return "Open now";
+      const d = new Date(c.unlockAt), t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const today = new Date(); const sameDay = d.toDateString() === today.toDateString();
+      const tm = new Date(today.getTime() + 86400000);
+      return "Opens " + (sameDay ? "" : d.toDateString() === tm.toDateString() ? "tomorrow " : d.toLocaleDateString([], { weekday: "short" }) + " ") + t;
+    }
+    function openProgressList() {
+      const all = learningCards.concat(learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; }));
+      const list = document.getElementById("lmList");
+      list.textContent = "";
+      all.forEach(function(c) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "lm-item alt lm-row";
+        const l = document.createElement("span"); l.className = "lm-l";
+        const r1 = document.createElement("span"); r1.className = "lm-ref"; r1.textContent = c.reference;
+        const r2 = document.createElement("small"); r2.textContent = progressWhen(c);
+        l.appendChild(r1); l.appendChild(r2);
+        const rt = document.createElement("span"); rt.className = "lm-r"; rt.textContent = repPart(c);
+        b.appendChild(l); b.appendChild(rt);
+        b.onclick = function() {
+          closeLearnMenu();
+          openVersePopup({ f: c.reference, g: 0, v: c.version || "", t: c.text || "", note: repPart(c) + " \u00b7 " + progressWhen(c).toLowerCase() }, null);
+          if (vpState) vpState.fromProgress = true;
+        };
+        list.appendChild(b);
+      });
+      list.classList.add("lm-scroll");
+      document.getElementById("lmTitle").textContent = "In progress";
+      const note = document.getElementById("lmNote"); note.className = "lm-note"; note.textContent = all.length + (all.length === 1 ? " card" : " cards");
+      document.getElementById("lmCancel").textContent = "Close";
+      document.getElementById("learnMenu").classList.add("open");
+    }
 
     // Gives the verse card its rank's color theme (no theme for New verses).
     function setCardRank(cardEl, g) {
@@ -4796,14 +4844,14 @@
       pressLearning("press");
     }
 
-    // kind: 'press' (the button), 'now' (hold menu, ignores the lock) or 'skip' (Skip Verse / Skip to Lock).
+    // kind: 'press' (the button), 'now' (hold menu, ignores the lock), 'skip' (Skip Verse / Skip to Lock) or 'again' (Keep in Lock another day).
     function pressLearning(kind) {
       if (isScoring || learnPending) return;
       const card = learningCards[learningIndex];
       if (!card) return;
       if (kind === "press" && isLocked(card)) return; // the unlock time is only in the hold menu
       learnPending = true;
-      const promote = card.stage === 'lock' && card.lockPart === 'pm' && kind !== 'skip';
+      const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
       if (promote) {
         notePts(card.reference, textVerses(card.text, card.reference) * ptsOf(1), 1);      // a new card in Bronze: one Treasury point per verse
@@ -4823,7 +4871,7 @@
         };
         // the PM ring fills in, then both dots turn green as the rank-up fades in over them
         if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(go, PIP_FILL_MS + 900); } else go();
-      } else if (kind !== 'skip' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
+      } else if (kind !== 'skip' && kind !== 'again' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
         // The seventh rep: its dot fills, every dot turns green in a wave, then the card moves on (to the next verse, or to Lock).
         const startedIn = epoch;
         isScoring = true;
@@ -4914,8 +4962,9 @@
       }, Math.min(Math.max(next - nowSrv(), 0) + 500, 2147483000));
     }
     // The line in the hold menu: where this card stands against the day's schedule.
+    function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
     function repStatus(card) {
-      const part = card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7";
+      const part = repPart(card);
       const late = lateNow(card).late, missed = card.missed || 0;
       let text, lv;
       // Reps pressed late earlier today are not made up, so the line says how far behind the day's schedule this verse is
@@ -4929,14 +4978,16 @@
     function predictLearn(card, kind) {
       const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n);
       let nr, unlock;
-      if (kind === 'skip') {
+      if (kind === 'again') {
+        nr = 7 * n + 1; unlock = lDayStart(now);
+      } else if (kind === 'skip') {
         if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nr = 7 * n + 1; unlock = lDayStart(now); }
       } else if (info.stage === 'learn') {
         nr = rep + 1; unlock = info.dot < 7 ? lNextSlot(now) : lDayStart(now);
       } else {
         const pm = lAt(now, 0, 1080); nr = rep + 1; unlock = pm > now ? pm : 0;
       }
-      const missed = (card.missed || 0) + (kind === 'skip' ? 0 : lateNow(card).late);
+      const missed = (card.missed || 0) + (kind === 'skip' || kind === 'again' ? 0 : lateNow(card).late);
       return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock, readyAt: unlock, late: 0, lateAt: 0, missed: missed });
     }
 
