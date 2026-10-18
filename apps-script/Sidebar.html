@@ -1169,12 +1169,23 @@
       z-index: 60; white-space: normal; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.22); } /* same spot on every screen, centered just above the tab bar */
     .sync-warning.is-saving { pointer-events: none; }
     /* Status readout */
-    .diag-test { display: block; margin: 8px 0 0; padding: 7px 12px; min-height: 0; width: auto; font-size: 13px; font-weight: 600;
-      border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); }
-    .diag-box { font-size: 11px; line-height: 1.4; color: var(--text-muted); word-break: break-all; padding: 8px 10px 10px; margin: 4px 0 6px;
-      border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); }
-    .pv-card .diag-box, .pv-card .diag-box * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
-    .diag-box .diag-test { display: inline-block; margin: 8px 8px 0 0; }
+    .pv-card.help-card { height: 78%; max-height: 600px; }
+    .help-card .help-scroll { flex: 1 1 auto; display: none; }
+    .help-card .help-scroll.on { display: block; }
+    .help-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 11px; background: var(--bg-body); border: 1px solid var(--border-card); margin: 0 0 12px; flex: none; }
+    .help-tabs button { flex: 1; min-height: 0; width: auto; padding: 8px 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); font-size: 14px; font-weight: 700; box-shadow: none; }
+    .help-tabs button.on { background: var(--bg-card); color: var(--text-accent); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+    .st-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border-card); font-size: 14px; }
+    .st-row:first-child { border-top: 0; }
+    .st-row span { color: var(--text-muted); flex: none; }
+    .st-row b { font-weight: 600; text-align: right; min-width: 0; word-break: break-word; }
+    .st-row b.ok { color: #1e8e3e; } .st-row b.bad { color: var(--badge-fail); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .st-row b.ok { color: #81c995; } }
+    :root[data-theme="dark"] .st-row b.ok { color: #81c995; }
+    .st-note { font-size: 12.5px; color: var(--text-muted); padding: 4px 0; }
+    .st-btns { display: flex; gap: 10px; margin-top: 12px; }
+    .st-btns button { flex: 1; min-height: 0; width: auto; padding: 9px 0; font-size: 13px; font-weight: 600; border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); box-shadow: none; }
+    .pv-card .st-row b, .pv-card .st-row b * { -webkit-user-select: text; user-select: text; }
     /* Notices (Cleared / Re-queued, errors) float over the bottom of the verse box,
        so they take no room between the verse and the buttons. */
     .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
@@ -1390,12 +1401,27 @@
   </div>
 
   <div class="pv" id="helpModal" onclick="if (event.target === this) toggleHelp(false)">
-    <div class="pv-card">
-      <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Status and gestures</div>
-      <div class="help-scroll">
-        <div class="help-sub">Status</div>
-        <div class="diag-box"><span id="diagText"></span><br><button type="button" class="diag-test" id="diagTest" onclick="sendTestPush()">Send test notification</button><button type="button" class="diag-test" id="diagReload" onclick="reloadApp()">Reload app</button></div>
-
+    <div class="pv-card help-card">
+      <div class="help-tabs" role="tablist">
+        <button type="button" role="tab" id="helpTabInfo" onclick="showHelpTab('info')">Info</button>
+        <button type="button" role="tab" id="helpTabCtl" onclick="showHelpTab('ctl')">Controls</button>
+        <button type="button" role="tab" id="helpTabSt" onclick="showHelpTab('st')">Status</button>
+      </div>
+      <div class="help-scroll" id="helpPaneInfo">
+        <div class="help-sub">A new day starts at 4 AM</div>
+        <div class="help-row"><span>Learn opens</span><kbd>4 · 8 · 10 AM · 12 · 2 · 4 · 6 PM</kbd></div>
+        <div class="help-row"><span>Lock AM opens</span><kbd>4 AM</kbd></div>
+        <div class="help-row"><span>Lock PM opens</span><kbd>6 PM</kbd></div>
+        <div class="help-note">A verse added before noon starts today; after noon it waits for 4 AM tomorrow. A rep left an hour past opening is marked late (amber, then red) and is not made up.</div>
+        <div class="help-sub">Notifications</div>
+        <div class="help-row"><span>Reviews, plus the 4 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
+        <div class="help-row"><span>Learn, as each one opens</span><kbd>8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
+        <div class="help-row"><span>The 6 PM Learn and Lock PM</span><kbd>8:00 PM</kbd></div>
+        <div class="help-note">The 4 AM and 6 PM Learn do not notify when they open: the 4 AM ones ride the 6 AM notification and the 6 PM ones go out at 8 PM. Only sent when something is waiting; finishing early cancels what is left.</div>
+        <div class="help-sub">Still to come today</div>
+        <div id="notifList"></div>
+      </div>
+      <div class="help-scroll" id="helpPaneCtl">
         <div class="help-sub">Verse box</div>
         <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
         <div class="help-row"><span>Reveal that verse's next phrase, or hide it again (New tab)</span><kbd>Tap a verse</kbd></div>
@@ -1403,24 +1429,29 @@
         <div class="help-row"><span>Reveal all</span><kbd>Swipe right</kbd></div>
         <div class="help-row"><span>Hide all</span><kbd>Swipe left</kbd></div>
         <div class="help-note">A piece is a whole verse on Review and a phrase on New. A blue bulb on the status line means everything revealed shows only its first letters, until you hold again.</div>
-        <div class="help-sub">Other holds</div>
+        <div class="help-sub">Holds</div>
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
         <div class="help-row"><span>Undo the last review</span><kbd>Hold Review tab</kbd></div>
         <div class="help-row"><span>Press early, or skip ahead (New tab)</span><kbd>Hold the button</kbd></div>
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
+        <div class="help-sub">Verse lists</div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse, or tap its peek</kbd></div>
         <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Tap the verse, or hold its reference</kbd></div>
         <div class="help-row"><span>Close an open verse</span><kbd>Pull it down</kbd></div>
-        <div class="help-row"><span>This panel: status and gestures</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
+        <div class="help-row"><span>This sheet</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
         <div class="help-sub">Keyboard (Review tab)</div>
         <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
         <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
         <div class="help-row"><span>Pass</span><kbd>F</kbd></div>
         <div class="help-row"><span>Miss</span><kbd>D</kbd></div>
         <div class="help-row"><span>Undo</span><kbd>Z</kbd></div>
-        <div class="help-row"><span>Show / hide this menu</span><kbd>?</kbd></div>
+        <div class="help-row"><span>Show / hide this sheet</span><kbd>?</kbd></div>
+      </div>
+      <div class="help-scroll" id="helpPaneSt">
+        <div id="diagText"></div>
+        <div class="st-btns"><button type="button" id="diagTest" onclick="sendTestPush()">Test notification</button><button type="button" id="diagReload" onclick="reloadApp()">Reload</button></div>
       </div>
       <div class="pv-btns"><button type="button" class="pv-close" onclick="toggleHelp(false)">Close</button></div>
     </div>
@@ -5730,12 +5761,49 @@
       }
     });
 
-    // One panel: the status readout and the gesture list. The ⓘ cell on the Verses map (or the ? key) shows or hides it.
+    // One sheet with three panels: Info (the day's schedule and what notifications are still to come), Controls (the gestures) and Status
+    // (the readout, with the test and reload buttons). The \u24d8 cell on the Verses map (or the ? key) shows or hides it.
+    let helpTab = "info", notif = null;
+    function showHelpTab(which) {
+      helpTab = which === "ctl" || which === "st" ? which : "info";
+      [["info", "Info"], ["ctl", "Ctl"], ["st", "St"]].forEach(function(p) {
+        const on = p[0] === helpTab;
+        document.getElementById("helpTab" + p[1]).classList.toggle("on", on);
+        document.getElementById("helpTab" + p[1]).setAttribute("aria-selected", on ? "true" : "false");
+        document.getElementById("helpPane" + p[1]).classList.toggle("on", on);
+      });
+      document.getElementById("helpPane" + (helpTab === "info" ? "Info" : helpTab === "ctl" ? "Ctl" : "St")).scrollTop = 0;
+    }
     function toggleHelp(open) {
       open = !!open;
       diagOn = open;
       document.getElementById("helpModal").classList.toggle("open", open);
-      if (open) renderDiag();
+      if (open) { showHelpTab(helpTab); renderDiag(); loadNotif(); }
+    }
+    // What the server has set to go out today, and whether the pieces that send it are in place (so the phone can say it, not the spreadsheet).
+    function loadNotif() {
+      notif = null; renderNotif(); renderDiag();
+      google.script.run
+        .withSuccessHandler(function(r) { notif = r && r.ok ? r : { failed: true }; renderNotif(); renderDiag(); })
+        .withFailureHandler(function() { notif = { failed: true }; renderNotif(); renderDiag(); })
+        .notifStatus();
+    }
+    function renderNotif() {
+      const el = document.getElementById("notifList");
+      if (!el) return;
+      el.textContent = "";
+      if (!notif || notif.failed || !notif.pending.length) {
+        const n = document.createElement("div"); n.className = "st-note";
+        n.textContent = !notif ? "Checking\u2026" : notif.failed ? "Couldn't check right now." : "Nothing else to send today.";
+        el.appendChild(n);
+        return;
+      }
+      notif.pending.forEach(function(p) {
+        const r = document.createElement("div"); r.className = "st-row";
+        const t = document.createElement("span"); t.textContent = new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const b = document.createElement("b"); b.textContent = p.text;
+        r.appendChild(t); r.appendChild(b); el.appendChild(r);
+      });
     }
 
     // ───────────── Staying in sync with your other device ─────────────
@@ -5746,16 +5814,30 @@
     function renderDiag() {
       const el = document.getElementById("diagText");
       if (!el || !diagOn) return;
-      el.textContent =
-        "page " + CLIENT_BUILD + " (server expects " + (diag.expects ? "sync-" + diag.expects : "?") + ")" + (updateReady ? " update waiting" : "") + " · server " + (serverBuild || "?") +
-        " · v" + sessionVersion + " · " + (sessionDate || "no date") +
-        " · last check " + (diag.checkedAt || "never") + ": " + diag.result +
-        (diag.error ? " · error: " + diag.error : "") +
-        " · loaded " + (diag.adopted || "never") +
-        (initialSession && initialSession.ms !== undefined ? " · server load " + initialSession.ms + " ms" : "") +
-        " · queued saves " + pendingCount() + (submitFailed ? " (failing)" : "") +
-        (shellInfo ? " · this icon since " + (shellInfo.first ? new Date(shellInfo.first).toLocaleDateString([], { month: "short", day: "numeric" }) + " " + new Date(shellInfo.first).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?") +
-          " · access key " + (shellInfo.key ? "saved" : "not saved") + (shellInfo.works ? "" : " (storage blocked)") : "");
+      el.textContent = "";
+      const row = function(label, value, cls) {
+        const r = document.createElement("div"); r.className = "st-row";
+        const l = document.createElement("span"); l.textContent = label;
+        const v = document.createElement("b"); v.textContent = value; if (cls) v.className = cls;
+        r.appendChild(l); r.appendChild(v); el.appendChild(r);
+      };
+      row("Page", CLIENT_BUILD + (updateReady ? " \u00b7 update waiting" : ""), updateReady ? "bad" : "");
+      if (diag.expects && "sync-" + diag.expects !== CLIENT_BUILD) row("Server expects", "sync-" + diag.expects, "bad");
+      row("Server", serverBuild || "?");
+      row("Session", "v" + sessionVersion + " \u00b7 " + (sessionDate || "no date"));
+      row("Last check", (diag.checkedAt || "never") + (diag.result ? " \u00b7 " + diag.result : ""));
+      if (diag.error) row("Error", diag.error, "bad");
+      row("Loaded", (diag.adopted || "never") + (initialSession && initialSession.ms !== undefined ? " \u00b7 " + initialSession.ms + " ms" : ""));
+      row("Queued saves", pendingCount() + (submitFailed ? " (failing)" : ""), pendingCount() === 0 && !submitFailed ? "ok" : "bad");
+      if (shellInfo) {
+        row("This icon since", shellInfo.first ? new Date(shellInfo.first).toLocaleDateString([], { month: "short", day: "numeric" }) + ", " + new Date(shellInfo.first).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?");
+        row("Access key", (shellInfo.key ? "saved" : "not saved") + (shellInfo.works ? "" : " (storage blocked)"), shellInfo.key ? "ok" : "bad");
+      }
+      if (!notif) row("Notifications", "checking\u2026");
+      else if (notif.failed) row("Notifications", "couldn't check", "bad");
+      else if (!notif.key) row("Notifications", "push key not set", "bad");
+      else if (notif.trigger === false) row("Notifications", "daily trigger missing", "bad");
+      else row("Notifications", "on \u00b7 " + notif.pending.length + " waiting today", "ok");
     }
 
     // Sends a test push through the server (from the status panel).
@@ -5763,7 +5845,7 @@
       const b = document.getElementById("diagTest");
       if (!b || b.disabled) return;
       b.disabled = true; b.textContent = "Sending\u2026";
-      function done(msg) { b.textContent = msg; setTimeout(function() { b.disabled = false; b.textContent = "Send test notification"; }, 4000); }
+      function done(msg) { b.textContent = msg; setTimeout(function() { b.disabled = false; b.textContent = "Test notification"; }, 4000); }
       google.script.run
         .withSuccessHandler(function(r) { done(r && r.ok ? "Sent \u2713" : "Failed: " + ((r && r.message) || "unknown")); })
         .withFailureHandler(function(err) { done("Failed: " + ((err && err.message) || err)); })

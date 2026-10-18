@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-86'; // shown in the app's status readout (two-finger tap)
+const BUILD = 'sync-87'; // shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2028,7 +2028,7 @@ function scheduleReport() {
   try { out.setFrozenRows(1); } catch (e) {}
 }
 
-// Called by the app (two-finger tap panel -> "Send test notification").
+// Called by the app (status panel -> "Test notification").
 function sendTestPush() {
   const r = osSend_('Test Notification', 'Push is working.', 0, 'vr-test');
   let msg = '';
@@ -2037,6 +2037,28 @@ function sendTestPush() {
     if (/subscribed|recipients/i.test(msg)) msg = 'no subscribed device';
   }
   return { ok: !!r.ok, message: msg };
+}
+
+// Called by the app's Info / Status panels: what is set to go out today and whether the pieces that send it are in place, so the phone
+// can answer "are notifications working?" without opening the spreadsheet. Reads script properties and the trigger list only, never the sheet.
+function notifStatus() {
+  const props = PropertiesService.getScriptProperties();
+  const now = nowMs_();
+  const out = { ok: true, trigger: null, key: !!props.getProperty('ONESIGNAL_KEY'), pending: [] };
+  try { out.trigger = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; }).length === 1; } catch (e) {}
+  try {
+    const d = JSON.parse(props.getProperty(PUSH_DAILY_ID_KEY) || 'null');
+    if (d && d.at > now) out.pending.push({ at: d.at, text: 'Reviews and the 4 AM reps' });
+  } catch (e) {}
+  const map = slotMap_();
+  Object.keys(map).map(Number).filter(function(k) { return k > now; }).sort(function(x, y) { return x - y; }).forEach(function(k) {
+    const e = map[k] || {}, bits = [];
+    if ((e.learn || []).length) bits.push('Learn ' + refsText_(e.learn));
+    if ((e.lock || []).length) bits.push('Lock ' + refsText_(e.lock));
+    if (bits.length) out.pending.push({ at: k, text: bits.join(', ') });
+  });
+  out.pending.sort(function(x, y) { return x.at - y.at; });
+  return out;
 }
 
 // When the push for a New card's unlock goes out. The 4 AM unlocks ride on the 6 AM daily push (dailyPush), so they get none
