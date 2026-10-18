@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-85'; // shown in the app's status readout (two-finger tap)
+const BUILD = 'sync-86'; // shown in the app's status readout (two-finger tap)
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -581,10 +581,8 @@ function learnAction(reference, action, expectedRep) {
       s.version++; writeState_(s);
     }
 
-    // The day's Learn / Lock pushes are kept in line with the new state: the last rep of the day, Skip and Promote drop what is left.
-    try { syncSlotPushes_(); } catch (e) { pushLog_('slot sync ERROR', ref, 0, false, String(e)); }
-    try { cancelDailyIfDone_(); } catch (e) { pushLog_('daily cancel ERROR', ref, 0, false, String(e)); }
-
+    // The push reminders are brought in line afterwards by syncPushes(), called by the page once this answer is back. They make network calls that take
+    // seconds, so they do not run here while the lock is held.
     const result = { ok: true, promoted: promoted, card: card, version: s && s.date === todayKey_() ? s.version : undefined };
     const tdata = readSheetData_();
     result.tomorrow = dueTomorrowCount_(tdata);
@@ -598,15 +596,9 @@ function learnAction(reference, action, expectedRep) {
 
 // ───────────────────────────────── Reads ─────────────────────────────────
 
-function getDueCards(includeNew) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Verses');
-  if (!sheet) return [];
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
-
-  const data = sheet.getRange(1, 1, lastRow, 8).getValues();
+function getDueCards(includeNew, preRead) {
+  const data = preRead || readSheetData_();   // callers that already read the sheet pass it in, so it is read once
+  if (data.length < 2) return [];
   const today = today_();
   const dueCards = [];
 
@@ -1248,7 +1240,6 @@ function submitReview(expectedVersion, review, next) {
     writeState_(s);
     const result = { ok: true, version: s.version, undoId: undoId };
     if (review) { const tdata = readSheetData_(); result.tomorrow = dueTomorrowCount_(tdata); result.tomorrowLoad = dueTomorrowLoad_(tdata); result.treasury = treasuryTotal_(tdata); }
-    if (review) { try { cancelDailyIfDone_(); } catch (e) { pushLog_('daily cancel ERROR', '', 0, false, String(e)); } }
     return result;
   } finally {
     lock.releaseLock();
@@ -1940,7 +1931,7 @@ function dailyPush() {
 
 // The 6:00 AM daily push is scheduled at about 5:00. If everything it would mention (due reviews, the 4 AM Learn / Lock cards) is finished before it
 // goes out, it is cancelled. Cheap: it does nothing unless a daily push is still waiting, which is only between about 5:00 and 6:00 AM.
-function cancelDailyIfDone_() {
+function cancelDailyIfDone_(preRead) {
   const props = PropertiesService.getScriptProperties();
   const raw = props.getProperty(PUSH_DAILY_ID_KEY);
   if (!raw) return false;
@@ -1948,8 +1939,9 @@ function cancelDailyIfDone_() {
   try { e = JSON.parse(raw); } catch (x) { e = null; }
   const now = nowMs_();
   if (!e || !e.id || !e.at || e.at <= now + 120000) { props.deleteProperty(PUSH_DAILY_ID_KEY); return false; }   // gone out already, or about to
-  const nc = newCardCounts_(readSheetData_(), now);
-  if (pushWords_(getDueCards(false).length, nc.learnRefs, nc.lockRefs)) return false;   // something is still waiting
+  const data = preRead || readSheetData_();
+  const nc = newCardCounts_(data, now);
+  if (pushWords_(getDueCards(false, data).length, nc.learnRefs, nc.lockRefs)) return false;   // something is still waiting
   const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
   pushLog_('cancel (all done early)', '', e.at, !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
   props.deleteProperty(PUSH_DAILY_ID_KEY);
@@ -2120,9 +2112,9 @@ function sameRefs_(a, b) {
 // Brings the scheduled Learn / Lock pushes in line with what is true right now: one push per remaining slot time, naming every verse
 // waiting then. Pushes that are no longer right (a verse finished its last rep, was skipped or promoted) are cancelled or re-sent with the
 // updated names, and missing ones are added. Safe to repeat; a push that is about to go out (within 2 minutes) is left alone.
-function syncSlotPushes_() {
+function syncSlotPushes_(preRead) {
   const now = nowMs_();
-  const want = wantedSlots_(readSheetData_(), now);
+  const want = wantedSlots_(preRead || readSheetData_(), now);
   const map = slotMap_();
   const out = { sent: 0, cancelled: cancelLegacyPushes_() };
   Object.keys(map).forEach(function(k) {
@@ -2145,6 +2137,25 @@ function syncSlotPushes_() {
   });
   setSlotMap_(map);
   return out;
+}
+
+// Called by the page after a Learn / Lock press or a review has been saved: brings the day's push reminders in line with the new state (the last rep of
+// the day, Skip and Promote drop what is left; finishing everything early cancels the 6:00 AM push). It makes OneSignal calls that take seconds, so it
+// runs on its own, outside the script lock, and the sheet is read once. A user lock stops two of these from overlapping without blocking presses.
+// kind: 'learn' does both jobs; 'review' only checks the daily push.
+function syncPushes(kind) {
+  const lock = LockService.getUserLock();
+  let got = false;
+  try { got = lock.tryLock(15000); } catch (e) {}
+  if (!got) return { ok: false, reason: 'busy' };
+  try {
+    const data = readSheetData_();
+    if (kind !== 'review') { try { syncSlotPushes_(data); } catch (e) { pushLog_('slot sync ERROR', '', 0, false, String(e)); } }
+    try { cancelDailyIfDone_(data); } catch (e) { pushLog_('daily cancel ERROR', '', 0, false, String(e)); }
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // Run from the editor to schedule the rest of today's slot pushes right now (for example after updating mid-day). Results show on the Push Log tab.

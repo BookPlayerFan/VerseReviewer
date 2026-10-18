@@ -2444,7 +2444,7 @@
         box.appendChild(document.createTextNode(sg.text + (i < segs.length - 1 ? " " : "")));
       });
     }
-    function closeVersePopup(instant, swiped) {
+    function closeVersePopup(instant) {
       const st = vpState;
       if (!st) return;
       vpState = null;
@@ -2452,12 +2452,6 @@
       const done = function() { if (st.dim.parentNode) st.dim.parentNode.removeChild(st.dim); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap); };
       if (instant || !st.pop.animate) { done(); return; }
       st.dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
-      if (swiped) {   // dragged down: it carries on off the bottom of the screen
-        const y = st.dragY || 0;
-        st.wrap.animate([{ transform: "translateY(" + y + "px)" }, { transform: "translateY(" + (window.innerHeight - st.wrap.getBoundingClientRect().top + 40) + "px)" }], { duration: 220, easing: "ease-in", fill: "forwards" });
-        setTimeout(done, 230);
-        return;
-      }
       Array.prototype.forEach.call(st.pop.children, function(c) { c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" }); });
       const pr = st.pop.getBoundingClientRect();
       const sr = st.row && st.row.isConnected ? st.row.getBoundingClientRect() : null;
@@ -2499,7 +2493,7 @@
         if (!dragging) { y0 = null; return; }
         dragging = false; y0 = null;
         st.swipedAt = Date.now();
-        if (st.dragY > 90 || vel > 0.7) { closeVersePopup(false, true); return; }
+        if (st.dragY > 90 || vel > 0.7) { closeVersePopup(); return; }   // closes the same way as a tap outside: the card folds back into its row
         st.dragY = 0;
         if (wrap.animate) wrap.animate([{ transform: wrap.style.transform }, { transform: "translateY(0px)" }], { duration: 220, easing: "cubic-bezier(.2,.9,.3,1.2)" });
         wrap.style.transform = ""; st.dim.style.opacity = "";
@@ -2949,7 +2943,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-239';
+    const CLIENT_BUILD = 'sync-241';
 
     let queue = [];
     let currentIndex = 0;
@@ -3332,6 +3326,7 @@
             if (typeof res.version === 'number') sessionVersion = res.version;
             if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); renderTomorrowNote(); }
             outbox.shift();
+            schedulePushSync("learn");
             if (res.promoted) {
               // Normally the card is already gone (the Promote animation). After a resend it is still on screen, so take it off.
               const at = learningCards.findIndex(function(x) { return x.reference === l.ref; });
@@ -3363,6 +3358,18 @@
         .learnAction(l.ref, l.action, l.rep);
     }
 
+    // After a press or review is saved, the server brings the push reminders in line. That takes a few seconds, so it is a separate call
+    // (the save itself returns at once), joined into one when several saves come close together.
+    let pushSyncTimer = null, pushSyncKind = "";
+    function schedulePushSync(kind) {
+      if (kind === "learn" || !pushSyncKind) pushSyncKind = kind;
+      if (pushSyncTimer) return;
+      pushSyncTimer = setTimeout(function() {
+        const k = pushSyncKind; pushSyncKind = ""; pushSyncTimer = null;
+        try { google.script.run.withFailureHandler(function() {}).syncPushes(k); } catch (e) {}
+      }, 2500);
+    }
+
     function pumpOutbox() {
       if (inFlight || submitFailed || outbox.length === 0) {
         updateSyncWarning();
@@ -3380,6 +3387,7 @@
             sessionVersion = res.version;
             if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); renderTomorrowNote(); }
             outbox.shift();
+            if (item.review) schedulePushSync("review");
             if (res.undoId && outbox.length === 0) showUndo(res.undoId);
             pumpOutbox();
           } else if (res && res.session) {
