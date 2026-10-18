@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-87'; // shown in the app's status readout
+const BUILD = 'sync-88'; // shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1690,7 +1690,7 @@ function addPastedVerse(reference, version, text) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
     if (!sheet) return { success: false, message: 'Sheet "Verses" not found.' };
-    const ref = cleanRef_(reference).replace(/\s+/g, ' ');
+    const ref = cleanRef_(reference).replace(/\s+/g, ' ').replace(/^psalms?(?=[\s\d]|$)/i, 'Psalms');   // "Psalm 23:1" is saved as "Psalms 23:1"
     const ver = cleanRef_(version).toUpperCase() || 'ESV';
     const body = String(text === null || text === undefined ? '' : text).replace(/\s+/g, ' ').trim();
     if (!ref || ref.length > 100 || !/^[A-Za-z0-9]/.test(ref) || !/\d/.test(ref)) return { success: false, message: 'That reference does not look right.' };
@@ -1698,7 +1698,7 @@ function addPastedVerse(reference, version, text) {
     if (!body) return { success: false, message: 'No verse text found.' };
     if (body.length > 20000 || /^[=+\-@]/.test(body)) return { success: false, message: 'That verse text cannot be saved.' };
     const last = sheet.getLastRow();
-    if (findRowByRef_(sheet, ref)) return { success: false, message: ref + ' is already in your sheet.' };
+    if (findRowByRef_(sheet, ref) || (/^Psalms\b/.test(ref) && findRowByRef_(sheet, ref.replace(/^Psalms/, 'Psalm')))) return { success: false, message: ref + ' is already in your sheet.' };   // an older "Psalm" row counts as the same verse
     const cols = Math.max(8, sheet.getLastColumn());
     if (last >= 2) {
       sheet.insertRowsBefore(2, 1);

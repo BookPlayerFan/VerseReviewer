@@ -1455,6 +1455,7 @@
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
         <div class="help-sub">Verse lists</div>
         <div class="help-row"><span>Open a book on the map; switch books while one is open</span><kbd>Tap its tile</kbd></div>
+        <div class="help-row"><span>Open a day on the schedule; switch days while one is open</span><kbd>Tap its day</kbd></div>
         <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
         <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse</kbd></div>
         <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
@@ -2048,6 +2049,7 @@
           if (vs.length) {
             c.setAttribute("aria-label", DOW[d.getDay()] + ", " + short(d) + ", " + vs.length + (vs.length === 1 ? " reference" : " references"));
             c.onclick = function() { peekDay(c, off, vs); };
+            c._openDay = function() { peekDay(c, off, vs); };   // so a tap on this day through an open day's dimmer switches to it
           }
           const sl = document.createElement("div"); sl.className = "cal-s";
           sl.appendChild(c); row.appendChild(sl);
@@ -2092,7 +2094,11 @@
       if (off === 0) label = "Today · " + label; else if (off === 1) label = "Tomorrow · " + label;
       const dim = document.createElement("div");
       dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
-      dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
+      dim.onclick = function(e) {   // a tap on another day switches straight to it; anywhere else (or the open day again) closes
+        e.stopPropagation();
+        const hit = (document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : []).find(function(n) { return n._openDay && n.id !== "pkTile"; });
+        if (hit && hit !== cell) hit._openDay(); else closePeek();
+      };
       document.body.appendChild(dim);
       const r = cell.getBoundingClientRect();
       const lift = cell.cloneNode(true);
@@ -3054,7 +3060,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-253';
+    const CLIENT_BUILD = 'sync-254';
 
     let queue = [];
     let currentIndex = 0;
@@ -5560,7 +5566,7 @@
         if (!looksLikeRef(rv.head)) return null;
         if (needsWords && text.split(" ").length < 4) return null; // one line: don't mistake "ESV" or a stray word for the verse text
         if (!text) return { error: "I found the reference but no verse text." };
-        return { ref: rv.head, ver: rv.ver || "ESV", defaultVer: !rv.ver, text: text };
+        return { ref: rv.head.replace(/^\s*psalms?(?=[\s\d]|$)/i, "Psalms"), ver: rv.ver || "ESV", defaultVer: !rv.ver, text: text };   // "Psalm 23:1" is saved as "Psalms 23:1"
       }
       // 1. reference on the first line, text below
       if (lines.length > 1) {
