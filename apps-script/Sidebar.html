@@ -446,7 +446,9 @@
     .fail-inner { --fade: var(--bg-body); }
     .pk-bubble.pk-day { left: 14px; right: 14px; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 20px; }
     .pk-day .pk-h { padding: 18px 20px 12px; align-items: center; gap: 12px; }
-    .pk-day .pk-h span { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.25; text-align: right; }   /* reviews and load: two small rows on the right, level with the date */
+    .pk-day .pk-h .pk-m { display: grid; grid-template-columns: auto auto; column-gap: 5px; align-items: baseline; line-height: 1.3; }   /* reviews and volume: two small rows on the right, level with the date; the numbers line up in one column, the labels in the next */
+    .pk-m b { text-align: right; font-weight: 800; color: var(--text-primary); }
+    .pk-m i { font-style: normal; text-align: left; font-weight: 600; }
     .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
     .pk-day .pk-r:last-child { padding-bottom: 14px; }
     .pk-book .vl-verses { border-top: 1px solid var(--border-card); border-bottom: 0; }
@@ -2087,7 +2089,7 @@
         tx.appendChild(bb); tx.appendChild(sm); r.appendChild(tx); b.appendChild(r);
       };
       row([[1], [2], [3]], "The color", "how much there is to learn that day: green is light, blue medium, amber heavy");
-      row([[2, "12"]], "Tap a day", "to see its verses and load");
+      row([[2, "12"]], "Tap a day", "to see its verses and their volume");
       document.body.appendChild(b);
     }
     // Tap a day: its tile lifts over a dimmed calendar and a card lists the day's references.
@@ -2114,10 +2116,11 @@
       b.className = "pk-bubble pk-day"; b.id = "pkBubble";
       const h = document.createElement("div"); h.className = "pk-h";
       const hn = document.createElement("div"); hn.textContent = label;
-      const hm = document.createElement("span");
-      const hm1 = document.createElement("div"); hm1.textContent = vs.length + (vs.length === 1 ? " review" : " reviews");
-      const hm2 = document.createElement("div"); hm2.textContent = "load " + Math.round(vs.reduce(function(a, v) { return a + (v.l || 1); }, 0));
-      hm.appendChild(hm1); hm.appendChild(hm2);
+      const hm = document.createElement("span"); hm.className = "pk-m";
+      [[vs.length, vs.length === 1 ? "review" : "reviews"], [Math.round(vs.reduce(function(a, v) { return a + (v.l || 1); }, 0)), "volume"]].forEach(function(m) {
+        const n = document.createElement("b"); n.textContent = m[0]; const t = document.createElement("i"); t.textContent = m[1];
+        hm.appendChild(n); hm.appendChild(t);
+      });
       h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
       vs.forEach(function(v) {
         const row = document.createElement("div"); row.className = "pk-r";
@@ -3069,7 +3072,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-259';
+    const CLIENT_BUILD = 'sync-260';
 
     let queue = [];
     let currentIndex = 0;
