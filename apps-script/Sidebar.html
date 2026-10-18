@@ -3026,7 +3026,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-250';
+    const CLIENT_BUILD = 'sync-251';
 
     let queue = [];
     let currentIndex = 0;
@@ -4661,9 +4661,18 @@
       const startedIn = epoch;
       setTimeout(function() { advanceCard(startedIn); }, ms);
     }
+    // The Cleared / Re-queued notice outlasts the card swap, so it can be read: it stays over the next card for CARD_NOTICE_MS.
+    const CARD_NOTICE_MS = 1500;
+    let cardNoticeOn = false;
+    function cardNotice(msg) {
+      const el = document.getElementById("toastNotice");
+      el.textContent = msg; el.classList.remove("is-error");
+      cardNoticeOn = true;
+      setTimeout(function() { cardNoticeOn = false; if (el.textContent === msg) el.textContent = ""; }, CARD_NOTICE_MS);
+    }
     function advanceCard(startedIn) {
       if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
-      document.getElementById("toastNotice").textContent = "";
+      if (!cardNoticeOn) document.getElementById("toastNotice").textContent = "";
       const doneCard = queue[currentIndex];
       currentIndex++;
       if (currentIndex >= activeEnd()) {
@@ -4840,10 +4849,10 @@
       if (card.isRepeat) {
         if (action === "Pass") {
           noteCleared(card.reference);
-          notice.textContent = "🎉 Cleared for today!";
+          cardNotice("🎉 Cleared for today!");
         } else {
           queue.push(card);
-          notice.textContent = "🔄 Re-queued for repeat";
+          cardNotice("🔄 Re-queued for repeat");
         }
         enqueueSubmit(null, snapshot(currentIndex + 1));
         animateOut();
