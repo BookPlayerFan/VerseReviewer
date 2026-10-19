@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-92'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-93'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -280,19 +280,18 @@ function stampLearningDates_(preRead) {
 //   rep 7n + 1    Lock AM
 //   rep 7n + 2    Lock PM  (its button is Promote: Level 1, Rep 1)
 // Column B (Next due) holds the time the button next unlocks (empty = live now). Level 0 rows ignore it everywhere else.
-// Learn unlocks at fixed times of the day, one press per time, nothing builds up if one is missed.
+// Learn reps open at fixed times of the day (rep 1 at 4 AM ... rep 7 at 6 PM). A rep that is missed is made up: once pressed, the next rep opens at once if its time has passed.
 const LEARN_SLOTS = [4 * 60, 8 * 60, 10 * 60, 12 * 60, 14 * 60, 16 * 60, 18 * 60]; // minutes after midnight
 const REPS_PER_VERSE = 7;
 const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM
 const LOCK_PM_MIN = 18 * 60;        // Lock PM unlocks at 6 PM
-const START_LIVE_BEFORE_MIN = 12 * 60; // a verse added before noon starts today; later it waits for 4 AM tomorrow
+const START_LIVE_BEFORE_MIN = 18 * 60; // a verse added before 6 PM starts today (the reps whose time has already passed open at once, to catch up); later it waits for 4 AM tomorrow
 // A rep is "late" an hour after it opens (the 4 AM rep: after 7 AM; the 6 PM rep and Lock PM: after 8:30 PM; Lock AM: after noon). The dots turn amber (one late rep
-// today) or red (two or more). Late reps are not made up, so the mark stays on a verse until 4 AM the next day. Kept per reference in VR_LATE_MAP.
+// today) or red (two or more). A late rep is made up by pressing: the next rep of the day opens at once when its time has already passed.
 const LATE_GRACE_MIN = 60;
 const LATE_FIRST_SLOT_MIN = 7 * 60;
 const LATE_LOCK_AM_MIN = 12 * 60;
 const LATE_LOCK_PM_MIN = 20 * 60 + 30;
-const LATE_MAP_KEY = 'VR_LATE_MAP';
 
 // The time (ms) of a clock time (minutes after midnight), dayOffset days from the day of `ms`.
 function atClock_(ms, dayOffset, mins) {
@@ -305,15 +304,6 @@ function atClock_(ms, dayOffset, mins) {
 function minsOfDay_(ms) {
   const d = new Date(ms);
   return d.getHours() * 60 + d.getMinutes();
-}
-
-// The next Learn unlock time after `ms` (today's list, else tomorrow's first).
-function nextSlotAfter_(ms) {
-  for (let i = 0; i < LEARN_SLOTS.length; i++) {
-    const t = atClock_(ms, 0, LEARN_SLOTS[i]);
-    if (t > ms) return t;
-  }
-  return atClock_(ms, 1, LEARN_SLOTS[0]);
 }
 
 // The time a rep that opened at `slotMs` counts as late.
@@ -351,44 +341,25 @@ function lateInfo_(stage, lockPart, readyMs, now) {
   return out;
 }
 
-// The day for "missed today" starts at 4 AM, like the Learn day.
-function lateDayKey_(ms) {
-  return Utilities.formatDate(new Date(ms - DAY_START_MIN * 60000), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-}
-function lateMap_() {
-  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(LATE_MAP_KEY) || '{}') || {}; } catch (e) { return {}; }
-}
-// Reps missed today for one reference (from presses that came late).
-function missedToday_(ref, now) {
-  const e = lateMap_()[ref];
-  return e && e.d === lateDayKey_(now) ? (Number(e.n) || 0) : 0;
-}
-function addMissed_(ref, n, now) {
-  const map = lateMap_(), day = lateDayKey_(now), out = {};
-  Object.keys(map).forEach(function(k) { if (map[k] && map[k].d === day) out[k] = map[k]; });
-  if (n > 0) out[ref] = { d: day, n: (out[ref] ? Number(out[ref].n) || 0 : 0) + n };
-  PropertiesService.getScriptProperties().setProperty(LATE_MAP_KEY, JSON.stringify(out));
-}
-function clearMissed_(ref, now) {
-  const map = lateMap_();
-  if (!map[ref]) return;
-  delete map[ref];
-  PropertiesService.getScriptProperties().setProperty(LATE_MAP_KEY, JSON.stringify(map));
-}
-
 // The next 4 AM after `ms`.
 function nextDayStart_(ms) {
   const t = atClock_(ms, 0, DAY_START_MIN);
   return t > ms ? t : atClock_(ms, 1, DAY_START_MIN);
 }
 
-// When a verse added at `ms` can first be pressed: 0 = now (before noon), otherwise the next 4 AM.
+// When a verse added at `ms` first opens: the 4 AM slot of today when it is added before 6 PM (that time may already be past, so the reps missed so far
+// are ready at once and can be caught up with presses in a row), otherwise the next 4 AM. Before 4 AM it opens at 4 AM.
 function startUnlock_(ms) {
   const m = minsOfDay_(ms);
-  if (m < DAY_START_MIN) return atClock_(ms, 0, DAY_START_MIN);
-  if (m < START_LIVE_BEFORE_MIN) return 0;
+  if (m < START_LIVE_BEFORE_MIN) return atClock_(ms, 0, DAY_START_MIN);
   return nextDayStart_(ms);
 }
+
+// The Learn day starts at 4 AM, so a time before 4 AM still belongs to the day before.
+function learnDayBase_(ms) { return minsOfDay_(ms) < DAY_START_MIN ? ms - 86400000 : ms; }
+// When the rep after rep number `dot` of a verse opens: its slot of today's Learn day. If that time has already gone by, the rep is ready at once, so a day
+// that ran behind is caught up by pressing again.
+function catchUpSlot_(dot, now) { return atClock_(learnDayBase_(now), 0, LEARN_SLOTS[Math.min(dot, LEARN_SLOTS.length - 1)]); }
 
 // Number of verses in a reference, from the [n] markers in its text (minimum 1).
 function verseCount_(text) {
@@ -441,7 +412,7 @@ function stageInfo_(rep, n, bRaw, now) {
 // What a press does. Returns { rep, unlock } (unlock 0 = live now) or { promote: true }.
 function nextStep_(info, rep, now) {
   if (info.stage === 'learn') {
-    if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, unlock: nextSlotAfter_(now) };
+    if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, unlock: catchUpSlot_(info.dot, now) };   // may be in the past: ready at once
     return { rep: rep + 1, unlock: nextDayStart_(now) }; // Next Verse or Learned: starts again at 4 AM tomorrow
   }
   if (info.lockPart === 'am') {
@@ -479,7 +450,6 @@ function learningCard_(row, i, now) {
   const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now);
   card.late = li.late;            // reps already late right now (the open rep and any slots that went by)
   card.lateAt = li.next;          // when the next one will count as late (the screen repaints then)
-  card.missed = missedToday_(ref, now); // reps that were pressed late earlier today
   return card;
 }
 
@@ -553,15 +523,6 @@ function learnAction(reference, action, expectedRep) {
       }
       step = nextStep_(info, rep, now);
     }
-
-    // A rep pressed after its grace time is remembered for the rest of the day (the dots stay amber / red).
-    try {
-      if (action !== 'skip' && action !== 'again') {
-        const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now);
-        if (li.late > 0 && !step.promote) addMissed_(ref, li.late, now);
-      }
-      if (step.promote) clearMissed_(ref, now);
-    } catch (e) { console.error('late record failed: ' + e); }
 
     let promoted = false;
     let card = null;
@@ -1356,9 +1317,9 @@ function addChosenVerse(rowIndex, reference) {
       }
     }
     // Starts today if added before noon, otherwise at 4 AM tomorrow (before 4 AM: at 4 AM).
-    const unlock = startUnlock_(nowMs_());
+    const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
     sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
-    return { success: true, reference: want, rowIndex: row, unlockAt: unlock };
+    return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0 };
   } finally {
     lock.releaseLock();
   }

@@ -1416,7 +1416,7 @@
         <div class="help-row"><span>Learn opens</span><kbd class="nw">4 · 8 · 10 AM · 12 · 2 · 4 · 6 PM</kbd></div>
         <div class="help-row"><span>Lock AM opens</span><kbd>4 AM</kbd></div>
         <div class="help-row"><span>Lock PM opens</span><kbd>6 PM</kbd></div>
-        <div class="help-note">A verse added before noon starts today; after noon it waits for 4 AM tomorrow. A rep left an hour past opening is marked late (amber, then red) and is not made up.</div>
+        <div class="help-note">A verse added before 6 PM starts today and all 7 reps are done in one day; after 6 PM it waits for 4 AM tomorrow. A rep left an hour past opening shows amber. Press Review again to catch up: each rep whose time has passed opens at once.</div>
         <div class="help-sub">Notifications</div>
         <div class="help-row"><span>Reviews, plus the 4 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
         <div class="help-row"><span>Learn at open</span><kbd class="nw">8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
@@ -3025,7 +3025,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-275';
+    const CLIENT_BUILD = 'sync-276';
 
     let queue = [];
     let currentIndex = 0;
@@ -4834,7 +4834,7 @@
     // The same stage rules the server uses, so a press shows its result straight away instead of waiting for the round trip.
     const L_SLOTS = [240, 480, 600, 720, 840, 960, 1080];
     function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
-    function lNextSlot(ms) { for (let i = 0; i < L_SLOTS.length; i++) { const t = lAt(ms, 0, L_SLOTS[i]); if (t > ms) return t; } return lAt(ms, 1, L_SLOTS[0]); }
+    function lDayBase(ms) { return new Date(ms).getHours() * 60 + new Date(ms).getMinutes() < 240 ? ms - 86400000 : ms; }   // before 4 AM still belongs to the day before
     function lDayStart(ms) { const t = lAt(ms, 0, 240); return t > ms ? t : lAt(ms, 1, 240); }
     function lInfo(rep, n) {
       const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
@@ -4848,7 +4848,7 @@
       return o;
     }
     // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (4 AM rep: 7 AM; 6 PM rep and Lock PM: 8:30 PM;
-    // Lock AM: noon). Late reps are not made up (card.missed still counts them for the day), but the dots only warn while a rep is late right now.
+    // Lock AM: noon). A late rep is made up by pressing again; the dots warn while a rep is late right now.
     function lLateDeadline(slotMs, stage, lockPart) {
       const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
       if (stage === 'lock') { const lim = lockPart === 'pm' ? 1230 : 720; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
@@ -4900,14 +4900,12 @@
     function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
     function repStatus(card) {
       const part = repPart(card);
-      const late = lateNow(card).late, missed = card.missed || 0;
+      const late = lateNow(card).late;
       let text, lv;
-      // Reps pressed late earlier today are not made up, so the line says how far behind the day's schedule this verse is
-      // (the dots still go back to normal once nothing is waiting).
-      const behind = missed ? missed + " behind" : "";
-      if (!late) { text = behind || "on track"; lv = 0; }
-      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is ready" + (behind ? " · " + behind : ""); lv = 1; }
-      else { text = late + " reps ready" + (behind ? " · " + behind : ""); lv = 1; }
+      // A late rep is made up by pressing again (the next rep opens at once when its time has passed), so the line only says what is waiting.
+      if (!late) { text = "on track"; lv = 0; }
+      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is ready"; lv = 1; }
+      else { text = late + " reps ready"; lv = 1; }
       return { text: part + " \u00b7 " + text, level: lv };
     }
     function predictLearn(card, kind) {
@@ -4918,12 +4916,11 @@
       } else if (kind === 'skip') {
         if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nr = 7 * n + 1; unlock = lDayStart(now); }
       } else if (info.stage === 'learn') {
-        nr = rep + 1; unlock = info.dot < 7 ? lNextSlot(now) : lDayStart(now);
+        nr = rep + 1; unlock = info.dot < 7 ? lAt(lDayBase(now), 0, L_SLOTS[Math.min(info.dot, 6)]) : lDayStart(now);   // a rep whose time has passed is ready at once
       } else {
         const pm = lAt(now, 0, 1080); nr = rep + 1; unlock = pm > now ? pm : 0;
       }
-      const missed = (card.missed || 0) + (kind === 'skip' || kind === 'again' ? 0 : lateNow(card).late);
-      return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock, readyAt: unlock, late: 0, lateAt: 0, missed: missed });
+      return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 });
     }
 
     function scoreCard(action) {
