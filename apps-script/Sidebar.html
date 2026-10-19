@@ -3025,7 +3025,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-277';
+    const CLIENT_BUILD = 'sync-278';
 
     let queue = [];
     let currentIndex = 0;
@@ -4902,10 +4902,9 @@
       const part = repPart(card);
       const late = lateNow(card).late;
       let text, lv;
-      // A late rep is made up by pressing again (the next rep opens at once when its time has passed), so the line only says what is waiting.
+      // A late rep is made up by pressing again (the next rep opens at once when its time has passed), so the line says how many are behind right now.
       if (!late) { text = "on track"; lv = 0; }
-      else if (late === 1) { text = "the " + new Date(card.readyAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " rep is ready"; lv = 1; }
-      else { text = late + " reps ready"; lv = 1; }
+      else { text = late + (late === 1 ? " rep behind" : " reps behind"); lv = 1; }   // the same count that turns the dots amber
       return { text: part + " \u00b7 " + text, level: lv };
     }
     function predictLearn(card, kind) {
