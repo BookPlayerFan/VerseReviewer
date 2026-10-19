@@ -1871,6 +1871,22 @@
       wakeSentAt = Date.now();
       try { window.top.postMessage({ type: 'VR_WAKE', on: true }, '*'); } catch (e) {}
     }, { passive: true, capture: true });
+    // After a press, once the screen has moved on: if nothing is waiting any more, ask the shell page to take the matching notifications off the lock screen.
+    // The New reminder goes when no Learn / Lock card is open; the 6 AM one (reviews and the 4 AM cards together) goes when nothing at all is waiting.
+    let clearPushTimer = null;
+    const CLEAR_PUSH_MS = 1500;
+    function scheduleClearDelivered() {
+      clearTimeout(clearPushTimer);
+      clearPushTimer = setTimeout(function() {
+        clearPushTimer = null;
+        if (isFetching || isRefreshing) return;
+        const reviews = Math.max(0, activeEnd() - currentIndex), fresh = unseenCount();
+        if (fresh > 0 && reviews > 0) return;
+        const msg = { type: 'VR_CLEAR_PUSH', fresh: fresh === 0, daily: fresh === 0 && reviews === 0 };
+        if (!msg.fresh && !msg.daily) return;
+        try { window.top.postMessage(msg, '*'); } catch (e) {}
+      }, CLEAR_PUSH_MS);
+    }
     function updateTabs() {
       if (mode === "learning" && learningCards[learningIndex] && !isScoring) paintLearningButton(learningCards[learningIndex]);
       updateProgressBar();
@@ -3081,7 +3097,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-262';
+    const CLIENT_BUILD = 'sync-263';
 
     let queue = [];
     let currentIndex = 0;
@@ -4852,6 +4868,7 @@
       if (!card) return;
       if (kind === "press" && isLocked(card)) return; // the unlock time is only in the hold menu
       learnPending = true;
+      scheduleClearDelivered();
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
       if (promote) {
@@ -4999,6 +5016,7 @@
       if (action === "Fail" && queue[currentIndex].isRepeat) return; // repeat cards have no Repeat button (the D key must not sneak one in)
 
       isScoring = true;
+      scheduleClearDelivered();
 
       const card = queue[currentIndex];
       const notice = document.getElementById("toastNotice");

@@ -223,6 +223,24 @@
     var handoffTimer = null;
     var failTimer = null;
 
+    // Take delivered reminders off the lock screen once nothing is waiting: the New reminders (topic "vr-new") and / or the 6 AM one ("vr-daily").
+    // Best effort: if the phone does not let the page look at them, they simply stay until swiped away.
+    function clearDelivered(fresh, daily) {
+      try {
+        if (!(fresh || daily) || !navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) return;
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(reg) {
+            if (!reg.getNotifications) return;
+            reg.getNotifications().then(function(list) {
+              list.forEach(function(n) {
+                var tag = String(n.tag || "");
+                if ((fresh && /^vr-new/.test(tag)) || (daily && tag === "vr-daily")) { try { n.close(); } catch (e) {} }
+              });
+            }, function() {});
+          });
+        }, function() {});
+      } catch (e) {}
+    }
     function isAppOrigin(o) { return /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(String(o)); }
 
     function todayKey() {
@@ -371,6 +389,10 @@
       if (d.type === 'VR_WAKE') {
         wakeApp = d.on === true;
         if (wakeApp) wakeTouch(); else wakeSync();
+        return;
+      }
+      if (d.type === 'VR_CLEAR_PUSH') {
+        clearDelivered(d.fresh === true, d.daily === true);
         return;
       }
       if (d.type === 'VR_PUSH_ENABLE') {
