@@ -757,6 +757,9 @@
       user-select: none;
     }
 
+    /* a long press (the hint hold) must not start iOS's text highlight over the blurred words */
+    .passage-stream, .passage-stream .verse-unit, .passage-stream .v-text { -webkit-user-select: none; -webkit-touch-callout: none; }
+    .passage-stream ::selection, .passage-stream::selection { background: transparent; color: inherit; }
     .v-text {
       border-radius: 4px;
       padding: 2px 4px;
@@ -1160,7 +1163,7 @@
     .pv-save { background: transparent; color: var(--text-accent); border: 1.5px solid var(--text-accent); }
     .pv-save:disabled { opacity: .4; pointer-events: none; }
     #pastePreview .pv-edit { border: 1px solid var(--border-card); border-radius: 12px; background: var(--bg-body); color: var(--text-muted); font-size: 16px; font-weight: 700; padding: 13px; }
-    .pp-learn-note { text-align: center; text-wrap: balance; margin: -2px 0 0; min-height: 0; }
+    .pp-learn-note { text-align: center; text-wrap: balance; margin: 10px 8px 0; min-height: 0; }
     .pp-learn-note:empty { display: none; }
     .pv-undo { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .uc-body { text-align: center; font-size: 16px; line-height: 1.45; margin: 2px 0 8px; color: var(--text-primary); }
@@ -1526,13 +1529,13 @@
       <div class="pp-note" id="ppNote"></div>
       <div class="pv-btns pp-col">
         <button type="button" class="pv-add" id="ppLearn" onclick="addFromPreview(true)">Save &amp; Learn now</button>
-        <div class="pp-note pp-learn-note" id="ppLearnNote"></div>
         <button type="button" class="pv-save" id="ppAdd" onclick="addFromPreview(false)">Save to my list</button>
       </div>
       <div class="pv-btns pp-row">
         <button type="button" class="pv-close" onclick="cancelPastePreview()">Cancel</button>
         <button type="button" class="pv-edit" onclick="editPastePreview()">Edit</button>
       </div>
+      <div class="pp-note pp-learn-note" id="ppLearnNote"></div>
     </div>
   </div>
 
@@ -3108,7 +3111,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-264';
+    const CLIENT_BUILD = 'sync-265';
 
     let queue = [];
     let currentIndex = 0;
