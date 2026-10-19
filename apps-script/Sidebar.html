@@ -402,8 +402,7 @@
     :root[data-theme="dark"] .cal-d.s1, :root[data-theme="dark"] .tomorrow-note.s1 { --fill: #1f4a33; --ink: #8fe0ae; }
     :root[data-theme="dark"] .cal-d.s2, :root[data-theme="dark"] .tomorrow-note.s2 { --fill: #1f3d6e; --ink: #9cc2ff; }
     :root[data-theme="dark"] .cal-d.s3, :root[data-theme="dark"] .tomorrow-note.s3 { --fill: #5a4122; --ink: #ffb454; }
-    .tomorrow-note.s1, .tomorrow-note.s2, .tomorrow-note.s3 { background: var(--fill); color: var(--ink); }
-    /* a day with nothing due is just a faint number */
+        /* a day with nothing due is just a faint number */
     .cal-d.z { background: none; color: var(--text-meta); font-size: 18px; font-weight: 500; opacity: 0.5; pointer-events: none; }
     .cal-d.past { opacity: 0.22; }
     .cal-d.today { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3.5px var(--text-accent); }
@@ -1007,19 +1006,24 @@
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
+      display: inline-flex;
       width: max-content;
       max-width: 90%;
       bottom: 16px;
       font-size: 13px;
       font-weight: 700;
-      color: var(--text-accent, #1a73e8);
-      background: var(--badge-pass-bg, rgba(26,115,232,0.12));
-      padding: 8px 16px;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border-card);
       border-radius: 999px;
+      overflow: hidden;
       text-align: center;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
+    .tomorrow-note span { padding: 7px 14px; white-space: nowrap; }
+    .tomorrow-note span + span { border-left: 1px solid var(--border-card); color: var(--ink, var(--text-accent, #1a73e8)); }
+    .tomorrow-note b { color: var(--text-primary); font-weight: 800; }
 
 
 
@@ -3020,7 +3024,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-268';
+    const CLIENT_BUILD = 'sync-269';
 
     let queue = [];
     let currentIndex = 0;
@@ -3936,11 +3940,15 @@
       renderTreasuryPill(ready);
       if (!ready || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       const wasHidden = el.style.display === "none";
-      const label = (tomorrowCount > 0 ? tomorrowCount + " due tomorrow" : "Nothing due tomorrow") + " \u203A";
+      const label = (tomorrowCount > 0 ? tomorrowCount + " tomorrow" : "Nothing tomorrow") + "|Schedule \u203A";
       const cls = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
-      if (el.textContent !== label) el.textContent = label;
+      if (el.getAttribute("data-label") !== label) {
+        el.setAttribute("data-label", label);
+        const parts = label.split("|");
+        el.innerHTML = "<span>" + (tomorrowCount > 0 ? "<b>" + tomorrowCount + "</b> tomorrow" : "Nothing tomorrow") + "</span><span>" + parts[1] + "</span>";
+      }
       if (el.className.replace(" fade-in", "") !== cls) el.className = cls;
-      el.style.display = "block";
+      el.style.display = "inline-flex";
       if (wasHidden) { el.classList.remove("fade-in"); void el.offsetWidth; el.classList.add("fade-in"); }
     }
     let noteHoldOver = false, noteHoldTimer = null;
