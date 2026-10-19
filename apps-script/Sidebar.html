@@ -1127,8 +1127,6 @@
     .pv-save { background: transparent; color: var(--text-accent); border: 1.5px solid var(--text-accent); }
     .pv-save:disabled { opacity: .4; pointer-events: none; }
     #pastePreview .pv-edit { border: 1px solid var(--border-card); border-radius: 12px; background: var(--bg-body); color: var(--text-muted); font-size: 16px; font-weight: 700; padding: 13px; }
-    .pp-learn-note { text-align: center; text-wrap: balance; margin: 10px 8px 0; min-height: 0; }
-    .pp-learn-note:empty { display: none; }
     .pv-undo { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .uc-body { text-align: center; font-size: 16px; line-height: 1.45; margin: 2px 0 8px; color: var(--text-primary); }
     .uc-body .uc-sub { margin-top: 4px; font-size: 14px; color: var(--text-muted); }
@@ -1499,7 +1497,6 @@
         <button type="button" class="pv-close" onclick="cancelPastePreview()">Cancel</button>
         <button type="button" class="pv-edit" onclick="editPastePreview()">Edit</button>
       </div>
-      <div class="pp-note pp-learn-note" id="ppLearnNote"></div>
     </div>
   </div>
 
@@ -3028,7 +3025,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-274';
+    const CLIENT_BUILD = 'sync-275';
 
     let queue = [];
     let currentIndex = 0;
@@ -4331,7 +4328,7 @@
       if (isLocked(card)) add(label + " Now", label === "Review" ? "" : "go", function() { pressLearning("now"); });
       if (card.stage === 'learn') {
         const last = !(card.verseIndex < card.verseCount);
-        add(last ? "Skip to Lock" : "Skip Verse", "alt", function() { pressLearning("skip"); });
+        add(last ? "Skip to Lock" : "Next Verse", "alt", function() { pressLearning("skip"); });
       }
       if (card.stage === 'lock' && !isLocked(card)) add("Keep in Lock another day", "alt", function() { pressLearning("again"); });
       add("Cards in progress \u203a", "alt", function() { openProgressList(); });
@@ -4781,7 +4778,7 @@
       pressLearning("press");
     }
 
-    // kind: 'press' (the button), 'now' (hold menu, ignores the lock), 'skip' (Skip Verse / Skip to Lock) or 'again' (Keep in Lock another day).
+    // kind: 'press' (the button), 'now' (hold menu, ignores the lock), 'skip' (Next Verse / Skip to Lock) or 'again' (Keep in Lock another day).
     function pressLearning(kind) {
       if (isScoring || learnPending) return;
       const card = learningCards[learningIndex];
@@ -5630,6 +5627,7 @@
       hint.textContent = note || "";
       hint.className = note ? "paste-hint bad" : "paste-hint";
       document.getElementById("pasteAdd").disabled = false;
+      document.getElementById("pasteAdd").style.display = prefill ? "" : "none";   // before anything is pasted there is only Cancel
       document.getElementById("pasteModal").classList.add("open");
       if (prefill) updatePasteHint();
       // Focus right here, while the tap that opened the box is still in progress: iPhone only raises the keyboard
@@ -5694,7 +5692,6 @@
       // one new verse at a time: Save & Learn is off while one is on the New tab (Save to my list still works)
       const haveNew = haveVerseInLearn();
       document.getElementById("ppLearn").disabled = haveNew;
-      document.getElementById("ppLearnNote").textContent = haveNew ? "You already have a new verse. Level it up first, then Save & Learn." : "";
       try { document.getElementById("pasteText").blur(); } catch (e) {}
       document.getElementById("pastePreview").classList.add("open");
     }
@@ -5746,6 +5743,7 @@
     function updatePasteHint() {
       const el = document.getElementById("pasteHint");
       const p = parsePasted(document.getElementById("pasteText").value);
+      document.getElementById("pasteAdd").style.display = p.empty ? "none" : "";
       if (p.empty) { el.textContent = ""; el.className = "paste-hint"; return; }
       if (p.error) { el.textContent = p.error; el.className = "paste-hint bad"; return; }
       el.textContent = p.ref + " · " + p.ver + (p.defaultVer ? " (no version given)" : "");
@@ -5853,7 +5851,7 @@
       addBtn.disabled = haveNew;
       addBtn.onclick = function() { if (haveNew) return; closePreview(); chooseVerse(it); };
       const del = document.getElementById("pvDel"), note = document.getElementById("pvNote");
-      note.textContent = (haveNew && !noAdd && !canDelete) ? "You already have a new verse. Level it up first, then add the next one." : "";
+      note.textContent = "";
       note.className = "pp-note";
       del.disabled = false;
       if (canDelete) {
