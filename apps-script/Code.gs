@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-91'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-92'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1816,20 +1816,36 @@ const PUSH_DAILY_ID_KEY = 'VR_PUSH_DAILY_ID'; // { id, at } of the daily push wh
 const PUSH_LAST_KEY = 'VR_PUSH_LAST';       // last API answer, for troubleshooting
 
 // ───────────── Push log ─────────────
-// Every notification the app asks OneSignal for (and every cancel) is added as a row on a "Push Log" tab, newest at the bottom,
-// so a missing notification can be traced: was it ever scheduled, for what time, and what did OneSignal answer?
+// A "Push Log" tab records only what went wrong: a notification OneSignal refused, a cancel that failed, a scheduling error. Pushes that go
+// through fine leave no row, so the tab stays empty while everything works. The two editor helpers (pushStatus / pushReport) still add their
+// "status" and "report" rows when you run them, so a missing notification can be traced.
 // Run pushReport() from the editor to add what OneSignal itself says happened to the 15 most recent notifications.
 // A logging problem never blocks a push.
 const PUSH_LOG_SHEET = 'Push Log';
 const PUSH_LOG_HEADERS = ['Logged', 'Event', 'Reference / topic', 'Scheduled for', 'Result', 'Detail'];
 const PUSH_LOG_KEEP = 400;
 
+// The Push Log tab, found whatever its spacing or capitals ("Push log", "PushLog") and renamed to exactly "Push Log".
+function pushLogSheet_(ss, create) {
+  const want = PUSH_LOG_SHEET.toLowerCase().replace(/\s+/g, '');
+  const all = ss.getSheets();
+  for (let i = 0; i < all.length; i++) {
+    const nm = all[i].getName();
+    if (nm.toLowerCase().replace(/\s+/g, '') === want) {
+      if (nm !== PUSH_LOG_SHEET) { try { all[i].setName(PUSH_LOG_SHEET); } catch (e) {} }
+      return all[i];
+    }
+  }
+  return create ? ss.insertSheet(PUSH_LOG_SHEET) : null;
+}
+
 function pushLog_(event, ref, whenMs, ok, detail) {
   try {
+    if (ok === true && !/^(status|report)/.test(event)) return;   // only failures are kept (status / report rows are the ones you ask for)
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(PUSH_LOG_SHEET);
+    let sheet = pushLogSheet_(ss, false);
     if (!sheet) {
-      sheet = ss.insertSheet(PUSH_LOG_SHEET);
+      sheet = pushLogSheet_(ss, true);
       sheet.appendRow(PUSH_LOG_HEADERS);
       try { sheet.setFrozenRows(1); } catch (e) {}
       try { sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd hh:mm:ss'); sheet.getRange('D:D').setNumberFormat('yyyy-mm-dd hh:mm:ss'); } catch (e) {}
