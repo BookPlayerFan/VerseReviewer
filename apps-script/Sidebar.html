@@ -3024,7 +3024,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-270';
+    const CLIENT_BUILD = 'sync-271';
 
     let queue = [];
     let currentIndex = 0;
@@ -3900,7 +3900,7 @@
       });
     }
     let ptsHeld = null;
-    // Hold the Treasury box: for 3 seconds its number becomes the net points of the last 7 days (today included) and its label says "This week".
+    // Hold the Treasury box: for 3 seconds its number becomes the net points of the last 7 days (today included) and its label says "Last 7".
     let weekTimer = null, weekToken = 0;
     function restoreTreasuryBox() {
       clearTimeout(weekTimer); weekTimer = null; weekToken++;
@@ -3913,7 +3913,7 @@
       clearTimeout(weekTimer);
       const tok = ++weekToken;
       const el = document.getElementById("statGraduated");
-      document.querySelector("#statGradBox .stat-lbl").textContent = "This week";
+      document.querySelector("#statGradBox .stat-lbl").textContent = "Last 7";
       el.textContent = "\u2026"; el.classList.remove("neg");
       weekTimer = setTimeout(restoreTreasuryBox, 8000);   // if the numbers never arrive, it still goes back
       netPointsOver(7, function(n) {
