@@ -279,7 +279,7 @@
     .pk-k span { font-size: 10.5px; font-weight: 600; line-height: 1; letter-spacing: 0.02em; opacity: 0.75; }
     .pk-k { --rc: var(--rl); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 46px; border-radius: 8px; white-space: nowrap; color: var(--rc);
       background-color: var(--bg-card); background-image: linear-gradient(color-mix(in srgb, var(--rc) 14%, transparent), color-mix(in srgb, var(--rc) 14%, transparent)); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
-    .vm-grid { display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
+    .vm-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
     /* a colour for each section of the Bible */
     .cat-1 { --rl: #138a55; --rd: #4fd18e; }
     .cat-2 { --rl: #2563c9; --rd: #7fa8ff; }
@@ -290,14 +290,15 @@
     .vm-tile { --rc: var(--rl); position: relative; box-sizing: border-box; min-height: 0; width: auto; padding: 0; border-radius: 8px; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 2px; line-height: 1; letter-spacing: 0; box-shadow: none; color: var(--rc);
       background: color-mix(in srgb, var(--rc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
-    .vm-tile .vm-ab { font-size: 14px; font-weight: 800; }
-    .vm-tile .vm-ct { font-size: 11px; font-weight: 700; opacity: 0.85; }
+    .vm-tile { padding: 0 7px; overflow: hidden; gap: 3px; }
+    .vm-tile .vm-ab { font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .vm-tile .vm-ct { font-size: 12px; font-weight: 800; opacity: 0.85; }
     .vm-tile.dim { opacity: 0.35; }
     /* a book with no verses yet: the section colour, dimmed, with a dotted outline */
     .vm-tile.empty { background: color-mix(in srgb, var(--rc) 5%, transparent); border: 1px dashed color-mix(in srgb, var(--rc) 38%, transparent); color: color-mix(in srgb, var(--rc) 50%, var(--text-meta)); opacity: 0.75; pointer-events: none; }
-    .vm-tile.empty .vm-ab { font-size: 12px; font-weight: 600; }
+    .vm-tile.empty .vm-ab { font-weight: 600; }
     .vm-tile.skel { opacity: 0.55; }
-    .vm-info { grid-column: 8; grid-row: 4; box-sizing: border-box; min-height: 0; width: auto; padding: 0; margin: 0; border: 0; border-radius: 8px; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+    .vm-info { grid-column: 5; grid-row: 6; box-sizing: border-box; min-height: 0; width: auto; padding: 0; margin: 0; border: 0; border-radius: 8px; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
     .vm-info svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
     .vm-info:active { transform: none; filter: none; opacity: 0.6; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
@@ -2861,7 +2862,7 @@
         map.appendChild(h);
         const grid = document.createElement("div");
         grid.className = "vm-grid";
-        const rows = Math.ceil(books.length / 8);
+        const rows = Math.ceil(books.length / 5);
         grid.style.flex = rows + " 1 0"; grid.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
         books.forEach(function(b) {
           const g = byKey[b.key];
@@ -2871,7 +2872,7 @@
           t.className = "vm-tile empty " + cat + (skeleton ? " skel" : "");
           if (g) {
             t.className = "vm-tile " + cat;
-            const ab = document.createElement("span"); ab.className = "vm-ab"; ab.textContent = b.abbr;
+            const ab = document.createElement("span"); ab.className = "vm-ab"; ab.textContent = b.abbr; ab.setAttribute("data-full", b.full || g.name);
             const ct = document.createElement("span"); ct.className = "vm-ct"; ct.textContent = g.n;
             t.appendChild(ab); t.appendChild(ct);
             t.setAttribute("aria-label", g.name + ", " + g.n + (g.n === 1 ? " verse" : " verses"));
@@ -2879,14 +2880,14 @@
             const heldTile = attachLongPress(t, function() { peekBook(g.key, t); heldTile(); });
             t.onclick = function() { if (heldTile()) return; peekBook(g.key, t); };
             t._openBook = function() { peekBook(g.key, t); };   // so a tap on this tile through an open book's dimmer switches to it
-          } else t.textContent = b.abbr;
+          } else { const ab = document.createElement("span"); ab.className = "vm-ab"; ab.textContent = b.abbr; ab.setAttribute("data-full", b.full || b.abbr); t.appendChild(ab); }
           grid.appendChild(t);
         });
         map.appendChild(grid);
       };
       const ot = [], nt = [], other = [];
-      BIBLE_BOOKS.forEach(function(b, i) { (i < 39 ? ot : nt).push({ key: i, abbr: BOOK_ABBR[i] }); });
-      Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3) }); });
+      BIBLE_BOOKS.forEach(function(b, i) { (i < 39 ? ot : nt).push({ key: i, abbr: BOOK_ABBR[i], full: b[0] }); });
+      Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3), full: byKey[k].name }); });
       section("Old Testament", ot, "ot");
       section("New Testament", nt, "nt");
       // the status and gestures panel lives in the empty cell under 2 John, in step with the book tiles
@@ -2898,7 +2899,39 @@
       if (other.length) section("Other", other);
 
       box.textContent = "";
+      fitMapNames(map);
+      requestAnimationFrame(function() { fitMapNames(map); });
     }
+    // Each tile shows as much of its book's name as the tile is wide, however long the name: the whole name when it fits, otherwise its first letters
+    // (the number stuck to the name: 1Thessa). One width, whatever the letters, so the tiles look even.
+    let mapMeasure;
+    function mapNameWidth(text, font) {
+      mapMeasure.font = font;
+      return mapMeasure.measureText(text).width;
+    }
+    function fitMapNames(map) {
+      map = map || document.querySelector(".vl-map");
+      if (!map) return;
+      const first = map.querySelector(".vm-tile");
+      if (!first) return;
+      if (mapMeasure === undefined) { try { mapMeasure = document.createElement("canvas").getContext("2d") || null; } catch (e) { mapMeasure = null; } }
+      if (!mapMeasure) return;   // nothing to measure with: the tiles keep their short names
+      const tw = first.getBoundingClientRect().width || ((window.innerWidth - 32 - 16) / 5);
+      const room = tw - 14 - 2;   // the tile's side padding, and a hair of air
+      Array.prototype.forEach.call(map.querySelectorAll(".vm-ab[data-full]"), function(ab) {
+        let full = ab.getAttribute("data-full").replace(/^(\d)\s+/, "$1");
+        if (/^Song of /.test(full)) full = "Song";
+        const cs = getComputedStyle(ab), font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+        let name = full;
+        if (mapNameWidth(name, font) > room) {
+          let n = name.length;
+          while (n > 1 && mapNameWidth(name.slice(0, n), font) > room) n--;
+          name = name.slice(0, n);
+        }
+        if (ab.textContent !== name) ab.textContent = name;
+      });
+    }
+    window.addEventListener("resize", function() { fitMapNames(); });
 
     // The end-of-list cues (see .end-mark): marks a scrolling element as scrolling or not, and fades its bottom edge while there is more below.
     // label: the text after the last row ("End \u00b7 14 references"); null for only the fade.
@@ -3025,7 +3058,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-279';
+    const CLIENT_BUILD = 'sync-280';
 
     let queue = [];
     let currentIndex = 0;
