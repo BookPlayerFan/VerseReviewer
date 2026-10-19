@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-94'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-95'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -319,8 +319,10 @@ function lateDeadline_(slotMs, stage, lockPart) {
 }
 
 // For a card that opens (or opened) at readyMs: { late: reps already late, next: the next time a rep will count as late (0 = none) }.
-// A Learn card has one rep per slot from readyMs on, and each slot whose deadline has gone by without a press is one late rep.
-function lateInfo_(stage, lockPart, readyMs, now) {
+// A Learn card has one rep per slot, and each slot whose deadline has gone by without a press is one late rep. With `dot` (the rep the card is on) the count
+// starts at that rep's own slot of the day it opened on, whatever time was stored, so a verse is judged against the day's schedule however it got there,
+// and it never counts more late reps than the card has left.
+function lateInfo_(stage, lockPart, readyMs, now, dot) {
   const out = { late: 0, next: 0 };
   if (!readyMs) return out;
   if (stage === 'lock') {
@@ -328,15 +330,18 @@ function lateInfo_(stage, lockPart, readyMs, now) {
     if (dl <= now) out.late = 1; else out.next = dl;
     return out;
   }
+  const base = dot ? learnDayBase_(readyMs) : readyMs;
+  const first = dot ? Math.max(0, Math.min(dot, LEARN_SLOTS.length) - 1) : 0;
+  const cap = dot ? Math.max(0, REPS_PER_VERSE - dot + 1) : 1e9;
   for (let d = 0; d < 21; d++) {
     for (let i = 0; i < LEARN_SLOTS.length; i++) {
-      const t = atClock_(readyMs, d, LEARN_SLOTS[i]);
-      if (t < readyMs) continue;
+      const t = atClock_(base, d, LEARN_SLOTS[i]);
+      if (dot ? (d === 0 && i < first) : t < readyMs) continue;
       const dl = lateDeadline_(t, stage, lockPart);
-      if (dl <= now) out.late++;
-      else if (!out.next) { out.next = dl; return out; }
+      if (dl <= now) { out.late++; if (out.late >= cap) { out.late = cap; return out; } }
+      else { out.next = dl; return out; }
     }
-    if (atClock_(readyMs, d + 1, LEARN_SLOTS[0]) > now + 86400000) break;
+    if (atClock_(base, d + 1, LEARN_SLOTS[0]) > now + 86400000) break;
   }
   return out;
 }
@@ -447,7 +452,7 @@ function learningCard_(row, i, now) {
   };
   const info = stageInfo_(rep, n, row[1], now);
   Object.keys(info).forEach(function(k) { card[k] = info[k]; });
-  const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now);
+  const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now, info.dot);
   card.late = li.late;            // reps already late right now (the open rep and any slots that went by)
   card.lateAt = li.next;          // when the next one will count as late (the screen repaints then)
   return card;

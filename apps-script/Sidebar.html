@@ -3025,7 +3025,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-278';
+    const CLIENT_BUILD = 'sync-279';
 
     let queue = [];
     let currentIndex = 0;
@@ -4864,14 +4864,16 @@
         if (dl <= now) out.late = 1; else out.next = dl;
         return out;
       }
+      // Counted from this rep's own slot of the day it opened on (whatever time was stored), and never more than the reps the card has left.
+      const dot = card.dot || 1, base = lDayBase(ready), first = Math.max(0, Math.min(dot, L_SLOTS.length) - 1), cap = Math.max(0, 7 - dot + 1);
       for (let d = 0; d < 21; d++) {
         for (let i = 0; i < L_SLOTS.length; i++) {
-          const t = lAt(ready, d, L_SLOTS[i]);
-          if (t < ready) continue;
+          if (d === 0 && i < first) continue;
+          const t = lAt(base, d, L_SLOTS[i]);
           const dl = lLateDeadline(t, 'learn', '');
-          if (dl <= now) out.late++; else { out.next = dl; return out; }
+          if (dl <= now) { out.late++; if (out.late >= cap) { out.late = cap; return out; } } else { out.next = dl; return out; }
         }
-        if (lAt(ready, d + 1, L_SLOTS[0]) > now + 86400000) break;
+        if (lAt(base, d + 1, L_SLOTS[0]) > now + 86400000) break;
       }
       return out;
     }
