@@ -3028,7 +3028,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-273';
+    const CLIENT_BUILD = 'sync-274';
 
     let queue = [];
     let currentIndex = 0;
@@ -3944,12 +3944,12 @@
       renderTreasuryPill(ready);
       if (!ready || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       const wasHidden = el.style.display === "none";
-      const label = (tomorrowCount > 0 ? tomorrowCount + " tomorrow" : "Nothing tomorrow") + "|Schedule \u203A";
+      const label = (tomorrowCount > 0 ? tomorrowCount + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + "|Schedule \u203A";
       const cls = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
       if (el.getAttribute("data-label") !== label) {
         el.setAttribute("data-label", label);
         const parts = label.split("|");
-        el.innerHTML = "<span>" + (tomorrowCount > 0 ? "<b>" + tomorrowCount + "</b> tomorrow" : "Nothing tomorrow") + "</span><span>" + parts[1] + "</span>";
+        el.innerHTML = "<span>" + (tomorrowCount > 0 ? "<b>" + tomorrowCount + "</b>" + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + "</span><span>" + parts[1] + "</span>";
       }
       if (el.className.replace(" fade-in", "") !== cls) el.className = cls;
       el.style.display = "inline-flex";
