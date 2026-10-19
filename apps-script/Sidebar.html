@@ -2483,6 +2483,7 @@
       vpState = null;
       if (st.fromProgress && !instant) setTimeout(function() { if (!vpState) openProgressList(); }, 220);   // the peek came from the Cards in progress list: back to it
       ctxToken++; // an answer still on its way is kept, but not drawn
+      if (st.ro) { try { st.ro.disconnect(); } catch (e) {} }
       const done = function() { if (st.dim.parentNode) st.dim.parentNode.removeChild(st.dim); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap); };
       if (instant || !st.pop.animate) { done(); return; }
       st.dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
@@ -2597,6 +2598,18 @@
         const h = wrap.offsetHeight;
         wrap.style.top = Math.max(40, Math.min(rr.top + rr.height / 2 - h / 2, room - h)) + "px";
       }
+      // The card is placed for the short Verse view, so when the Background (much longer) takes its place, the card can grow past the
+      // bottom of the screen. fit() lets it use the whole height available and lifts it so its bottom stays above the tab bar.
+      function fit() {
+        if (vpState !== st) return;
+        body.style.maxHeight = Math.max(160, room - 40 - head.offsetHeight) + "px";
+        const h = wrap.offsetHeight;
+        let t = parseFloat(wrap.style.top) || top0;
+        if (t + h > room) t = Math.max(40, room - h);
+        wrap.style.top = t + "px";
+      }
+      st.fit = fit;
+      if (window.ResizeObserver) { try { st.ro = new ResizeObserver(fit); st.ro.observe(box); } catch (e) {} }   // the Background grows when its text arrives
       function show(which) {
         const bg = which === "bg";
         if ((st.showing === "bg") === bg) return;
@@ -2607,6 +2620,7 @@
         const p = bg ? paneB : paneV;
         p.classList.remove("in"); void p.offsetWidth; p.classList.add("in");
         body.scrollTop = 0;
+        fit();
         if (bg && !st.loaded) {
           st.loaded = true;
           const card = { reference: it.f, version: it.v || "", text: it.t || "" };
@@ -3028,7 +3042,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-266';
+    const CLIENT_BUILD = 'sync-267';
 
     let queue = [];
     let currentIndex = 0;
