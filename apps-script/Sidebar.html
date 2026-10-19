@@ -1030,7 +1030,7 @@
     }
     .tomorrow-note span { padding: 7px 14px; white-space: nowrap; line-height: 16px; }
     .tomorrow-note span + span { border-left: 1px solid var(--border-card); color: var(--ink, var(--text-accent, #1a73e8)); }
-    .tomorrow-note b { color: var(--text-primary); font-weight: 800; }
+    .tomorrow-note b { color: inherit; font-weight: 800; }
 
 
 
@@ -1209,13 +1209,13 @@
     button:disabled:active { transform: none; filter: none; }
 
 
-    /* Treasury pill at the top of Review Complete: total points | Treasury \u203A. Tap it (or swipe right) to open the Treasury. */
+    /* Treasury pill at the top of Review Complete: Treasury | total points \u203A. Tap it (or swipe right) to open the Treasury. */
     .tr-pill { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; cursor: pointer;
       display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-card);
       font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
     .tr-pill span { padding: 7px 14px; line-height: 16px; }
     .tr-pill span + span { border-left: 1px solid var(--border-card); }
-    .tr-pill b { color: var(--text-primary); font-weight: 800; }
+    .tr-pill b { color: inherit; font-weight: 800; }
     .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
     .tr-pill:active { opacity: 0.6; }
     .tr-pill.fade-in { animation: noteFadeIn .35s ease-out both; }
@@ -3079,7 +3079,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-281';
+    const CLIENT_BUILD = 'sync-282';
 
     let queue = [];
     let currentIndex = 0;
@@ -3892,8 +3892,11 @@
       const key = typeof pts === "number" ? String(pts) : "";
       if (wasHidden || el.getAttribute("data-pts") !== key) {   // rebuilt only when the number changes, so a refresh with the same total does not blink
         el.textContent = "";
-        if (typeof pts === "number") { const a = document.createElement("span"); a.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> pts"; el.appendChild(a); }
-        const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury \u203A"; el.appendChild(g);
+        // Treasury (plain) | 1,214 points \u203A (blue); with no total yet, just a blue "Treasury \u203A"
+        if (typeof pts === "number") {
+          const a = document.createElement("span"); a.textContent = "Treasury"; el.appendChild(a);
+          const g = document.createElement("span"); g.className = "tp-go"; g.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> points \u203A"; el.appendChild(g);
+        } else { const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury \u203A"; el.appendChild(g); }
         el.setAttribute("aria-label", (typeof pts === "number" ? "Treasury, " + pts + " points. " : "Treasury. ") + "Open");
         el.setAttribute("data-pts", key);
       }
@@ -3995,12 +3998,11 @@
       renderTreasuryPill(ready);
       if (!ready || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
       const wasHidden = el.style.display === "none";
-      const label = (tomorrowCount > 0 ? tomorrowCount + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + "|Schedule \u203A";
+      const label = "Schedule|" + (tomorrowCount > 0 ? tomorrowCount + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + " \u203A";
       const cls = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
       if (el.getAttribute("data-label") !== label) {
         el.setAttribute("data-label", label);
-        const parts = label.split("|");
-        el.innerHTML = "<span>" + (tomorrowCount > 0 ? "<b>" + tomorrowCount + "</b>" + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + "</span><span>" + parts[1] + "</span>";
+        el.innerHTML = "<span>Schedule</span><span>" + (tomorrowCount > 0 ? "<b>" + tomorrowCount + "</b>" + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + " \u203A</span>";
       }
       if (el.className.replace(" fade-in", "") !== cls) el.className = cls;
       el.style.display = "inline-flex";
