@@ -447,21 +447,15 @@
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
-    #verseListView, #upcomingView, #treasuryView, .vl-verse, .vl-row, .vl-tip, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #verseListView, #upcomingView, #treasuryView, .vl-verse, .vl-row, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
-    .fail-list .fail-row .vl-tip { position: static; flex-basis: 100%; max-width: 100%; margin: 0 0 6px; box-shadow: none; white-space: normal; background: var(--btn-restart-bg); color: var(--text-primary); }
-    .vl-tip.on-row { top: calc(50% - 1px); transform: translateY(-50%); overflow: hidden; text-overflow: ellipsis; }
-    .vl-tip { position: absolute; left: 14px; top: calc(100% - 6px); z-index: 5; max-width: 80%;
-      background: #e9ecf1; color: #2b303a; font-size: 13px; font-weight: 500;
-      padding: 6px 12px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); pointer-events: none; white-space: nowrap; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); } }
-    :root[data-theme="dark"] .vl-tip { background: #3a3f4a; color: #e8eaee; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
     /* Peek: the first words swap in over the reference (the rank pill stays), wiping in with a soft edge */
     .vl-peek { position: absolute; z-index: 9; top: 50%; margin-top: -15px; height: 30px; display: flex; align-items: center; box-sizing: border-box; padding: 0 2px; overflow: hidden; pointer-events: none;
       white-space: nowrap; font-weight: 700; font-style: italic; color: var(--text-accent); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+    .peek-hid { visibility: hidden; }
     .vl-peek span { -webkit-mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); padding-right: 6px; }
     /* Full verse popup: the row opens into a card that looks like a review card (rank colours, same header, same verse box).
        Hold the reference to flip the box to the verse's Background. */
@@ -2398,7 +2392,8 @@
     let vlTipTimer = null;
     function hideVerseTip() {
       clearTimeout(vlTipTimer);
-      document.querySelectorAll(".vl-tip, .vl-peek").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+      document.querySelectorAll(".vl-peek").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+      document.querySelectorAll(".peek-hid").forEach(function(n) { n.classList.remove("peek-hid"); });
     }
 
     // The colour behind a row (the first ancestor that has one), so the peek can cover the reference cleanly.
@@ -2419,9 +2414,7 @@
       const stopEl = item.querySelector(".rank-badge, .vl-due, .pts-badge");
       const ir = item.getBoundingClientRect(), nr = nameEl.getBoundingClientRect();
       const left = nr.left - ir.left - 2;
-      const stop = stopEl ? stopEl.getBoundingClientRect().left - ir.left - 8 : ir.width - 12;
-      const w = stop - left;
-      if (!(w >= 70)) return false;
+      let w = (stopEl ? stopEl.getBoundingClientRect().left - ir.left - 8 : ir.width - 12) - left;
       const pill = item.querySelector(".rank-badge:not(.is-new)");
       const pk = document.createElement("div");
       pk.className = "vl-peek";
@@ -2431,6 +2424,12 @@
       sp.textContent = words;
       pk.appendChild(sp);
       item.appendChild(pk);
+      // the three words need the room: if the rank pill is in the way, it steps aside while the words show
+      if (stopEl && sp.scrollWidth + 8 > w) {
+        item.querySelectorAll(".rank-badge, .vl-due, .pts-badge").forEach(function(n) { n.classList.add("peek-hid"); });
+        w = ir.width - left - 12;
+        pk.style.width = w + "px";
+      }
       if (pk.animate) {
         const G = "linear-gradient(90deg, #000 33.3%, transparent 66.6%)";
         pk.style.webkitMaskImage = G; pk.style.maskImage = G; pk.style.webkitMaskSize = "300% 100%"; pk.style.maskSize = "300% 100%";
@@ -2655,29 +2654,8 @@
       }
     }
     function showVerseTip(item, words) {
-      const had = item.querySelector(".vl-tip");
       hideVerseTip();
-      if (had) return; // tapping the same verse again closes it
-      if ((item.classList.contains("fail-row") || (item.classList.contains("vl-verse") && !item.classList.contains("hit"))) && peekSwap(item, words)) return;
-      const tip = document.createElement("div");
-      tip.className = "vl-tip";
-      tip.textContent = words ? words : "(no text)";
-      item.appendChild(tip);
-      // In a book's list the peek pops up on the row itself, just right of the reference, centered on the row's height.
-      // It may cover the version tag and the rank pill.
-      const nameEl = item.classList.contains("vl-verse") && !item.classList.contains("hit") ? item.querySelector(".vl-ref > span") : null;
-      if (nameEl) {
-        const left = nameEl.offsetLeft + nameEl.offsetWidth + 4;
-        const room = item.clientWidth - left - 8;
-        if (room >= 80) {
-          const ver = item.querySelector(".version-badge");
-          tip.classList.add("on-row");
-          tip.style.left = left + "px";
-          tip.style.maxWidth = room + "px";
-          if (ver) tip.style.minWidth = Math.min(room, ver.offsetLeft + ver.offsetWidth - left + 8) + "px"; // wide enough to hide the version tag
-        } // a very long reference leaves no room beside it, so the peek stays below the row
-      }
-      vlTipTimer = setTimeout(hideVerseTip, PEEK_MS);
+      peekSwap(item, words || "(no text)");   // a second tap shows it again from the start
     }
 
     // ── Verse List search ──
@@ -3040,9 +3018,9 @@
 
     const RESTART_LABEL = "Try again";
     const SETTLE_TIMEOUT_MS = 15000;
-    const POLL_MS = 15000;
+    const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-267';
+    const CLIENT_BUILD = 'sync-268';
 
     let queue = [];
     let currentIndex = 0;
@@ -3918,44 +3896,29 @@
       });
     }
     let ptsHeld = null;
+    // Hold the Treasury box: for 3 seconds its number becomes the net points of the last 7 days (today included) and its label says "This week".
+    let weekTimer = null, weekToken = 0;
+    function restoreTreasuryBox() {
+      clearTimeout(weekTimer); weekTimer = null; weekToken++;
+      const lbl = document.querySelector("#statGradBox .stat-lbl");
+      if (lbl) lbl.textContent = "Treasury";
+      paintPts(sessionStats.pts || 0);
+    }
     function openPtsPeek() {
       hideVerseTip(); closePeek();
-      const box = document.getElementById("statGradBox");
-      const dim = document.createElement("div");
-      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.26)";
-      dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
-      document.body.appendChild(dim);
-      const r = box.getBoundingClientRect();
-      const lift = box.cloneNode(true);
-      lift.removeAttribute("id"); lift.removeAttribute("onclick");
-      lift.className += " pk-tile"; lift.id = "pkTile";
-      lift.style.left = r.left + "px"; lift.style.top = r.top + "px"; lift.style.width = r.width + "px"; lift.style.height = r.height + "px";
-      document.body.appendChild(lift);
-      const b = document.createElement("div");
-      b.className = "pk-bubble pk-day"; b.id = "pkBubble";
-      const h = document.createElement("div"); h.className = "pk-h";
-      const hn = document.createElement("div"); hn.textContent = "Treasury points";
-      const hm = document.createElement("span"); hm.textContent = "net";
-      h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
-      const val = {};
-      [["today", "Today"], ["w", "Last 7 days"], ["m", "Last 30 days"], ["tot", "Total"]].forEach(function(x) {
-        const row = document.createElement("div"); row.className = "pk-r";
-        const l = document.createElement("span"); l.textContent = x[1];
-        const v = document.createElement("b"); v.textContent = "\u2026"; v.className = "pk-v";
-        row.appendChild(l); row.appendChild(v); b.appendChild(row); val[x[0]] = v;
+      clearTimeout(weekTimer);
+      const tok = ++weekToken;
+      const el = document.getElementById("statGraduated");
+      document.querySelector("#statGradBox .stat-lbl").textContent = "This week";
+      el.textContent = "\u2026"; el.classList.remove("neg");
+      weekTimer = setTimeout(restoreTreasuryBox, 8000);   // if the numbers never arrive, it still goes back
+      netPointsOver(7, function(n) {
+        if (tok !== weekToken) return;
+        el.textContent = n === null ? "\u2014" : fmtPts(n);
+        el.classList.toggle("neg", n !== null && n < 0);
+        clearTimeout(weekTimer);
+        weekTimer = setTimeout(restoreTreasuryBox, 3000);   // 3 seconds on screen once the number is in
       });
-      const setNet = function(el, n) { el.textContent = n === null ? "\u2014" : fmtPts(n); el.classList.toggle("neg", n !== null && n < 0); };
-      setNet(val.today, sessionStats.pts || 0);
-      const tot = knownTreasury();
-      val.tot.textContent = tot === null ? "\u2014" : tot.toLocaleString("en-US");
-      val.tot.classList.add("tot");
-      netPointsOver(7, function(n) { if (document.getElementById("pkBubble") === b) setNet(val.w, n); });
-      netPointsOver(30, function(n) { if (document.getElementById("pkBubble") === b) setNet(val.m, n); });
-      document.body.appendChild(b);
-      const room = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
-      let top = r.bottom + 14;
-      if (top + b.offsetHeight > room) top = Math.max(10, r.top - 14 - b.offsetHeight);
-      b.style.top = top + "px";
     }
 
     function renderTomorrowNote() {
