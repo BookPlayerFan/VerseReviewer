@@ -3024,7 +3024,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-271';
+    const CLIENT_BUILD = 'sync-272';
 
     let queue = [];
     let currentIndex = 0;
@@ -3876,11 +3876,11 @@
           .getMonthStats(y, m);
       } catch (e) { settle(null); }   // an older Code.gs has no getMonthStats
     }
-    // Net points over the last n days: the days before today come from the sheet's daily log, today from this session.
+    // Net points over the n days before today (today is left out, so the number does not move while you review), from the sheet's daily log.
     function netPointsOver(n, done) {
       const t = new Date(); t.setHours(12, 0, 0, 0);
       const need = [], want = [];
-      for (let i = 1; i < n; i++) {
+      for (let i = 1; i <= n; i++) {
         const d = new Date(t); d.setDate(d.getDate() - i);
         want.push([d.getFullYear(), d.getMonth() + 1, d.getDate()]);
         const k = d.getFullYear() + "-" + (d.getMonth() + 1);
@@ -3889,7 +3889,7 @@
       const got = {}; let left = need.length, bad = false;
       const finish = function() {
         if (bad) { done(null); return; }
-        let sum = sessionStats.pts || 0;
+        let sum = 0;
         want.forEach(function(w) { const md = got[w[0] + "-" + w[1]]; const row = md && md.days && md.days[w[2]]; if (row) sum += row[4] || 0; });
         done(sum);
       };
@@ -3900,7 +3900,7 @@
       });
     }
     let ptsHeld = null;
-    // Hold the Treasury box: for 3 seconds its number becomes the net points of the last 7 days (today included) and its label says "Last 7".
+    // Hold the Treasury box: for 3 seconds its number becomes the net points of the 7 days before today and its label says "Last 7".
     let weekTimer = null, weekToken = 0;
     function restoreTreasuryBox() {
       clearTimeout(weekTimer); weekTimer = null; weekToken++;
