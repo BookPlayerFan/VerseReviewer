@@ -279,7 +279,7 @@
     .pk-k span { font-size: 10.5px; font-weight: 600; line-height: 1; letter-spacing: 0.02em; opacity: 0.75; }
     .pk-k { --rc: var(--rl); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 46px; border-radius: 8px; white-space: nowrap; color: var(--rc);
       background-color: var(--bg-card); background-image: linear-gradient(color-mix(in srgb, var(--rc) 14%, transparent), color-mix(in srgb, var(--rc) 14%, transparent)); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); }
-    .vm-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
+    .vm-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 4px; min-height: 0; }
     /* a colour for each section of the Bible */
     .cat-1 { --rl: #138a55; --rd: #4fd18e; }
     .cat-2 { --rl: #2563c9; --rd: #7fa8ff; }
@@ -298,8 +298,14 @@
     .vm-tile.empty { background: color-mix(in srgb, var(--rc) 5%, transparent); border: 1px dashed color-mix(in srgb, var(--rc) 38%, transparent); color: color-mix(in srgb, var(--rc) 50%, var(--text-meta)); opacity: 0.75; pointer-events: none; }
     .vm-tile.empty .vm-ab { font-weight: 600; }
     .vm-tile.skel { opacity: 0.55; }
-    .vm-info { grid-column: 5; grid-row: 6; box-sizing: border-box; min-height: 0; width: auto; padding: 0; margin: 0; border: 0; border-radius: 8px; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
-    .vm-info svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    /* a thin line between the testaments, and the colour key and info buttons side by side in the New Testament's empty last cell */
+    .vm-div { flex: none; height: 1px; margin: 8px 4px; background: color-mix(in srgb, var(--text-muted) 40%, transparent); }
+    .vm-tools { grid-column: 4; display: flex; align-items: center; justify-content: space-around; min-height: 0; }
+    .vm-info, .vm-leg { box-sizing: border-box; min-height: 0; width: 44px; height: 100%; padding: 0; margin: 0; border: 0; border-radius: 8px; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+    .vm-info svg, .vm-leg svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    .vm-leg:active { transform: none; filter: none; opacity: 0.6; }
+    .pk-lab { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 4px 2px 0; }
+    .pk-lab:first-child { margin-top: 0; }
     .vm-info:active { transform: none; filter: none; opacity: 0.6; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
@@ -2813,10 +2819,10 @@
       return i < 43 ? 1 : i === 43 ? 2 : i < 53 ? 3 : i < 57 ? 4 : 5;
     }
     const MAP_KEY = {
-      ot: [[1, "Law", "Gen \u00b7 Exo \u00b7 Lev \u00b7 Num \u00b7 Deu"], [2, "History", "Jos \u00b7 Jdg \u00b7 Rut \u00b7 1Sa \u2026 Est"], [3, "Wisdom & poetry", "Job \u00b7 Psa \u00b7 Pro \u00b7 Ecc \u00b7 Sng"], [4, "Major Prophets", "Isa \u00b7 Jer \u00b7 Lam \u00b7 Eze \u00b7 Dan"], [5, "Minor Prophets", "Hos \u00b7 Joe \u00b7 Amo \u2026 Mal"]],
-      nt: [[1, "Gospels", "Mat \u00b7 Mrk \u00b7 Luk \u00b7 Joh"], [2, "History", "Act"], [3, "Paul to churches", "Rom \u00b7 1Co \u00b7 2Co \u2026 2Th"], [4, "Paul to individuals", "1Ti \u00b7 2Ti \u00b7 Tit \u00b7 Phm"], [5, "General & Revelation", "Heb \u00b7 Jas \u00b7 1Pe \u2026 Rev"]]
+      ot: [[1, "Law", "Genesis \u00b7 Exodus \u00b7 Leviticus \u00b7 Numbers \u00b7 Deuteronomy"], [2, "History", "Joshua \u00b7 Judges \u00b7 Ruth \u00b7 1 Samuel \u2026 Esther"], [3, "Wisdom & poetry", "Job \u00b7 Psalms \u00b7 Proverbs \u00b7 Ecclesiastes \u00b7 Song"], [4, "Major Prophets", "Isaiah \u00b7 Jeremiah \u00b7 Lamentations \u00b7 Ezekiel \u00b7 Daniel"], [5, "Minor Prophets", "Hosea \u00b7 Joel \u00b7 Amos \u2026 Malachi"]],
+      nt: [[1, "Gospels", "Matthew \u00b7 Mark \u00b7 Luke \u00b7 John"], [2, "History", "Acts"], [3, "Paul to churches", "Romans \u00b7 1 Corinthians \u2026 2 Thessalonians"], [4, "Paul to individuals", "1 Timothy \u00b7 2 Timothy \u00b7 Titus \u00b7 Philemon"], [5, "General & Revelation", "Hebrews \u00b7 James \u00b7 1 Peter \u2026 Revelation"]]
     };
-    // Tap a testament heading for the colour key.
+    // The legend button beside the info button: the colour key for both testaments (which: "ot", "nt" or "both"); head is the button it opens from.
     function showMapKey(which, head) {
       hideVerseTip(); closePeek();
       const dim = document.createElement("div");
@@ -2825,11 +2831,14 @@
       document.body.appendChild(dim);
       const b = document.createElement("div");
       b.className = "pk-bubble pk-key"; b.id = "pkBubble";
-      MAP_KEY[which].forEach(function(r) {
-        const row = document.createElement("div"); row.className = "pk-k cat-" + r[0];
-        const nm = document.createElement("b"); nm.textContent = r[1];
-        const bk = document.createElement("span"); bk.textContent = r[2];
-        row.appendChild(nm); row.appendChild(bk); b.appendChild(row);
+      (which === "both" ? ["ot", "nt"] : [which]).forEach(function(w) {
+        if (which === "both") { const lab = document.createElement("div"); lab.className = "pk-lab"; lab.textContent = w === "ot" ? "Old Testament" : "New Testament"; b.appendChild(lab); }
+        MAP_KEY[w].forEach(function(r) {
+          const row = document.createElement("div"); row.className = "pk-k cat-" + r[0];
+          const nm = document.createElement("b"); nm.textContent = r[1];
+          const bk = document.createElement("span"); bk.textContent = r[2];
+          row.appendChild(nm); row.appendChild(bk); b.appendChild(row);
+        });
       });
       document.body.appendChild(b);
       const r = head.getBoundingClientRect();
@@ -2850,19 +2859,16 @@
         if (v.g > g.top) g.top = v.g;
       });
       map.textContent = "";
-      const section = function(title, books, legend) {   // legend: "ot" / "nt" gives the heading a colour key
-        const h = document.createElement(legend ? "button" : "div");
-        h.className = "vm-sect";
-        const ht = document.createElement("span"); ht.textContent = title; h.appendChild(ht);
-        if (legend) {
-          h.type = "button";
-          h.setAttribute("aria-label", title + ", colour key");
-          h.onclick = function() { showMapKey(legend, h); };
+      const section = function(title, books) {   // title: a small heading, only for the "Other" books; the two testaments sit either side of a thin line
+        if (title) {
+          const h = document.createElement("div");
+          h.className = "vm-sect";
+          const ht = document.createElement("span"); ht.textContent = title; h.appendChild(ht);
+          map.appendChild(h);
         }
-        map.appendChild(h);
         const grid = document.createElement("div");
         grid.className = "vm-grid";
-        const rows = Math.ceil(books.length / 5);
+        const rows = Math.ceil(books.length / 4);
         grid.style.flex = rows + " 1 0"; grid.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
         books.forEach(function(b) {
           const g = byKey[b.key];
@@ -2888,27 +2894,32 @@
       const ot = [], nt = [], other = [];
       BIBLE_BOOKS.forEach(function(b, i) { (i < 39 ? ot : nt).push({ key: i, abbr: BOOK_ABBR[i], full: b[0] }); });
       Object.keys(byKey).forEach(function(k) { if (!/^\d+$/.test(k)) other.push({ key: k, abbr: byKey[k].name.replace(/\s+/g, "").slice(0, 3), full: byKey[k].name }); });
-      section("Old Testament", ot, "ot");
-      section("New Testament", nt, "nt");
-      // the status and gestures panel lives in the empty cell under 2 John, in step with the book tiles
+      section(null, ot);
+      const line = document.createElement("div"); line.className = "vm-div"; map.appendChild(line);
+      section(null, nt);
+      // the colour key and the status and gestures panel sit side by side in the empty cell at the end of the New Testament
+      const tools = document.createElement("div");
+      tools.className = "vm-tools"; tools.style.gridRow = String(Math.ceil(nt.length / 4));
+      const legBtn = document.createElement("button");
+      legBtn.type = "button"; legBtn.className = "vm-leg"; legBtn.setAttribute("aria-label", "Colour key");
+      legBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>';
+      legBtn.onclick = function() { showMapKey("both", legBtn); };
       const infoBtn = document.createElement("button");
       infoBtn.type = "button"; infoBtn.className = "vm-info"; infoBtn.setAttribute("aria-label", "Status and gestures");
       infoBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></svg>';
       infoBtn.onclick = function() { toggleHelp(true); };
-      map.lastChild.appendChild(infoBtn);
+      tools.appendChild(legBtn); tools.appendChild(infoBtn);
+      map.lastChild.appendChild(tools);
       if (other.length) section("Other", other);
 
       box.textContent = "";
       fitMapNames(map);
       requestAnimationFrame(function() { fitMapNames(map); });
     }
-    // Each tile shows as much of its book's name as the tile is wide, however long the name: the whole name when it fits, otherwise its first letters
-    // (the number stuck to the name: 1Thessa). One width, whatever the letters, so the tiles look even.
+    // Each tile shows its book's whole name. A name that is a little too wide for its tile is shrunk a little (to 11px), then, if it still won't fit,
+    // given tighter sides and shrunk a bit more (to 10.5px); only a name that still doesn't fit is cut. Song of Solomon is "Song" and the Thessalonians
+    // are "Thessalon", at the full size. The number keeps its space after it (1 Samuel).
     let mapMeasure;
-    function mapNameWidth(text, font) {
-      mapMeasure.font = font;
-      return mapMeasure.measureText(text).width;
-    }
     function fitMapNames(map) {
       map = map || document.querySelector(".vl-map");
       if (!map) return;
@@ -2916,17 +2927,27 @@
       if (!first) return;
       if (mapMeasure === undefined) { try { mapMeasure = document.createElement("canvas").getContext("2d") || null; } catch (e) { mapMeasure = null; } }
       if (!mapMeasure) return;   // nothing to measure with: the tiles keep their short names
-      const tw = first.getBoundingClientRect().width || ((window.innerWidth - 32 - 16) / 5);
-      const room = tw - 14 - 2;   // the tile's side padding, and a hair of air
+      const tw = first.getBoundingClientRect().width || ((window.innerWidth - 32 - 12) / 4);
       Array.prototype.forEach.call(map.querySelectorAll(".vm-ab[data-full]"), function(ab) {
-        let full = ab.getAttribute("data-full").replace(/^(\d)\s+/, "$1");
+        const tile = ab.parentNode;
+        let full = ab.getAttribute("data-full");
         if (/^Song of /.test(full)) full = "Song";
-        const cs = getComputedStyle(ab), font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+        full = full.replace(/Thessalonians$/, "Thessalon");
+        tile.style.removeProperty("padding"); ab.style.removeProperty("font-size");
+        const cs = getComputedStyle(ab), base = parseFloat(cs.fontSize) || 12;
+        const width = function(size, text) { mapMeasure.font = cs.fontWeight + " " + size + "px " + cs.fontFamily; return mapMeasure.measureText(text).width; };
+        let size = base, room = tw - 14 - 2;   // the tile's side padding, and a hair of air
+        while (width(size, full) > room && size > 11) size = Math.round((size - 0.25) * 100) / 100;
+        if (width(size, full) > room) {
+          room = tw - 8 - 2; tile.style.padding = "0 4px";
+          while (width(size, full) > room && size > 10.5) size = Math.round((size - 0.25) * 100) / 100;
+        }
+        if (size !== base) ab.style.fontSize = size + "px";
         let name = full;
-        if (mapNameWidth(name, font) > room) {
+        if (width(size, name) > room) {
           let n = name.length;
-          while (n > 1 && mapNameWidth(name.slice(0, n), font) > room) n--;
-          name = name.slice(0, n);
+          while (n > 1 && width(size, name.slice(0, n)) > room) n--;
+          name = name.slice(0, n).replace(/\s+$/, "");
         }
         if (ab.textContent !== name) ab.textContent = name;
       });
@@ -3058,7 +3079,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-280';
+    const CLIENT_BUILD = 'sync-281';
 
     let queue = [];
     let currentIndex = 0;
