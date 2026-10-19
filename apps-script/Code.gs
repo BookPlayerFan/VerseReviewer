@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-89'; // shown in the app's status readout
+const BUILD = 'sync-90'; // shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1714,7 +1714,7 @@ function addPastedVerse(reference, version, text) {
       } catch (e) {}
     }
     sheet.getRange(2, 1, 1, 8).setValues([['', '', today_(), '', '', ref, ver, body]]);
-    return { success: true, reference: ref };
+    return { success: true, reference: ref, rowIndex: 2 };
   } finally {
     lock.releaseLock();
   }

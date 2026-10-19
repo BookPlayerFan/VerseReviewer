@@ -1155,6 +1155,13 @@
     .pv-close { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-card); }
     .pv-add { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
     .pv-add:disabled { opacity: .4; pointer-events: none; }
+    .pv-btns.pp-col { flex-direction: column; gap: 10px; }
+    .pv-btns.pp-col button { flex: none; width: 100%; }
+    .pv-save { background: transparent; color: var(--text-accent); border: 1.5px solid var(--text-accent); }
+    .pv-save:disabled { opacity: .4; pointer-events: none; }
+    #pastePreview .pv-edit { border: 1px solid var(--border-card); border-radius: 12px; background: var(--bg-body); color: var(--text-muted); font-size: 16px; font-weight: 700; padding: 13px; }
+    .pp-learn-note { text-align: center; text-wrap: balance; margin: -2px 0 0; min-height: 0; }
+    .pp-learn-note:empty { display: none; }
     .pv-undo { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .uc-body { text-align: center; font-size: 16px; line-height: 1.45; margin: 2px 0 8px; color: var(--text-primary); }
     .uc-body .uc-sub { margin-top: 4px; font-size: 14px; color: var(--text-muted); }
@@ -1517,10 +1524,14 @@
       <div class="pv-head"><span id="ppRef"></span><span class="version-badge" id="ppVer"></span></div>
       <div class="pv-text" id="ppText"></div>
       <div class="pp-note" id="ppNote"></div>
-      <div class="pv-btns">
+      <div class="pv-btns pp-col">
+        <button type="button" class="pv-add" id="ppLearn" onclick="addFromPreview(true)">Save &amp; Learn now</button>
+        <div class="pp-note pp-learn-note" id="ppLearnNote"></div>
+        <button type="button" class="pv-save" id="ppAdd" onclick="addFromPreview(false)">Save to my list</button>
+      </div>
+      <div class="pv-btns pp-row">
         <button type="button" class="pv-close" onclick="cancelPastePreview()">Cancel</button>
         <button type="button" class="pv-edit" onclick="editPastePreview()">Edit</button>
-        <button type="button" class="pv-add" id="ppAdd" onclick="addFromPreview()">Add</button>
       </div>
     </div>
   </div>
@@ -3097,7 +3108,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 15000;
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-263';
+    const CLIENT_BUILD = 'sync-264';
 
     let queue = [];
     let currentIndex = 0;
@@ -5771,6 +5782,10 @@
       note.textContent = p.defaultVer ? "No version found, so I used ESV. Tap Edit to change it." : "";
       note.className = "pp-note";
       document.getElementById("ppAdd").disabled = false;
+      // one new verse at a time: Save & Learn is off while one is on the New tab (Save to my list still works)
+      const haveNew = learningCards.length > 0 || learningHeld.length > 0;
+      document.getElementById("ppLearn").disabled = haveNew;
+      document.getElementById("ppLearnNote").textContent = haveNew ? "You already have a new verse. Level it up first, then Save & Learn." : "";
       try { document.getElementById("pasteText").blur(); } catch (e) {}
       document.getElementById("pastePreview").classList.add("open");
     }
@@ -5788,14 +5803,15 @@
       openPaste(p.ref + " " + p.ver + "\n" + p.text);
     }
 
-    function addFromPreview() {
+    function addFromPreview(learn) {
       const p = pasteParsed;
       if (!p) return;
       const note = document.getElementById("ppNote");
-      const btn = document.getElementById("ppAdd");
-      btn.disabled = true;
+      const btn = document.getElementById("ppAdd"), lbtn = document.getElementById("ppLearn");
+      const lWas = lbtn.disabled;
+      btn.disabled = true; lbtn.disabled = true;
       addParsedVerse(p, function(res, msg) {
-        btn.disabled = false;
+        btn.disabled = false; lbtn.disabled = lWas;
         if (res) {
           document.getElementById("pastePreview").classList.remove("open");
           closePaste();
@@ -5804,7 +5820,7 @@
           note.textContent = msg;
           note.className = "pp-note bad";
         }
-      });
+      }, learn === true);
     }
 
     // iPhone's keyboard "Paste from ..." suggestion inserts text without sending a paste event, so a big jump in
@@ -5836,10 +5852,14 @@
     }
 
     // Saves the verse to the sheet (it joins the waiting list in the picker).
-    function addParsedVerse(p, cb) {
+    function addParsedVerse(p, cb, learn) {
       google.script.run
         .withSuccessHandler(function(res) {
-          if (res && res.success) {
+          if (res && res.success && learn) {
+            cb(true);
+            closePicker();
+            chooseVerse({ r: res.rowIndex || 2, f: res.reference }, "Saved to your list, but ");
+          } else if (res && res.success) {
             cb(true);
             document.getElementById("pickerNote").textContent = "Added " + res.reference + " (waiting in your list)";
             google.script.run
@@ -5971,7 +5991,7 @@
       document.getElementById("pickerPreview").classList.remove("open");
     }
 
-    function chooseVerse(it) {
+    function chooseVerse(it, failPrefix) {
       closePicker();
       const btn = document.getElementById("btnAddVerse");
       if (btn) { btn.disabled = true; btn.textContent = "Adding..."; }
@@ -5982,12 +6002,13 @@
             enterLearningAfterLoad = res.reference;
             restartSession();
           } else {
-            showSummaryNotice((res && res.message) ? res.message : "Couldn't add that verse.", true);
+            const m = (res && res.message) ? res.message : "Couldn't add that verse.";
+            showSummaryNotice(failPrefix ? failPrefix + "it didn't start: " + m : m, true);
           }
         })
         .withFailureHandler(function(err) {
           if (btn) { btn.disabled = false; btn.textContent = "Add New Verse"; }
-          showSummaryNotice("Error adding verse: " + ((err && err.message) || err), true);
+          showSummaryNotice((failPrefix ? failPrefix + "it didn't start: " : "Error adding verse: ") + ((err && err.message) || err), true);
         })
         .addChosenVerse(it.r, it.f);
     }
