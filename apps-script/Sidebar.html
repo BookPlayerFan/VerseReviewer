@@ -1906,6 +1906,10 @@
           ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
       });
     }
+    // One new verse at a time means one in its Learn reps; a verse that has moved on to Lock does not count (the server applies the same rule).
+    function haveVerseInLearn() {
+      return learningCards.concat(learningHeld).some(function(c) { return c.stage !== 'lock'; });
+    }
     function unseenCount() {
       return learningCards.filter(function(c) { return !isLocked(c); }).length;
     }
@@ -3024,7 +3028,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-272';
+    const CLIENT_BUILD = 'sync-273';
 
     let queue = [];
     let currentIndex = 0;
@@ -5688,7 +5692,7 @@
       note.className = "pp-note";
       document.getElementById("ppAdd").disabled = false;
       // one new verse at a time: Save & Learn is off while one is on the New tab (Save to my list still works)
-      const haveNew = learningCards.length > 0 || learningHeld.length > 0;
+      const haveNew = haveVerseInLearn();
       document.getElementById("ppLearn").disabled = haveNew;
       document.getElementById("ppLearnNote").textContent = haveNew ? "You already have a new verse. Level it up first, then Save & Learn." : "";
       try { document.getElementById("pasteText").blur(); } catch (e) {}
@@ -5845,7 +5849,7 @@
       const addBtn = document.getElementById("pvAdd");
       addBtn.style.display = (noAdd || canDelete) ? "none" : "";
       // one new verse at a time: while one is on the New tab, the final Add button is off (the list itself still opens)
-      const haveNew = learningCards.length > 0 || learningHeld.length > 0;
+      const haveNew = haveVerseInLearn();
       addBtn.disabled = haveNew;
       addBtn.onclick = function() { if (haveNew) return; closePreview(); chooseVerse(it); };
       const del = document.getElementById("pvDel"), note = document.getElementById("pvNote");
