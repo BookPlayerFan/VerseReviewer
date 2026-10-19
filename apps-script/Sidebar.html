@@ -1021,7 +1021,7 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    .tomorrow-note span { padding: 7px 14px; white-space: nowrap; }
+    .tomorrow-note span { padding: 7px 14px; white-space: nowrap; line-height: 16px; }
     .tomorrow-note span + span { border-left: 1px solid var(--border-card); color: var(--ink, var(--text-accent, #1a73e8)); }
     .tomorrow-note b { color: var(--text-primary); font-weight: 800; }
 
@@ -1208,7 +1208,7 @@
     .tr-pill { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; cursor: pointer;
       display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-card);
       font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
-    .tr-pill span { padding: 7px 14px; }
+    .tr-pill span { padding: 7px 14px; line-height: 16px; }
     .tr-pill span + span { border-left: 1px solid var(--border-card); }
     .tr-pill b { color: var(--text-primary); font-weight: 800; }
     .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
@@ -3024,7 +3024,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-269';
+    const CLIENT_BUILD = 'sync-270';
 
     let queue = [];
     let currentIndex = 0;
