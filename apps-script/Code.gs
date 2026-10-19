@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'sync-90'; // shown in the app's status readout
+const BUILD = 'srv-91'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -227,8 +227,7 @@ function dueTomorrowCount_(data) {
   let n = 0;
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5])) continue;
-    const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
-    if (groupStr === '' || isNaN(Number(groupStr)) || Number(groupStr) < 1) continue;
+    if (levelOf_(data[i][4]) < 1) continue;
     const nextDue = toMidnight_(data[i][1]);
     if (!nextDue || nextDue <= limit) n++;
   }
@@ -241,9 +240,9 @@ function treasuryTotal_(data) {
   let pts = 0;
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5])) continue;
-    const str = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
-    if (str === '' || isNaN(Number(str))) continue;
-    pts += ptsOf_(Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str))))) * verseCount_(data[i][7]);
+    const lv = levelOf_(data[i][4]);
+    if (lv < 0) continue;
+    pts += ptsOf_(lv) * verseCount_(data[i][7]);
   }
   return pts;
 }
@@ -254,8 +253,7 @@ function dueTomorrowLoad_(data) {
   let load = 0;
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5])) continue;
-    const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
-    if (groupStr === '' || isNaN(Number(groupStr)) || Number(groupStr) < 1) continue;
+    if (levelOf_(data[i][4]) < 1) continue;
     const nextDue = toMidnight_(data[i][1]);
     if (!nextDue || nextDue <= limit) load += verseLoad_(data[i][7]);
   }
@@ -270,8 +268,7 @@ function stampLearningDates_(preRead) {
   const today = today_();
   for (let i = 1; i < data.length; i++) {
     if (!cleanRef_(data[i][5])) continue;
-    const groupStr = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
-    if (groupStr === '' || Number(groupStr) !== 0) continue;
+    if (!isLevelZero_(data[i][4])) continue;
     if (!toMidnight_(data[i][2])) { sheet.getRange(i + 1, 3).setValue(today); data[i][2] = today; }
   }
 }
@@ -484,6 +481,13 @@ function learningCard_(row, i, now) {
   card.lateAt = li.next;          // when the next one will count as late (the screen repaints then)
   card.missed = missedToday_(ref, now); // reps that were pressed late earlier today
   return card;
+}
+
+// The Level column (E) as a whole number 0-8, or -1 when the verse has no level yet (blank or not a number).
+function levelOf_(raw) {
+  const s = String(raw === null || raw === undefined ? '' : raw).trim();
+  if (s === '' || isNaN(Number(s))) return -1;
+  return Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(s))));
 }
 
 function isLevelZero_(raw) {
@@ -1662,13 +1666,11 @@ function sortVerses_() {
     const forms = range.getFormulas();
     const items = vals.map(function(row, i) {
       const ref = cleanRef_(row[5]);
-      const str = String(row[4] === null || row[4] === undefined ? '' : row[4]).trim();
-      const hasLevel = str !== '' && !isNaN(Number(str));
       const p = parseRef_(ref);
       return {
         i: i,
         empty: !ref,
-        level: hasLevel ? Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str)))) : -1, // unassigned verses sort first
+        level: levelOf_(row[4]), // unassigned verses (-1) sort first
         book: p.book, chapter: p.chapter, verse: p.verse, ref: ref
       };
     });
@@ -1731,10 +1733,8 @@ function getVerseList() {
   for (let i = 1; i < data.length; i++) {
     const ref = cleanRef_(data[i][5]);
     if (!ref) continue;
-    const raw = data[i][4];
-    const str = String(raw === null || raw === undefined ? '' : raw).trim();
-    if (str === '' || isNaN(Number(str))) continue;
-    const g = Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(str))));
+    const g = levelOf_(data[i][4]);
+    if (g < 0) continue;
     // First three words of the verse text (verse-number markers like [3] removed).
     const words = String(data[i][7] || '').replace(/\[\d+\]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
     const first = words.slice(0, 3).join(' ') + (words.length > 3 ? '…' : '');
@@ -1756,6 +1756,16 @@ function getMonthStats(year, month) {
   year = Number(year); month = Number(month);
   const tz = Session.getScriptTimeZone();
   const out = { y: year, m: month, days: {}, today: todayKey_() };
+  // A month that is over never changes, so its numbers are kept for a few hours instead of reading the whole Log tab again.
+  const monthKey = year + '-' + (month < 10 ? '0' : '') + month;
+  const isPast = monthKey < out.today.slice(0, 7);
+  const cacheKey = 'VR_MS_' + monthKey;
+  if (isPast) {
+    try {
+      const hit = CacheService.getScriptCache().get(cacheKey);
+      if (hit) { const cached = JSON.parse(hit); cached.today = out.today; return cached; }
+    } catch (e) {}
+  }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return out;
   const vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues();
@@ -1780,6 +1790,7 @@ function getMonthStats(year, month) {
     if (isPromo) day[3]++;
     day[4] += (ptsOf_(la) - ptsOf_(lb)) * (vc[cleanRef_(v[1])] || 1);
   });
+  if (isPast) { try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(out), 21600); } catch (e) {} }
   return out;
 }
 
@@ -2191,60 +2202,4 @@ function syncPushes(kind) {
 function scheduleTodayPushes() {
   const r = syncSlotPushes_();
   pushLog_('status: slots', '', 0, null, r.sent + ' slot push(es) scheduled, ' + r.cancelled + ' cancelled, for the rest of today');
-}
-
-// ───────────── One-time migration: Bronze goes from 4 reps to 3 ─────────────
-// 1) Run migrationPreview() from the editor and read View -> Logs. It changes nothing.
-// 2) Run migrationRun(). It first copies the Verses tab to a backup tab ("Verses backup <date time>"), then lowers every
-//    Bronze verse at rep 2 or higher by one, so a verse already part-way through keeps its Silver date. Bronze verses at rep 1 stay.
-//    Level 0 verses are already at rep 1 and simply start the new Learn flow.
-// It refuses to run a second time (script property VR_MIGRATED_BRONZE3).
-const MIGRATION_KEY = 'VR_MIGRATED_BRONZE3';
-
-function migrationPreview() { return migrateBronze_(false); }
-function migrationRun() { return migrateBronze_(true); }
-
-function migrateBronze_(apply) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const props = PropertiesService.getScriptProperties();
-    if (apply && props.getProperty(MIGRATION_KEY)) {
-      console.log('The migration already ran (' + props.getProperty(MIGRATION_KEY) + '). Nothing changed.');
-      return { ran: false, reason: 'already' };
-    }
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Verses');
-    if (!sheet) { console.log('Sheet "Verses" not found.'); return { ran: false, reason: 'nosheet' }; }
-    const data = readSheetData_();
-    const changes = [];
-    for (let i = 1; i < data.length; i++) {
-      const ref = cleanRef_(data[i][5]);
-      if (!ref) continue;
-      const g = String(data[i][4] === null || data[i][4] === undefined ? '' : data[i][4]).trim();
-      if (g === '' || Number(g) !== 1) continue;
-      const rep = Number(data[i][3]) || 1;
-      if (rep >= 2) changes.push({ row: i + 1, ref: ref, from: rep, to: rep - 1 });
-    }
-    changes.forEach(function(c) { console.log((apply ? 'Changed ' : 'Would change ') + c.ref + ' (row ' + c.row + '): Bronze rep ' + c.from + ' -> ' + c.to); });
-    console.log((apply ? 'Changed ' : 'Would change ') + changes.length + ' verse(s).');
-    if (!apply) return { ran: false, preview: true, changes: changes };
-
-    const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HHmm');
-    let backupName = '';
-    try {
-      const copy = sheet.copyTo(ss);
-      backupName = 'Verses backup ' + stamp;
-      copy.setName(backupName);
-    } catch (e) {
-      console.log('Could not make the backup tab, so nothing was changed: ' + e);
-      return { ran: false, reason: 'backup' };
-    }
-    changes.forEach(function(c) { sheet.getRange(c.row, 4).setValue(c.to); });
-    props.setProperty(MIGRATION_KEY, stamp);
-    console.log('Done. Backup tab: ' + backupName);
-    return { ran: true, changes: changes, backup: backupName };
-  } finally {
-    lock.releaseLock();
-  }
 }
