@@ -3025,7 +3025,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-276';
+    const CLIENT_BUILD = 'sync-277';
 
     let queue = [];
     let currentIndex = 0;
@@ -4847,13 +4847,13 @@
       }
       return o;
     }
-    // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (4 AM rep: 7 AM; 6 PM rep and Lock PM: 8:30 PM;
+    // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (4 AM rep: 7 AM; 6 PM rep and Lock PM: 9 PM;
     // Lock AM: noon). A late rep is made up by pressing again; the dots warn while a rep is late right now.
     function lLateDeadline(slotMs, stage, lockPart) {
       const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
-      if (stage === 'lock') { const lim = lockPart === 'pm' ? 1230 : 720; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
+      if (stage === 'lock') { const lim = lockPart === 'pm' ? 1260 : 720; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
       if (m === L_SLOTS[0]) return lAt(slotMs, 0, 420);
-      if (m === L_SLOTS[L_SLOTS.length - 1]) return lAt(slotMs, 0, 1230);
+      if (m === L_SLOTS[L_SLOTS.length - 1]) return lAt(slotMs, 0, 1260);
       return slotMs + 3600000;
     }
     function lateNow(card) {

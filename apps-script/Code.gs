@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-93'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-94'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -286,12 +286,12 @@ const REPS_PER_VERSE = 7;
 const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM
 const LOCK_PM_MIN = 18 * 60;        // Lock PM unlocks at 6 PM
 const START_LIVE_BEFORE_MIN = 18 * 60; // a verse added before 6 PM starts today (the reps whose time has already passed open at once, to catch up); later it waits for 4 AM tomorrow
-// A rep is "late" an hour after it opens (the 4 AM rep: after 7 AM; the 6 PM rep and Lock PM: after 8:30 PM; Lock AM: after noon). The dots turn amber (one late rep
+// A rep is "late" an hour after it opens (the 4 AM rep: after 7 AM; the 6 PM rep and Lock PM: after 9 PM; Lock AM: after noon). The dots turn amber (one late rep
 // today) or red (two or more). A late rep is made up by pressing: the next rep of the day opens at once when its time has already passed.
 const LATE_GRACE_MIN = 60;
 const LATE_FIRST_SLOT_MIN = 7 * 60;
 const LATE_LOCK_AM_MIN = 12 * 60;
-const LATE_LOCK_PM_MIN = 20 * 60 + 30;
+const LATE_LOCK_PM_MIN = 21 * 60;
 
 // The time (ms) of a clock time (minutes after midnight), dayOffset days from the day of `ms`.
 function atClock_(ms, dayOffset, mins) {
@@ -314,7 +314,7 @@ function lateDeadline_(slotMs, stage, lockPart) {
     return m < lim ? atClock_(slotMs, 0, lim) : slotMs + LATE_GRACE_MIN * 60000;
   }
   if (m === LEARN_SLOTS[0]) return atClock_(slotMs, 0, LATE_FIRST_SLOT_MIN);
-  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return atClock_(slotMs, 0, LATE_LOCK_PM_MIN); // the 6 PM rep: its reminder goes out at 8 PM, so it is late after 8:30
+  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return atClock_(slotMs, 0, LATE_LOCK_PM_MIN); // the 6 PM rep: its reminder goes out at 8 PM, so it is late after 9 PM
   return slotMs + LATE_GRACE_MIN * 60000;
 }
 
