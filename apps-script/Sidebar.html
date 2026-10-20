@@ -3115,7 +3115,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-286';
+    const CLIENT_BUILD = 'sync-287';
 
     let queue = [];
     let currentIndex = 0;
@@ -4363,11 +4363,11 @@
       lastPips = { ref: card.reference, stage: card.stage, now: now };
       for (let i = 1; i <= total; i++) {
         const pip = document.createElement("div");
-        pip.className = "pip" + (i < now ? " filled" : i === now ? " cur" : "") + (before > 0 && i >= before && i < now ? " pop" : "") + (grow ? " grow" : "");
-        if (grow) pip.style.setProperty("--k", i - 1);
+        pip.className = "pip" + (i < now ? " filled" : i === now ? " cur" : "") + (before > 0 && i >= before && i < now ? " pop" : "");
         if (isLock) pip.title = i === 1 ? "Lock AM" : "Lock PM";
         pips.appendChild(pip);
       }
+      if (grow) pipsEmerge(150);   // after the old dots went into the pill, the new ones come out of it
       paintLateState(card);
       scheduleLate(card);
       paintLearningButton(card);
@@ -4975,8 +4975,8 @@
             render();
           });
         };
-        // the PM ring fills in, then both dots turn green as the rank-up fades in over them
-        if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(go, PIP_FILL_MS + 900); } else go();
+        // the PM ring fills in, both dots turn green, then they lift into the badge and the rank-up plays
+        if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(function() { pipsIntoBadge(go); }, PIP_FILL_MS + 900); } else go();
       } else if (kind !== 'skip' && kind !== 'again' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
         // The seventh rep: its dot fills, every dot turns green in a wave, then the card moves on (to the next verse, or to Lock).
         const startedIn = epoch;
@@ -5249,15 +5249,20 @@
       cur.classList.remove("cur"); cur.classList.add("filled", "pop");
       return true;
     }
-    // Learn becomes Lock (or the next verse): the full dots shrink away from the middle out, and for Lock the pill's text slides to a padlock while its color glides from gray to blue.
+    // Learn becomes Lock (or the next verse): the full dots lift into the pill and disappear (as on a Review level-up), and for Lock the pill's text slides to a padlock
+    // while its color glides from gray to blue. The new dots then come out of the pill (see pipsEmerge).
+    const LIFT_MS = 300, LIFT_STEP_MS = 70;
     function learnHeaderExit(toLock, done) {
       const pips = document.querySelectorAll("#cardPips .pip");
       const pill = document.querySelector("#cardMeta .rank-badge");
-      if (!pips.length || !pips[0].animate) { done(); return; }
-      const mid = (pips.length - 1) / 2;
-      pips.forEach(function(p, i) {
-        p.animate([{ transform: "scale(1.15)", opacity: 1 }, { transform: "scale(0)", opacity: 0 }], { duration: 450, delay: Math.round(Math.abs(i - mid) * 75), easing: "ease-in", fill: "forwards" });
+      if (!pips.length || !pill || !pips[0].animate) { done(); return; }
+      const pr = pill.getBoundingClientRect(), px = pr.left + pr.width / 2, py = pr.top + pr.height / 2;
+      pips.forEach(function(p, k) {
+        const r = p.getBoundingClientRect();
+        const dx = Math.round(px - (r.left + r.width / 2)), dy = Math.round(py - (r.top + r.height / 2));
+        p.animate([{ transform: "translate(0px, 0px) scale(1.15)", opacity: 1 }, { transform: "translate(" + dx + "px, " + dy + "px) scale(0.2)", opacity: 0 }], { duration: LIFT_MS, delay: k * LIFT_STEP_MS, easing: "ease-in", fill: "forwards" });
       });
+      if (!toLock) pill.animate([{ transform: "scale(1)" }, { transform: "scale(1.1)", offset: 0.5 }, { transform: "scale(1)" }], { duration: 450, delay: 200, easing: "ease-out" });
       if (toLock && pill) {
         const accent = (getComputedStyle(document.documentElement).getPropertyValue("--text-accent") || "").trim() || "#1a73e8";
         const cs = getComputedStyle(pill);
@@ -5273,7 +5278,20 @@
         pill.animate([{ transform: "scale(1)" }, { transform: "scale(1.14)", offset: 0.45 }, { transform: "scale(1)" }], { duration: 750, easing: "ease-out" });
         pill.animate([from, { color: accent, borderColor: "color-mix(in srgb, " + accent + " 45%, transparent)", backgroundColor: "color-mix(in srgb, " + accent + " 12%, transparent)" }], { duration: 750, easing: "ease-out", fill: "forwards" });
       }
-      setTimeout(done, 640);
+      setTimeout(done, LIFT_MS + (pips.length - 1) * LIFT_STEP_MS + 80);
+    }
+    // The new dots come out of the pill, one after another, once the old ones have gone into it.
+    function pipsEmerge(delay0) {
+      const pill = document.querySelector("#cardMeta .rank-badge");
+      const dots = document.querySelectorAll("#cardPips .pip");
+      if (!pill || !dots.length || !dots[0].animate) return;
+      const pr = pill.getBoundingClientRect(), px = pr.left + pr.width / 2, py = pr.top + pr.height / 2;
+      const step = Math.min(110, Math.round(560 / dots.length));
+      dots.forEach(function(d, k) {
+        const r = d.getBoundingClientRect();
+        const dx = Math.round(px - (r.left + r.width / 2)), dy = Math.round(py - (r.top + r.height / 2));
+        d.animate([{ transform: "translate(" + dx + "px, " + dy + "px) scale(0.2)", opacity: 0 }, { opacity: 1 }], { duration: 450, delay: delay0 + k * step, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.3)", fill: "both" });
+      });
     }
     // A review card's last rep: the full dots lift into the rank badge and disappear; then the rank-up plays.
     function pipsIntoBadge(done) {
