@@ -1868,11 +1868,12 @@
     // The New reminder goes when no Learn / Lock card is open; the 6 AM one (reviews and the 6 AM cards together) goes when nothing at all is waiting.
     let clearPushTimer = null;
     const CLEAR_PUSH_MS = 1500;
-    function scheduleClearDelivered() {
+    function scheduleClearDelivered(tries) {
       clearTimeout(clearPushTimer);
       clearPushTimer = setTimeout(function() {
         clearPushTimer = null;
-        if (isFetching || isRefreshing) return;
+        // still saving the press, scoring or refreshing: look again in a moment (up to about ten seconds) instead of giving up, so a slow save never leaves the reminder up
+        if (isFetching || isRefreshing || learnPending || isScoring) { if ((tries || 0) < 6) scheduleClearDelivered((tries || 0) + 1); return; }
         const reviews = Math.max(0, activeEnd() - currentIndex), fresh = unseenCount();
         if (fresh > 0 && reviews > 0) return;
         const msg = { type: 'VR_CLEAR_PUSH', fresh: fresh === 0, daily: fresh === 0 && reviews === 0 };
@@ -3161,7 +3162,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-299';
+    const CLIENT_BUILD = 'sync-300';
 
     let queue = [];
     let currentIndex = 0;
