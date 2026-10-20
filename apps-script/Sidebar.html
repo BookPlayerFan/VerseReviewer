@@ -1475,7 +1475,6 @@
       <div class="help-scroll" id="helpPaneSt">
         <div id="diagText"></div>
         <div class="st-btns"><button type="button" id="diagTest" onclick="sendTestPush()">Test notification</button><button type="button" id="diagReload" onclick="reloadApp()">Reload</button></div>
-        <div class="st-btns"><button type="button" id="diagClear" onclick="clearTestNotifications()">Clear notifications</button></div>
       </div>
       <div class="pv-btns"><button type="button" class="pv-close" onclick="toggleHelp(false)">Close</button></div>
     </div>
@@ -1865,25 +1864,6 @@
       wakeSentAt = Date.now();
       try { window.top.postMessage({ type: 'VR_WAKE', on: true }, '*'); } catch (e) {}
     }, { passive: true, capture: true });
-    // After a press, once the screen has moved on: if nothing is waiting any more, ask the shell page to take the matching notifications off the lock screen.
-    // The New reminder goes when no Learn / Lock card is open; the 6 AM one (reviews and the 6 AM cards together) goes when nothing at all is waiting.
-    let clearPushTimer = null;
-    const CLEAR_PUSH_MS = 1500;
-    let clearDailyWanted = false;   // a Review card was pressed: the morning reminder (reviews) goes as soon as the press has settled, even with other things still waiting
-    function scheduleClearDelivered(tries, reviewed) {
-      if (reviewed) clearDailyWanted = true;
-      clearTimeout(clearPushTimer);
-      clearPushTimer = setTimeout(function() {
-        clearPushTimer = null;
-        // still saving the press, scoring or refreshing: look again in a moment (up to about ten seconds) instead of giving up, so a slow save never leaves the reminder up
-        if (isFetching || isRefreshing || learnPending || isScoring) { if ((tries || 0) < 6) scheduleClearDelivered((tries || 0) + 1); return; }
-        const reviews = Math.max(0, activeEnd() - currentIndex), fresh = unseenCount();
-        const msg = { type: 'VR_CLEAR_PUSH', fresh: fresh === 0, daily: clearDailyWanted || (fresh === 0 && reviews === 0) };
-        clearDailyWanted = false;
-        if (!msg.fresh && !msg.daily) return;
-        try { window.top.postMessage(msg, '*'); } catch (e) {}
-      }, CLEAR_PUSH_MS);
-    }
     function updateTabs() {
       if (mode === "learning" && learningCards[learningIndex] && !isScoring) paintLearningButton(learningCards[learningIndex]);
       updateProgressBar();
@@ -3165,7 +3145,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-303';
+    const CLIENT_BUILD = 'sync-304';
 
     let queue = [];
     let currentIndex = 0;
@@ -3331,7 +3311,6 @@
       const d = e.data;
       if (!d || e.source !== window.top || e.origin !== SHELL_ORIGIN) return;
       if (d.type === "VR_EARLY") applyEarly(d);
-      else if (d.type === "VR_CLEARED") clearTestResult(d);
       else if (d.type === "VR_REPLAY") replayLearn(d.items);
       else if (d.type === "VR_SHELL") {
         shellInfo = Object.assign({}, d); delete shellInfo.vl; delete shellInfo.pills; renderDiag();
@@ -5054,7 +5033,6 @@
       if (!card) return;
       if (kind === "press" && isLocked(card)) return; // the unlock time is only in the hold menu
       learnPending = true;
-      scheduleClearDelivered();
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
       if (promote) {
@@ -5204,7 +5182,6 @@
       if (action === "Fail" && queue[currentIndex].isRepeat) return; // repeat cards have no Repeat button (the D key must not sneak one in)
 
       isScoring = true;
-      scheduleClearDelivered(0, true);   // pressing a review takes the morning reminder off the lock screen
 
       const card = queue[currentIndex];
       const notice = document.getElementById("toastNotice");
@@ -6350,29 +6327,6 @@
       last.firstChild.appendChild(caret);
       last.onclick = function() { notifOpen = !notifOpen; renderDiag(); };
       if (notifOpen) { const nl = document.createElement("div"); nl.id = "notifList"; el.appendChild(nl); renderNotif(); }
-    }
-
-    // Asks the home-screen page to take this app's delivered notifications off the lock screen, and shows what the phone said (how many it listed and closed).
-    // Used to test whether the phone lets the page do that.
-    let clearTestTimer = null;
-    function clearTestNotifications() {
-      const b = document.getElementById("diagClear");
-      if (!b || b.disabled) return;
-      b.disabled = true; b.textContent = "Checking\u2026";
-      const reset = function(msg) { clearTimeout(clearTestTimer); b.textContent = msg; clearTestTimer = setTimeout(function() { b.disabled = false; b.textContent = "Clear notifications"; }, 5000); };
-      clearTestTimer = setTimeout(function() { reset("No answer from the home screen page"); }, 3000);
-      try { window.top.postMessage({ type: "VR_CLEAR_PUSH", all: true, fresh: true, daily: true }, "*"); } catch (e) { reset("Could not ask"); }
-    }
-    function clearTestResult(d) {
-      const b = document.getElementById("diagClear");
-      if (!b) return;
-      clearTimeout(clearTestTimer);
-      let msg;
-      if (d.supported === false) msg = "This phone does not let the page list them";
-      else if (!d.found) msg = "None listed on this phone";
-      else msg = "Closed " + d.closed + " of " + d.found + " (" + (d.tags || []).join(", ") + ")" + (d.via ? " · by " + d.via : "");
-      b.textContent = msg;
-      clearTestTimer = setTimeout(function() { b.disabled = false; b.textContent = "Clear notifications"; }, 6000);
     }
 
     // Sends a test push through the server (from the status panel).

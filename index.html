@@ -180,11 +180,6 @@
     try {
       navigator.serviceWorker.addEventListener("message", function(ev) {
         var m = ev.data;
-        if (m && m.type === "VR_CLOSED" && closeWait[m.id]) {
-          var cw = closeWait[m.id]; delete closeWait[m.id]; clearTimeout(cw.timer);
-          if (cw.report) cw.report({ found: m.found || 0, closed: m.closed || 0, tags: m.tags || [], supported: !m.failed, via: 'worker' });
-          return;
-        }
         if (m && m.type === "VR_GOTO" && (m.tab === "new" || m.tab === "review")) {
           pendingGo = m.tab;
           if (appSource) sendGoto(appSource);
@@ -249,52 +244,6 @@
     var handoffTimer = null;
     var failTimer = null;
 
-    // Take delivered reminders off the lock screen once nothing is waiting: the New reminders (topic "vr-new") and / or the 6 AM one ("vr-daily").
-    // Best effort: if the phone does not let the page look at them, they simply stay until swiped away.
-    // all: the status panel's "Clear notifications" test, which closes every notification of this app (the test one too) and reports what the phone said.
-    function clearDeliveredPage(fresh, daily, all, report) {
-      var out = { found: 0, closed: 0, tags: [], supported: true, via: 'page' };
-      try {
-        if (!(fresh || daily || all) || !navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) { out.supported = false; if (report) report(out); return; }
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          var waiting = regs.length, listed = false;
-          function finish() { if (--waiting <= 0 && report) { if (!listed) out.supported = false; report(out); } }
-          if (!regs.length) { out.supported = false; if (report) report(out); return; }
-          regs.forEach(function(reg) {
-            if (!reg.getNotifications) { finish(); return; }
-            listed = true;
-            reg.getNotifications().then(function(list) {
-              list.forEach(function(n) {
-                // What kind it is: the tag when it is ours, else the "vrkind" the server puts in the push's data (this phone's tag is a random id, not the topic).
-                var kind = String(n.tag || "");
-                if (!/^vr-/.test(kind)) {
-                  kind = "";
-                  try { var m = JSON.stringify(n.data || {}).match(/"vrkind":"(vr-[a-z]+)"/); if (m) kind = m[1]; } catch (x) {}
-                }
-                out.found++;
-                try { out.tags.push(kind || ("? " + (n.data && typeof n.data === "object" ? Object.keys(n.data).join("/") : "no data"))); } catch (x) { out.tags.push(kind || "?"); }
-                if (all || (fresh && /^vr-new/.test(kind)) || (daily && kind === "vr-daily")) { try { n.close(); out.closed++; } catch (e) {} }
-              });
-              finish();
-            }, function() { finish(); });
-          });
-        }, function() { out.supported = false; if (report) report(out); });
-      } catch (e) { out.supported = false; if (report) report(out); }
-    }
-    // Ask the service worker (it showed them) to close the notifications; if it does not answer in time (an older worker file), close them from the page.
-    var closeWait = {};
-    function clearDelivered(fresh, daily, all, report) {
-      if (!(fresh || daily || all)) { if (report) report({ found: 0, closed: 0, tags: [], supported: false, via: 'page' }); return; }
-      var id = String(Date.now()) + Math.random().toString(36).slice(2, 6), sent = false;
-      function viaPage() { if (closeWait[id]) { delete closeWait[id]; clearDeliveredPage(fresh, daily, all, report); } }
-      closeWait[id] = { report: report, timer: setTimeout(viaPage, 1500) };
-      try {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          regs.forEach(function(reg) { if (reg.active) { try { reg.active.postMessage({ type: 'VR_CLOSE', id: id, fresh: fresh, daily: daily, all: all }); sent = true; } catch (x) {} } });
-          if (!sent) { clearTimeout(closeWait[id] && closeWait[id].timer); viaPage(); }
-        }, function() { clearTimeout(closeWait[id] && closeWait[id].timer); viaPage(); });
-      } catch (e) { clearTimeout(closeWait[id] && closeWait[id].timer); viaPage(); }
-    }
     function isAppOrigin(o) { return /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(String(o)); }
 
     function todayKey() {
@@ -443,13 +392,6 @@
       if (d.type === 'VR_WAKE') {
         wakeApp = d.on === true;
         if (wakeApp) wakeTouch(); else wakeSync();
-        return;
-      }
-      if (d.type === 'VR_CLEAR_PUSH') {
-        var csrc = e.source, corg = e.origin;
-        clearDelivered(d.fresh === true, d.daily === true, d.all === true, d.all === true ? function(r) {
-          try { csrc.postMessage({ type: 'VR_CLEARED', found: r.found, closed: r.closed, tags: r.tags, supported: r.supported, via: r.via }, corg); } catch (x) {}
-        } : null);
         return;
       }
       if (d.type === 'VR_PUSH_ENABLE') {
