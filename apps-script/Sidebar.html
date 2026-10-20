@@ -3161,7 +3161,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-298';
+    const CLIENT_BUILD = 'sync-299';
 
     let queue = [];
     let currentIndex = 0;
@@ -4755,7 +4755,7 @@
     // ── Reveal gestures ──
     // A "piece" is one phrase on the New tab and one whole verse on the Review tab.
     //   Tap              reveal the next hidden piece after the one revealed most recently (wrapping round to any still hidden)
-    //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again
+    //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again (the same at a hint level: phrases show at the level, then the verse blurs again)
     //   Hold             New tab, Learn cards: the full words of the verse you are learning show while you hold, then go back
     //                    Review and Lock cards: reveal everything, and it stays revealed; a hold when everything shows hides it all again
     //   Swipe left       Learn cards only: one hint level easier (toward Off)
@@ -4793,12 +4793,6 @@
     // Hiding one verse sends the next plain tap back to the start of the reference (to the verse you are learning first, while that one is not showing).
     function tapVerse(index) {
       if (isScoring || !hasActiveCard() || !parsedSegments[index]) return;
-      if (learningHints()) {   // at a hint level: a shown phrase flips between its hint and its full words; a hidden one is shown at the level
-        if (segmentStates[index] === 'hidden') { revealPiece(index); return; }
-        if (fullPieces[index]) delete fullPieces[index]; else fullPieces[index] = true;
-        renderCardBody();
-        return;
-      }
       const vi = parsedSegments[index].vi;
       const mine = [];
       parsedSegments.forEach(function(p, i) { if (p.vi === vi) mine.push(i); });
