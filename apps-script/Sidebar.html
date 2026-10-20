@@ -463,6 +463,7 @@
     .vl-peek { position: absolute; z-index: 9; top: 50%; margin-top: -15px; height: 30px; display: flex; align-items: center; box-sizing: border-box; padding: 0 2px; overflow: hidden; pointer-events: none;
       white-space: nowrap; font-weight: 700; font-style: italic; color: var(--text-accent); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
     .peek-hid { visibility: hidden; }
+    .vl-pk-date { position: absolute; z-index: 9; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 700; font-style: italic; white-space: nowrap; pointer-events: none; }   /* the next review date, in the rank pill's place while the first words show */
     .vl-peek span { -webkit-mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); mask-image: linear-gradient(90deg, #000 0, #000 72%, transparent 100%); padding-right: 6px; }
     /* Full verse popup: the row opens into a card that looks like a review card (rank colours, same header, same verse box).
        Hold the reference to flip the box to the verse's Background. */
@@ -2369,7 +2370,7 @@
       item.onclick = function(ev) {
         ev.stopPropagation();
         if (heldRow()) return; // the hold already opened the full verse
-        showVerseTip(item, v.w);
+        showVerseTip(item, v.w, v);
       };
       return item;
     }
@@ -2418,11 +2419,12 @@
     }
 
     // Small popup under a verse with its first few words.
-    let vlTipTimer = null;
+    let vlTipTimer = null, pkPillAnim = null;
     function hideVerseTip() {
       clearTimeout(vlTipTimer);
-      document.querySelectorAll(".vl-peek").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+      document.querySelectorAll(".vl-peek, .vl-pk-date").forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
       document.querySelectorAll(".peek-hid").forEach(function(n) { n.classList.remove("peek-hid"); });
+      if (pkPillAnim) { try { pkPillAnim.cancel(); } catch (e) {} pkPillAnim = null; }
     }
 
     // The colour behind a row (the first ancestor that has one), so the peek can cover the reference cleanly.
@@ -2436,15 +2438,27 @@
     // Peek: the first words swap in over the reference with a soft wipe, in the rank's colour, for about two seconds.
     // The rank pill stays where it is; the version tag is covered while the words show. Returns false when there is no room.
     const PEEK_MS = 2100;
-    function peekSwap(item, words) {
+    // The rank pill's spot shows when the verse is next reviewed while the peek is up: "Oct 31 \u00b7 11 days" ("Today", "Tomorrow" when it is that close);
+    // when that does not fit beside the first words it shrinks to "Oct 31", and when even that does not fit the pill simply stays. Nothing for a verse with no review date.
+    function dueTexts(v) {
+      if (!v || !(v.g > 0) || v.d === null || v.d === undefined) return [];
+      const d = Math.max(0, v.d | 0);
+      if (d === 0) return ["Today"];
+      if (d === 1) return ["Tomorrow"];
+      const t = new Date(); t.setDate(t.getDate() + d);
+      const md = t.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return [md + " \u00b7 " + d + " days", md];
+    }
+    function peekSwap(item, words, v) {
       const nameEl = item.querySelector(".vl-ref > span, .fail-ref");
       if (!nameEl || !words) return false;
       if (getComputedStyle(item).position === "static") item.style.position = "relative";
-      const stopEl = item.querySelector(".rank-badge, .vl-due, .pts-badge");
+      let stopEl = item.querySelector(".rank-badge, .vl-due, .pts-badge");
       const ir = item.getBoundingClientRect(), nr = nameEl.getBoundingClientRect();
       const left = nr.left - ir.left - 2;
       let w = (stopEl ? stopEl.getBoundingClientRect().left - ir.left - 8 : ir.width - 12) - left;
       const pill = item.querySelector(".rank-badge:not(.is-new)");
+      const dueCands = pill ? dueTexts(v) : [];
       const pk = document.createElement("div");
       pk.className = "vl-peek";
       pk.style.left = left + "px"; pk.style.width = w + "px"; pk.style.background = rowBackdrop(item);
@@ -2453,6 +2467,28 @@
       sp.textContent = words;
       pk.appendChild(sp);
       item.appendChild(pk);
+      // the pill's spot: the date, right-aligned where the pill ends, if it fits beside the words
+      let dt = null;
+      if (dueCands.length) {
+        const pr = pill.getBoundingClientRect();
+        dt = document.createElement("span");
+        dt.className = "vl-pk-date";
+        dt.style.right = (ir.right - pr.right) + "px"; dt.style.color = getComputedStyle(pill).color;
+        item.appendChild(dt);
+        let fit = false;
+        for (let i = 0; i < dueCands.length && !fit; i++) {
+          dt.textContent = dueCands[i];
+          const avail = (pr.right - dt.getBoundingClientRect().width) - ir.left - 8 - left;
+          if (sp.scrollWidth + 8 <= avail) { fit = true; w = avail; pk.style.width = w + "px"; }
+        }
+        if (fit) {
+          stopEl = null;   // the date takes the pill's place, so the pill is not in the way
+          if (pill.animate) {
+            pkPillAnim = pill.animate([{ opacity: 1 }, { opacity: 0, offset: 0.24 }, { opacity: 0, offset: 0.86 }, { opacity: 1 }], { duration: PEEK_MS, easing: "cubic-bezier(.3,.7,.3,1)" });
+            dt.animate([{ opacity: 0 }, { opacity: 1, offset: 0.24 }, { opacity: 1, offset: 0.86 }, { opacity: 0 }], { duration: PEEK_MS, easing: "cubic-bezier(.3,.7,.3,1)", fill: "both" });
+          } else pill.classList.add("peek-hid");
+        } else { dt.parentNode.removeChild(dt); dt = null; }
+      }
       // the three words need the room: if the rank pill is in the way, it steps aside while the words show
       if (stopEl && sp.scrollWidth + 8 > w) {
         item.querySelectorAll(".rank-badge, .vl-due, .pts-badge").forEach(function(n) { n.classList.add("peek-hid"); });
@@ -2682,9 +2718,9 @@
         [head, body].forEach(function(e) { e.animate([{ opacity: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1 }], { duration: 360, easing: "ease", fill: "both" }); });
       }
     }
-    function showVerseTip(item, words) {
+    function showVerseTip(item, words, v) {
       hideVerseTip();
-      peekSwap(item, words || "(no text)");   // a second tap shows it again from the start
+      peekSwap(item, words || "(no text)", v);   // a second tap shows it again from the start
     }
 
     // ── Verse List search ──
@@ -3125,7 +3161,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-294';
+    const CLIENT_BUILD = 'sync-295';
 
     let queue = [];
     let currentIndex = 0;
