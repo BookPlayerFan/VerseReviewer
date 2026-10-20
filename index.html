@@ -260,9 +260,15 @@
             listed = true;
             reg.getNotifications().then(function(list) {
               list.forEach(function(n) {
-                var tag = String(n.tag || "");
-                out.found++; out.tags.push(tag || "(no tag)");
-                if (all || (fresh && /^vr-new/.test(tag)) || (daily && tag === "vr-daily")) { try { n.close(); out.closed++; } catch (e) {} }
+                // What kind it is: the tag when it is ours, else the "vrkind" the server puts in the push's data (this phone's tag is a random id, not the topic).
+                var kind = String(n.tag || "");
+                if (!/^vr-/.test(kind)) {
+                  kind = "";
+                  try { var m = JSON.stringify(n.data || {}).match(/"vrkind":"(vr-[a-z]+)"/); if (m) kind = m[1]; } catch (x) {}
+                }
+                out.found++;
+                try { out.tags.push(kind || ("? " + (n.data && typeof n.data === "object" ? Object.keys(n.data).join("/") : "no data"))); } catch (x) { out.tags.push(kind || "?"); }
+                if (all || (fresh && /^vr-new/.test(kind)) || (daily && kind === "vr-daily")) { try { n.close(); out.closed++; } catch (e) {} }
               });
               finish();
             }, function() { finish(); });

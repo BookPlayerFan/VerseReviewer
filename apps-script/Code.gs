@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-102'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-103'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1888,7 +1888,7 @@ function osSend_(heading, message, whenMs, topic, go) {
     contents: { en: message },
     url: PUSH_URL + (go ? '?go=' + go : ''),
     web_push_topic: topic || 'verse-review',
-    data: go ? { vrgo: go } : {},
+    data: go ? { vrgo: go, vrkind: topic || 'verse-review' } : { vrkind: topic || 'verse-review' },   // vrkind lets the page tell which notifications to clear
     priority: 10, // high priority: delivered right away, even when the phone is idle
     ttl: 4 * 60 * 60 // if the phone is unreachable, drop it after 4 hours instead of delivering a stale reminder
   };
