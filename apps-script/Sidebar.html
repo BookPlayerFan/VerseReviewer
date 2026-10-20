@@ -306,9 +306,7 @@
     .vm-leg:active { transform: none; filter: none; opacity: 0.6; }
     .pk-lab { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-accent, #1a73e8); margin: 4px 2px 0; }
     .pk-lab:first-child { margin-top: 0; }
-    .pk-lab span { font-size: 11px; letter-spacing: 0.02em; text-transform: none; font-weight: 700; color: var(--text-muted); }
-    .pk-tot { display: flex; justify-content: center; gap: 10px; font-size: 13px; font-weight: 700; color: var(--text-muted); padding: 2px 0 6px; border-bottom: 1px solid var(--border-card); margin-bottom: 2px; }
-    .pk-tot b { color: var(--text-primary); font-weight: 800; }
+    .pk-key .tr-mini { margin: 0 0 6px; }
     .vm-info:active { transform: none; filter: none; opacity: 0.6; }
     .vm-tile.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-accent, #1a73e8); }
     .vm-tile:active { transform: none; filter: none; }
@@ -2859,19 +2857,21 @@
       document.body.appendChild(dim);
       const b = document.createElement("div");
       b.className = "pk-bubble pk-key"; b.id = "pkBubble";
-      // with the key for both testaments: how many references and verses there are in all, and in each testament
-      const tot = which === "both" && vlVerses.length ? mapTotals() : null;
-      const refsVerses = function(t) { return t.r + (t.r === 1 ? " ref" : " refs") + " \u00b7 " + t.v + (t.v === 1 ? " verse" : " verses"); };
-      if (tot) {
-        const all = document.createElement("div"); all.className = "pk-tot";
-        all.innerHTML = "<span><b>" + tot.all.r + "</b> " + (tot.all.r === 1 ? "reference" : "references") + "</span><span>\u00b7</span><span><b>" + tot.all.v + "</b> " + (tot.all.v === 1 ? "verse" : "verses") + "</span>";
-        b.appendChild(all);
+      // with the key for both testaments: the same three counts as the Treasury page, small, at the top
+      if (which === "both" && vlVerses.length) {
+        const tot = mapTotals().all, books = {};
+        vlVerses.forEach(function(v) { books[vlBookKey(v)] = true; });
+        const stats = document.createElement("div"); stats.className = "tr-mini";
+        [[tot.v, tot.v === 1 ? "verse" : "verses"], [tot.r, tot.r === 1 ? "reference" : "references"], [Object.keys(books).length, "of 66 books"]].forEach(function(q) {
+          const c = document.createElement("div"), n = document.createElement("b"), l = document.createElement("span");
+          n.textContent = q[0]; l.textContent = q[1]; c.appendChild(n); c.appendChild(l); stats.appendChild(c);
+        });
+        b.appendChild(stats);
       }
       (which === "both" ? ["ot", "nt"] : [which]).forEach(function(w) {
         if (which === "both") {
           const lab = document.createElement("div"); lab.className = "pk-lab";
           lab.appendChild(document.createTextNode(w === "ot" ? "Old Testament" : "New Testament"));
-          if (tot) { const n = document.createElement("span"); n.textContent = refsVerses(tot[w]); lab.appendChild(n); }
           b.appendChild(lab);
         }
         MAP_KEY[w].forEach(function(r) {
@@ -3124,7 +3124,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-289';
+    const CLIENT_BUILD = 'sync-290';
 
     let queue = [];
     let currentIndex = 0;
