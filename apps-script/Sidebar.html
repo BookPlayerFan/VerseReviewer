@@ -1426,7 +1426,7 @@
         <button type="button" role="tab" id="helpTabCtl" onclick="showHelpTab('ctl')">Controls</button>
       </div>
       <div class="help-scroll" id="helpPaneInfo">
-        <div class="help-sub">A new day starts at 4 AM</div>
+        <div class="help-sub">A new day starts at midnight</div>
         <div class="help-row"><span>Learn opens</span><kbd class="nw">6 · 8 · 10 AM · 12 · 2 · 4 · 8 PM</kbd></div>
         <div class="help-row"><span>Lock AM opens</span><kbd>6 AM</kbd></div>
         <div class="help-row"><span>Lock PM opens</span><kbd>8 PM</kbd></div>
@@ -3124,7 +3124,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-291';
+    const CLIENT_BUILD = 'sync-292';
 
     let queue = [];
     let currentIndex = 0;
@@ -4778,8 +4778,8 @@
     function learningCard() { return mode === 'learning' ? learningCards[learningIndex] : null; }
     function isLearnCard(c) { return !!c && c.stage === 'learn'; }
     function learningHints() { return hintLevel > 0 && isLearnCard(learningCard()); }
-    // A level belongs to one verse on one day (the day starts at 4 AM): a new verse, or a new day, starts at Off again.
-    function lvlDay() { const d = new Date(nowSrv() - 4 * 3600000); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+    // A level belongs to one verse on one day (the day runs midnight to midnight): a new verse, or a new day, starts at Off again.
+    function lvlDay() { const d = new Date(nowSrv()); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
     function hintKey(c) { return isLearnCard(c) ? c.reference + "|" + (c.verseIndex || 1) + "|" + lvlDay() : ""; }
     function startHints(card) {
       hintLevel = isLearnCard(card) ? (lvlMap[hintKey(card)] || 0) : 0;
@@ -5046,7 +5046,7 @@
     // The same stage rules the server uses, so a press shows its result straight away instead of waiting for the round trip.
     const L_SLOTS = [360, 480, 600, 720, 840, 960, 1200];   // 6 AM, 8, 10, 12, 2, 4 PM, 8 PM: the first and the last open when their notification goes out
     function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
-    function lDayBase(ms) { return new Date(ms).getHours() * 60 + new Date(ms).getMinutes() < 240 ? ms - 86400000 : ms; }   // before 4 AM still belongs to the day before
+    function lDayBase(ms) { return ms; }   // days run midnight to midnight (same as the server's learnDayBase_)
     function lDayStart(ms) { return lAt(lDayBase(ms), 1, L_SLOTS[0]); }   // when the next day's first rep opens (6 AM)
     function lInfo(rep, n) {
       const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
@@ -5060,10 +5060,10 @@
       return o;
     }
     // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (6 AM rep: 7 AM; 8 PM rep and Lock PM: 9 PM;
-    // Lock AM: noon). A late rep is made up by pressing again; the dots warn while a rep is late right now.
+    // Lock AM: 7 AM). A late rep is made up by pressing again; the dots warn while a rep is late right now.
     function lLateDeadline(slotMs, stage, lockPart) {
       const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
-      if (stage === 'lock') { const lim = lockPart === 'pm' ? 1260 : 720; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
+      if (stage === 'lock') { const lim = lockPart === 'pm' ? 1260 : 420; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
       if (m === L_SLOTS[0]) return lAt(slotMs, 0, 420);
       if (m === L_SLOTS[L_SLOTS.length - 1]) return lAt(slotMs, 0, 1260);
       return slotMs + 3600000;

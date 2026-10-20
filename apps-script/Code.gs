@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-96'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-97'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -284,14 +284,14 @@ function stampLearningDates_(preRead) {
 // A rep that is missed is made up: once pressed, the next rep opens at once if its time has passed.
 const LEARN_SLOTS = [6 * 60, 8 * 60, 10 * 60, 12 * 60, 14 * 60, 16 * 60, 20 * 60]; // minutes after midnight
 const REPS_PER_VERSE = 7;
-const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM (which day a time belongs to); the first rep of the day opens at 6 AM (LEARN_SLOTS[0])
+const DAY_START_MIN = 0;            // a Learn/Lock day runs midnight to midnight (which day a time belongs to); the first rep of the day opens at 6 AM (LEARN_SLOTS[0])
 const LOCK_PM_MIN = 20 * 60;        // Lock PM unlocks at 8 PM
 const START_LIVE_BEFORE_MIN = 18 * 60; // a verse added before 6 PM starts today (the reps whose time has already passed open at once, to catch up); later it waits for 6 AM tomorrow
-// A rep is "late" an hour after it opens (the 6 AM rep: after 7 AM; the 8 PM rep and Lock PM: after 9 PM; Lock AM: after noon). The dots turn amber (one late rep
+// A rep is "late" an hour after it opens (the 6 AM rep: after 7 AM; the 8 PM rep and Lock PM: after 9 PM; Lock AM: after 7 AM). The dots turn amber (one late rep
 // today) or red (two or more). A late rep is made up by pressing: the next rep of the day opens at once when its time has already passed.
 const LATE_GRACE_MIN = 60;
 const LATE_FIRST_SLOT_MIN = 7 * 60;
-const LATE_LOCK_AM_MIN = 12 * 60;
+const LATE_LOCK_AM_MIN = 7 * 60;
 const LATE_LOCK_PM_MIN = 21 * 60;
 
 // The time (ms) of a clock time (minutes after midnight), dayOffset days from the day of `ms`.
@@ -347,7 +347,7 @@ function lateInfo_(stage, lockPart, readyMs, now, dot) {
   return out;
 }
 
-// When the next Learn day opens (its first rep, 6 AM): the day after the one `ms` belongs to. A time before 4 AM still belongs to the day before, so it opens at 6 AM that same morning.
+// When the next Learn day opens (its first rep, 6 AM): the day after the one `ms` belongs to (days run midnight to midnight, so always 6 AM the next calendar day).
 function nextDayStart_(ms) {
   return atClock_(learnDayBase_(ms), 1, LEARN_SLOTS[0]);
 }
@@ -360,7 +360,7 @@ function startUnlock_(ms) {
   return nextDayStart_(ms);
 }
 
-// The Learn day starts at 4 AM, so a time before 4 AM still belongs to the day before.
+// The Learn day runs midnight to midnight (DAY_START_MIN = 0), so this is just `ms`; kept as a function so the day boundary can move.
 function learnDayBase_(ms) { return minsOfDay_(ms) < DAY_START_MIN ? ms - 86400000 : ms; }
 // When the rep after rep number `dot` of a verse opens: its slot of today's Learn day. If that time has already gone by, the rep is ready at once, so a day
 // that ran behind is caught up by pressing again.
