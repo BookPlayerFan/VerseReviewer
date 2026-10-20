@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-99'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-100'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1930,12 +1930,31 @@ function pushWords_(due, learnRefs, lockRefs) {
   return { title: titles.join(', '), text: text };
 }
 
+// Does what the first open of a new day does (sort the Verses tab, build the day's deck), so it is already done when the app is opened. If the app was opened
+// before this ran (after midnight), that open already did it, and this does nothing. Returns true when it built the day.
+function prepareDay_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const today = todayKey_();
+    const s = readState_();
+    if (s && s.date === today) return false;
+    stampLearningDates_();
+    sortVerses_();
+    createState_(today);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // Runs from the daily trigger (installDailyPush), at about 4:00 AM (Apps Script starts it somewhere in 4:00 to 4:15). It works out what is
 // waiting then, and schedules the push for exactly 6:00 AM: due reviews, a Learn card and a Lock AM card (both open at 6 AM, so they are counted as of 6:00).
 // If it happens to run after 6:00 the push goes out right away. Sent once a day, and only if something is waiting.
 function dailyPush() {
   const props = PropertiesService.getScriptProperties();
   const today = todayKey_();
+  try { prepareDay_(); } catch (e) { pushLog_('prepare day ERROR', '', 0, false, String(e)); }   // the sort and the day's deck are ready before the app is opened
   try { syncSlotPushes_(); } catch (e) { pushLog_('slot schedule ERROR', '', 0, false, String(e)); }
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;

@@ -246,21 +246,29 @@
 
     // Take delivered reminders off the lock screen once nothing is waiting: the New reminders (topic "vr-new") and / or the 6 AM one ("vr-daily").
     // Best effort: if the phone does not let the page look at them, they simply stay until swiped away.
-    function clearDelivered(fresh, daily) {
+    // all: the status panel's "Clear notifications" test, which closes every notification of this app (the test one too) and reports what the phone said.
+    function clearDelivered(fresh, daily, all, report) {
+      var out = { found: 0, closed: 0, tags: [], supported: true };
       try {
-        if (!(fresh || daily) || !navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) return;
+        if (!(fresh || daily || all) || !navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) { out.supported = false; if (report) report(out); return; }
         navigator.serviceWorker.getRegistrations().then(function(regs) {
+          var waiting = regs.length, listed = false;
+          function finish() { if (--waiting <= 0 && report) { if (!listed) out.supported = false; report(out); } }
+          if (!regs.length) { out.supported = false; if (report) report(out); return; }
           regs.forEach(function(reg) {
-            if (!reg.getNotifications) return;
+            if (!reg.getNotifications) { finish(); return; }
+            listed = true;
             reg.getNotifications().then(function(list) {
               list.forEach(function(n) {
                 var tag = String(n.tag || "");
-                if ((fresh && /^vr-new/.test(tag)) || (daily && tag === "vr-daily")) { try { n.close(); } catch (e) {} }
+                out.found++; out.tags.push(tag || "(no tag)");
+                if (all || (fresh && /^vr-new/.test(tag)) || (daily && tag === "vr-daily")) { try { n.close(); out.closed++; } catch (e) {} }
               });
-            }, function() {});
+              finish();
+            }, function() { finish(); });
           });
-        }, function() {});
-      } catch (e) {}
+        }, function() { out.supported = false; if (report) report(out); });
+      } catch (e) { out.supported = false; if (report) report(out); }
     }
     function isAppOrigin(o) { return /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(String(o)); }
 
@@ -413,7 +421,10 @@
         return;
       }
       if (d.type === 'VR_CLEAR_PUSH') {
-        clearDelivered(d.fresh === true, d.daily === true);
+        var csrc = e.source, corg = e.origin;
+        clearDelivered(d.fresh === true, d.daily === true, d.all === true, d.all === true ? function(r) {
+          try { csrc.postMessage({ type: 'VR_CLEARED', found: r.found, closed: r.closed, tags: r.tags, supported: r.supported }, corg); } catch (x) {}
+        } : null);
         return;
       }
       if (d.type === 'VR_PUSH_ENABLE') {
