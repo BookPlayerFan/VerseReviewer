@@ -139,10 +139,18 @@
         localStorage.removeItem("vr_hint");
       } catch (e) {}
     }
+    // The last verse list and the Review Complete pills, kept so the app can show them at once and then refresh them.
+    function loadVl() { try { var v = JSON.parse(localStorage.getItem("vr_vl") || "null"); return Array.isArray(v) && v.length ? v : null; } catch (e) { return null; } }
+    function saveVl(v) {
+      if (!Array.isArray(v) || !v.length) return;
+      try { localStorage.setItem("vr_vl", JSON.stringify(v)); } catch (e) { try { localStorage.removeItem("vr_vl"); } catch (x) {} }
+    }
+    function loadPills() { try { var v = JSON.parse(localStorage.getItem("vr_pills") || "null"); return v && typeof v === "object" ? v : null; } catch (e) { return null; } }
+    function savePills(v) { if (!v || typeof v !== "object") return; try { localStorage.setItem("vr_pills", JSON.stringify(v)); } catch (e) {} }
     function shellInfo() {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
-      return { type: "VR_SHELL", first: first, key: key, works: works, hl: loadHints(), legacy: legacyHint() };
+      return { type: "VR_SHELL", first: first, key: key, works: works, hl: loadHints(), legacy: legacyHint(), vl: loadVl(), pills: loadPills() };
     }
     function loadApp() {
       var key = "";
@@ -427,6 +435,10 @@
         saveEarlyCache(d.cards);
       } else if (d.type === 'VR_HINT') {
         saveHint(d.key, d.level);
+      } else if (d.type === 'VR_VL') {
+        saveVl(d.verses);
+      } else if (d.type === 'VR_PILLS') {
+        savePills(d.pills);
       } else if (d.type === 'VR_RELOAD') {
         // An automatic reload (the page saw a newer copy) happens at most once per minute, so a stuck old copy can only retry slowly, never spin;
         // a tap on "Update ready" or "Reload app" always goes through.

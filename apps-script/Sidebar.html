@@ -1950,17 +1950,24 @@
     function plainVerse(t) { return String(t || "").replace(/\[\d+\]/g, " ").replace(/\s+/g, " ").trim(); }
     let vlSig = "", vlSigCount = -1;
     // done(changed): changed is false when the list from the server is the same as the one already on screen, so callers can skip a second draw.
+    // Takes the server's list of verses (or the copy the phone kept from last time) and builds the list; false when it is the same as what is already showing.
+    function ingestVl(raw) {
+      const sig = JSON.stringify(raw);
+      if (sig === vlSig && vlVerses.length === vlSigCount) return false;
+      vlSig = sig;
+      vlVerses = raw.map(function(v) { const nv = textVerses(v.t, v.f); return { f: v.f, g: v.g, p: parseRef(v.f), n: nv, pn: nv, v: v.v || "", w: v.w || "", x: v.x || plainVerse(v.t), t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0 }; });
+      vlVerses.sort(compareVerses);
+      vlSigCount = vlVerses.length;
+      return true;
+    }
+    // The outer page keeps the last list, so the map can show at once the next time the app opens and then refresh quietly.
     function loadVlVerses(done, failed) {
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !Array.isArray(res.verses)) { failed(); return; }
-          const sig = JSON.stringify(res.verses);
-          if (sig === vlSig && vlVerses.length === vlSigCount) { done(false); return; }
-          vlSig = sig;
-          vlVerses = res.verses.map(function(v) { const nv = textVerses(v.t, v.f); return { f: v.f, g: v.g, p: parseRef(v.f), n: nv, pn: nv, v: v.v || "", w: v.w || "", x: v.x || plainVerse(v.t), t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0 }; });
-          vlVerses.sort(compareVerses);
-          vlSigCount = vlVerses.length;
+          if (!ingestVl(res.verses)) { done(false); return; }
           setTreasury(treasuryTotal());
+          try { window.top.postMessage({ type: 'VR_VL', verses: res.verses }, '*'); } catch (e) {}
           done(true);
         })
         .withFailureHandler(failed)
@@ -3115,7 +3122,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-287';
+    const CLIENT_BUILD = 'sync-288';
 
     let queue = [];
     let currentIndex = 0;
@@ -3127,6 +3134,8 @@
     let totalCardsProcessed = 0;
     let progressHigh = 0;
     let loadedAt = 0;
+    let pillCache = null;   // the Review Complete pills as they were last time today (kept by the outer page): {day, tc, tl, tp}
+    let pillSaved = "";
     let tomorrowCount = null, tomorrowLoad = null;   // tomorrowLoad: the word load of that deck, for the note's colour
     let countUpPending = false;
     let regularScoredThisLoad = false; // a real (non-repeat) card was scored since this page opened
@@ -3281,7 +3290,12 @@
       if (d.type === "VR_EARLY") applyEarly(d);
       else if (d.type === "VR_REPLAY") replayLearn(d.items);
       else if (d.type === "VR_SHELL") {
-        shellInfo = d; renderDiag();
+        shellInfo = Object.assign({}, d); delete shellInfo.vl; delete shellInfo.pills; renderDiag();
+        if (Array.isArray(d.vl) && d.vl.length && !vlVerses.length) {   // the list from last time: the map shows at once, and the fresh list replaces it if it changed
+          ingestVl(d.vl);
+          if (document.getElementById("verseListView").classList.contains("open")) renderVerseList();
+        }
+        if (d.pills && typeof d.pills === "object") pillCache = d.pills;
         if (!shellHintApplied && d.hl && typeof d.hl === "object") {
           shellHintApplied = true;
           lvlMap = Object.assign({}, d.hl);
@@ -3932,6 +3946,7 @@
       if (typeof trTotal === "number") return trTotal;
       if (vlVerses.length) return treasuryTotal();
       try { const sv = JSON.parse(localStorage.getItem("vr_trpts") || "null"); if (typeof sv === "number") return sv; } catch (e) {}
+      if (pillCache && pillCache.day === lvlDay() && typeof pillCache.tp === "number") return pillCache.tp;
       return null;
     }
     function treasuryTotal() {
@@ -4048,21 +4063,36 @@
       // already right, instead of showing old numbers and changing colour a moment later. A slow answer does not hold them past 4 seconds.
       if (!onComplete) { noteHoldOver = false; clearTimeout(noteHoldTimer); noteHoldTimer = null; }
       else if (pendingCount() > 0 && !noteHoldOver && !noteHoldTimer) noteHoldTimer = setTimeout(function() { noteHoldTimer = null; noteHoldOver = true; renderTomorrowNote(); }, 4000);
-      const ready = onComplete && (pendingCount() === 0 || noteHoldOver);
+      // Once the pills have been shown today, they show at once from what was kept (and fix themselves when the answer arrives) instead of waiting for it.
+      const kept = !!(pillCache && pillCache.day === lvlDay() && typeof pillCache.tc === "number");
+      const settled = pendingCount() === 0 || noteHoldOver;
+      const ready = onComplete && (settled || kept);
       renderTreasuryPill(ready);
-      if (!ready || typeof tomorrowCount !== 'number') { el.style.display = "none"; return; }
+      const tc = typeof tomorrowCount === 'number' ? tomorrowCount : (kept && !settled ? pillCache.tc : null);
+      const tl = typeof tomorrowLoad === 'number' ? tomorrowLoad : (kept && !settled && typeof pillCache.tl === "number" ? pillCache.tl : null);
+      if (!ready || typeof tc !== 'number') { el.style.display = "none"; return; }
+      if (onComplete && settled) savePills(tc, tl);
       const wasHidden = el.style.display === "none";
-      const label = "Schedule|" + (tomorrowCount > 0 ? tomorrowCount + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + " \u203A";
-      const cls = "tomorrow-note" + (tomorrowCount > 0 && typeof tomorrowLoad === "number" ? " s" + loadStep(tomorrowLoad) : "");
+      const label = "Schedule|" + (tc > 0 ? tc + (tc === 1 ? " review" : " reviews") : "No reviews") + " \u203A";
+      const cls = "tomorrow-note" + (tc > 0 && typeof tl === "number" ? " s" + loadStep(tl) : "");
       if (el.getAttribute("data-label") !== label) {
         el.setAttribute("data-label", label);
-        el.innerHTML = "<span>Schedule</span><span>" + (tomorrowCount > 0 ? "<b>" + tomorrowCount + "</b>" + (tomorrowCount === 1 ? " review" : " reviews") : "No reviews") + " \u203A</span>";
+        el.innerHTML = "<span>Schedule</span><span>" + (tc > 0 ? "<b>" + tc + "</b>" + (tc === 1 ? " review" : " reviews") : "No reviews") + " \u203A</span>";
       }
       if (el.className.replace(" fade-in", "") !== cls) el.className = cls;
       el.style.display = "inline-flex";
       if (wasHidden) { el.classList.remove("fade-in"); void el.offsetWidth; el.classList.add("fade-in"); }
     }
     let noteHoldOver = false, noteHoldTimer = null;
+    // The pills' numbers, handed to the outer page when they change, so they can show at once the next time they come up today.
+    function savePills(tc, tl) {
+      const tp = knownTreasury();
+      const rec = { day: lvlDay(), tc: tc, tl: typeof tl === "number" ? tl : null, tp: typeof tp === "number" ? tp : null };
+      const j = JSON.stringify(rec);
+      if (j === pillSaved) return;
+      pillSaved = j; pillCache = rec;
+      try { window.top.postMessage({ type: 'VR_PILLS', pills: rec }, '*'); } catch (e) {}
+    }
 
     // Short message that works on both the card and summary screens.
     function flashNotice(msg) {
@@ -4410,6 +4440,11 @@
       learningIndex = 0;
       if (mode === 'learning' && !isScoring) {
         if (learningCards[0] && learningCards[0].reference === shown) {
+          if (oldVerse && learningCards[0].verseIndex !== oldVerse) {
+            // moved on to the next verse of the reference: it starts like a new verse (rep 1: the verse is showing, everything else blurred, hints at that verse's level)
+            segmentStates = parsedSegments.map(function() { return 'hidden'; });
+            startHints(learningCards[0]);
+          }
           if (learningCards[0].verseIndex !== oldVerse || segmentStates.every(function(x) { return x === 'hidden'; })) revealCursor = curStart(); // taps start at the verse you are on
           paintLearningHeader(learningCards[0]);
           renderCardBody();
