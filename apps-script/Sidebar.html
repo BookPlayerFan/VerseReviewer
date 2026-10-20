@@ -1427,15 +1427,15 @@
       </div>
       <div class="help-scroll" id="helpPaneInfo">
         <div class="help-sub">A new day starts at 4 AM</div>
-        <div class="help-row"><span>Learn opens</span><kbd class="nw">4 · 8 · 10 AM · 12 · 2 · 4 · 6 PM</kbd></div>
-        <div class="help-row"><span>Lock AM opens</span><kbd>4 AM</kbd></div>
-        <div class="help-row"><span>Lock PM opens</span><kbd>6 PM</kbd></div>
-        <div class="help-note">A verse added before 6 PM starts today and all 7 reps are done in one day; after 6 PM it waits for 4 AM tomorrow. A rep left an hour past opening shows amber. Press Review again to catch up: each rep whose time has passed opens at once.</div>
+        <div class="help-row"><span>Learn opens</span><kbd class="nw">6 · 8 · 10 AM · 12 · 2 · 4 · 8 PM</kbd></div>
+        <div class="help-row"><span>Lock AM opens</span><kbd>6 AM</kbd></div>
+        <div class="help-row"><span>Lock PM opens</span><kbd>8 PM</kbd></div>
+        <div class="help-note">A verse added before 6 PM starts today and all 7 reps are done in one day; after 6 PM it waits for 6 AM tomorrow. A rep left an hour past opening shows amber. Press Review again to catch up: each rep whose time has passed opens at once.</div>
         <div class="help-sub">Notifications</div>
-        <div class="help-row"><span>Reviews, plus the 4 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
+        <div class="help-row"><span>Reviews, plus the 6 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
         <div class="help-row"><span>Learn at open</span><kbd class="nw">8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
-        <div class="help-row"><span>The 6 PM Learn and Lock PM</span><kbd>8:00 PM</kbd></div>
-        <div class="help-note">The 4 AM and 6 PM Learn do not notify when they open: the 4 AM ones ride the 6 AM notification and the 6 PM ones go out at 8 PM. Only sent when something is waiting; finishing early cancels what is left.</div>
+        <div class="help-row"><span>The 8 PM Learn and Lock PM</span><kbd>8:00 PM</kbd></div>
+        <div class="help-note">The 6 AM Learn and Lock AM do not send their own notification: they ride the 6 AM one. Every other rep notifies when it opens. Only sent when something is waiting; finishing early cancels what is left.</div>
       </div>
       <div class="help-scroll" id="helpPaneCtl">
         <div class="help-sub">Verse box</div>
@@ -1863,7 +1863,7 @@
       try { window.top.postMessage({ type: 'VR_WAKE', on: true }, '*'); } catch (e) {}
     }, { passive: true, capture: true });
     // After a press, once the screen has moved on: if nothing is waiting any more, ask the shell page to take the matching notifications off the lock screen.
-    // The New reminder goes when no Learn / Lock card is open; the 6 AM one (reviews and the 4 AM cards together) goes when nothing at all is waiting.
+    // The New reminder goes when no Learn / Lock card is open; the 6 AM one (reviews and the 6 AM cards together) goes when nothing at all is waiting.
     let clearPushTimer = null;
     const CLEAR_PUSH_MS = 1500;
     function scheduleClearDelivered() {
@@ -3124,7 +3124,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-290';
+    const CLIENT_BUILD = 'sync-291';
 
     let queue = [];
     let currentIndex = 0;
@@ -5044,10 +5044,10 @@
     }
 
     // The same stage rules the server uses, so a press shows its result straight away instead of waiting for the round trip.
-    const L_SLOTS = [240, 480, 600, 720, 840, 960, 1080];
+    const L_SLOTS = [360, 480, 600, 720, 840, 960, 1200];   // 6 AM, 8, 10, 12, 2, 4 PM, 8 PM: the first and the last open when their notification goes out
     function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
     function lDayBase(ms) { return new Date(ms).getHours() * 60 + new Date(ms).getMinutes() < 240 ? ms - 86400000 : ms; }   // before 4 AM still belongs to the day before
-    function lDayStart(ms) { const t = lAt(ms, 0, 240); return t > ms ? t : lAt(ms, 1, 240); }
+    function lDayStart(ms) { return lAt(lDayBase(ms), 1, L_SLOTS[0]); }   // when the next day's first rep opens (6 AM)
     function lInfo(rep, n) {
       const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
       if (rep <= total) {
@@ -5059,7 +5059,7 @@
       }
       return o;
     }
-    // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (4 AM rep: 7 AM; 6 PM rep and Lock PM: 9 PM;
+    // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (6 AM rep: 7 AM; 8 PM rep and Lock PM: 9 PM;
     // Lock AM: noon). A late rep is made up by pressing again; the dots warn while a rep is late right now.
     function lLateDeadline(slotMs, stage, lockPart) {
       const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
@@ -5131,7 +5131,7 @@
       } else if (info.stage === 'learn') {
         nr = rep + 1; unlock = info.dot < 7 ? lAt(lDayBase(now), 0, L_SLOTS[Math.min(info.dot, 6)]) : lDayStart(now);   // a rep whose time has passed is ready at once
       } else {
-        const pm = lAt(now, 0, 1080); nr = rep + 1; unlock = pm > now ? pm : 0;
+        const pm = lAt(now, 0, 1200); nr = rep + 1; unlock = pm > now ? pm : 0;
       }
       return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 });
     }

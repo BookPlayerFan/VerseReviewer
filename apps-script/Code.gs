@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-95'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-96'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -280,13 +280,14 @@ function stampLearningDates_(preRead) {
 //   rep 7n + 1    Lock AM
 //   rep 7n + 2    Lock PM  (its button is Promote: Level 1, Rep 1)
 // Column B (Next due) holds the time the button next unlocks (empty = live now). Level 0 rows ignore it everywhere else.
-// Learn reps open at fixed times of the day (rep 1 at 4 AM ... rep 7 at 6 PM). A rep that is missed is made up: once pressed, the next rep opens at once if its time has passed.
-const LEARN_SLOTS = [4 * 60, 8 * 60, 10 * 60, 12 * 60, 14 * 60, 16 * 60, 18 * 60]; // minutes after midnight
+// Learn reps open at fixed times of the day (rep 1 at 6 AM ... rep 7 at 8 PM): the first and last open exactly when their notification goes out.
+// A rep that is missed is made up: once pressed, the next rep opens at once if its time has passed.
+const LEARN_SLOTS = [6 * 60, 8 * 60, 10 * 60, 12 * 60, 14 * 60, 16 * 60, 20 * 60]; // minutes after midnight
 const REPS_PER_VERSE = 7;
-const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM
-const LOCK_PM_MIN = 18 * 60;        // Lock PM unlocks at 6 PM
-const START_LIVE_BEFORE_MIN = 18 * 60; // a verse added before 6 PM starts today (the reps whose time has already passed open at once, to catch up); later it waits for 4 AM tomorrow
-// A rep is "late" an hour after it opens (the 4 AM rep: after 7 AM; the 6 PM rep and Lock PM: after 9 PM; Lock AM: after noon). The dots turn amber (one late rep
+const DAY_START_MIN = 4 * 60;       // a new day of Learn/Lock starts at 4 AM (which day a time belongs to); the first rep of the day opens at 6 AM (LEARN_SLOTS[0])
+const LOCK_PM_MIN = 20 * 60;        // Lock PM unlocks at 8 PM
+const START_LIVE_BEFORE_MIN = 18 * 60; // a verse added before 6 PM starts today (the reps whose time has already passed open at once, to catch up); later it waits for 6 AM tomorrow
+// A rep is "late" an hour after it opens (the 6 AM rep: after 7 AM; the 8 PM rep and Lock PM: after 9 PM; Lock AM: after noon). The dots turn amber (one late rep
 // today) or red (two or more). A late rep is made up by pressing: the next rep of the day opens at once when its time has already passed.
 const LATE_GRACE_MIN = 60;
 const LATE_FIRST_SLOT_MIN = 7 * 60;
@@ -314,7 +315,7 @@ function lateDeadline_(slotMs, stage, lockPart) {
     return m < lim ? atClock_(slotMs, 0, lim) : slotMs + LATE_GRACE_MIN * 60000;
   }
   if (m === LEARN_SLOTS[0]) return atClock_(slotMs, 0, LATE_FIRST_SLOT_MIN);
-  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return atClock_(slotMs, 0, LATE_LOCK_PM_MIN); // the 6 PM rep: its reminder goes out at 8 PM, so it is late after 9 PM
+  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return atClock_(slotMs, 0, LATE_LOCK_PM_MIN); // the 8 PM rep: late after 9 PM
   return slotMs + LATE_GRACE_MIN * 60000;
 }
 
@@ -346,17 +347,16 @@ function lateInfo_(stage, lockPart, readyMs, now, dot) {
   return out;
 }
 
-// The next 4 AM after `ms`.
+// When the next Learn day opens (its first rep, 6 AM): the day after the one `ms` belongs to. A time before 4 AM still belongs to the day before, so it opens at 6 AM that same morning.
 function nextDayStart_(ms) {
-  const t = atClock_(ms, 0, DAY_START_MIN);
-  return t > ms ? t : atClock_(ms, 1, DAY_START_MIN);
+  return atClock_(learnDayBase_(ms), 1, LEARN_SLOTS[0]);
 }
 
-// When a verse added at `ms` first opens: the 4 AM slot of today when it is added before 6 PM (that time may already be past, so the reps missed so far
-// are ready at once and can be caught up with presses in a row), otherwise the next 4 AM. Before 4 AM it opens at 4 AM.
+// When a verse added at `ms` first opens: the 6 AM slot of today when it is added before 6 PM (that time may already be past, so the reps missed so far
+// are ready at once and can be caught up with presses in a row), otherwise the next 6 AM. Before 6 AM it opens at 6 AM.
 function startUnlock_(ms) {
   const m = minsOfDay_(ms);
-  if (m < START_LIVE_BEFORE_MIN) return atClock_(ms, 0, DAY_START_MIN);
+  if (m < START_LIVE_BEFORE_MIN) return atClock_(ms, 0, LEARN_SLOTS[0]);
   return nextDayStart_(ms);
 }
 
@@ -418,7 +418,7 @@ function stageInfo_(rep, n, bRaw, now) {
 function nextStep_(info, rep, now) {
   if (info.stage === 'learn') {
     if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, unlock: catchUpSlot_(info.dot, now) };   // may be in the past: ready at once
-    return { rep: rep + 1, unlock: nextDayStart_(now) }; // Next Verse or Learned: starts again at 4 AM tomorrow
+    return { rep: rep + 1, unlock: nextDayStart_(now) }; // Next Verse or Learned: starts again at 6 AM tomorrow
   }
   if (info.lockPart === 'am') {
     const pm = atClock_(now, 0, LOCK_PM_MIN);
@@ -487,7 +487,7 @@ function newCardCounts_(data, now) {
  *   action 'press'  - the button (refused with 'locked' until its unlock time)
  *   action 'now'    - the same step, ignoring the lock (hold menu)
  *   action 'skip'   - Skip Verse / Skip to Lock (Learn cards only)
- *   action 'again'  - Keep in Lock another day (Lock cards that are open): back to Lock AM, opening at 4 AM tomorrow
+ *   action 'again'  - Keep in Lock another day (Lock cards that are open): back to Lock AM, opening at 6 AM tomorrow
  * expectedRep is the rep the screen showed, so a second phone that is behind gets 'stale' and the current card.
  * Lock PM is Promote: the verse becomes Bronze rep 1, due tomorrow.
  */
@@ -518,7 +518,7 @@ function learnAction(reference, action, expectedRep) {
       step = skipStep_(info, n, now);
     } else if (action === 'again') {
       // The rep number stays the same when this is pressed on Lock AM, so a press that arrives twice is caught by the lock instead: once kept,
-      // the card is not open until 4 AM and a second 'again' is refused.
+      // the card is not open until 6 AM and a second 'again' is refused.
       if (info.stage !== 'lock') return { ok: false, reason: 'nolock', card: learningCard_(vals, row - 1, now) };
       if (info.unlockAt) return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
       step = { rep: REPS_PER_VERSE * n + 1, unlock: nextDayStart_(now) };
@@ -1292,7 +1292,7 @@ function listUnassigned() {
   return out;
 }
 
-// Starts learning the verse you picked (Level 0). Its first rep is live now if it is before noon, otherwise it unlocks at 4 AM tomorrow.
+// Starts learning the verse you picked (Level 0). Its first rep is live now if it is before 6 PM, otherwise it unlocks at 6 AM tomorrow.
 function addChosenVerse(rowIndex, reference) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -1321,7 +1321,7 @@ function addChosenVerse(rowIndex, reference) {
         }
       }
     }
-    // Starts today if added before noon, otherwise at 4 AM tomorrow (before 4 AM: at 4 AM).
+    // Starts today if added before 6 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
     const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
     sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
     return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0 };
@@ -1767,11 +1767,11 @@ function getMonthStats(year, month) {
 //               2) Run installDailyPush() from the editor (creates the ~5:00 AM trigger; approve the permissions).
 //               3) Run testPush() to send yourself a test.
 // Two kinds of reminder:
-//   - Daily: at 6:00 AM (scheduled by a trigger that runs at about 5:00), one push for due reviews plus any Learn / Lock card unlocked at 4 AM (dailyPush). Sent once a day.
+//   - Daily: at 6:00 AM (scheduled by a trigger that runs at about 5:00), one push for due reviews plus any Learn / Lock card that opens at 6 AM (dailyPush). Sent once a day.
 //   - Learn / Lock unlocks: the 5 AM job (dailyPush) schedules the whole day's slot pushes up front (syncSlotPushes_): 8, 10, 12, 2, 4 PM,
-//     and 8 PM for the 6 PM unlock. There is one push per time, naming every verse waiting then ("Learn A and 1 more", "Learn A, lock B"), so a rep
+//     and 8 PM for the last rep (which opens at 8 PM). There is one push per time, naming every verse waiting then ("Learn A and 1 more", "Learn A, lock B"), so a rep
 //     you forgot to press never leaves a gap. After each press the same sync runs again: it cancels what is no longer needed (the last rep of the
-//     day, Skip, Promote) and adds anything missing. The 4 AM unlocks are covered by the daily push.
+//     day, Skip, Promote) and adds anything missing. The 6 AM unlocks are covered by the daily push.
 
 const ONESIGNAL_APP_ID = 'e9bc8efc-620e-49a8-9275-09f9d76cd272';
 const PUSH_URL = 'https://bookplayerfan.github.io/VerseReviewer/';
@@ -1908,7 +1908,7 @@ function pushWords_(due, learnRefs, lockRefs) {
 }
 
 // Runs from the daily trigger (installDailyPush), at about 5:00 AM (Apps Script starts it somewhere in 5:00 to 5:15). It works out what is
-// waiting then, and schedules the push for exactly 6:00 AM: due reviews, a Learn card and a Lock AM card (both unlock at 4 AM).
+// waiting then, and schedules the push for exactly 6:00 AM: due reviews, a Learn card and a Lock AM card (both open at 6 AM, so they are counted as of 6:00).
 // If it happens to run after 6:00 the push goes out right away. Sent once a day, and only if something is waiting.
 function dailyPush() {
   const props = PropertiesService.getScriptProperties();
@@ -1916,12 +1916,12 @@ function dailyPush() {
   try { syncSlotPushes_(); } catch (e) { pushLog_('slot schedule ERROR', '', 0, false, String(e)); }
   if (props.getProperty(PUSH_DAILY_KEY) === today) return;
   const due = getDueCards(false).length;
-  const nc = newCardCounts_(readSheetData_(), nowMs_());
+  const now = nowMs_();
+  const at = atClock_(now, 0, DAILY_PUSH_MIN);
+  const nc = newCardCounts_(readSheetData_(), Math.max(now, at));   // the cards that open at 6:00 are waiting by the time the push goes out
   const words = pushWords_(due, nc.learnRefs, nc.lockRefs);
   if (!words) return;
   const go = due > 0 ? 'review' : 'new';
-  const now = nowMs_();
-  const at = atClock_(now, 0, DAILY_PUSH_MIN);
   const r = osSend_(words.title, words.text, at > now + 30000 ? at : 0, 'vr-daily', go);
   if (r.ok) {
     props.setProperty(PUSH_DAILY_KEY, today);
@@ -1929,7 +1929,7 @@ function dailyPush() {
   }
 }
 
-// The 6:00 AM daily push is scheduled at about 5:00. If everything it would mention (due reviews, the 4 AM Learn / Lock cards) is finished before it
+// The 6:00 AM daily push is scheduled at about 5:00. If everything it would mention (due reviews, the 6 AM Learn / Lock cards) is finished before it
 // goes out, it is cancelled. Cheap: it does nothing unless a daily push is still waiting, which is only between about 5:00 and 6:00 AM.
 function cancelDailyIfDone_(preRead) {
   const props = PropertiesService.getScriptProperties();
@@ -1940,7 +1940,7 @@ function cancelDailyIfDone_(preRead) {
   const now = nowMs_();
   if (!e || !e.id || !e.at || e.at <= now + 120000) { props.deleteProperty(PUSH_DAILY_ID_KEY); return false; }   // gone out already, or about to
   const data = preRead || readSheetData_();
-  const nc = newCardCounts_(data, now);
+  const nc = newCardCounts_(data, Math.max(now, e.at));   // as of the time the push goes out: the 6 AM cards count
   if (pushWords_(getDueCards(false, data).length, nc.learnRefs, nc.lockRefs)) return false;   // something is still waiting
   const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
   pushLog_('cancel (all done early)', '', e.at, !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
@@ -2048,7 +2048,7 @@ function notifStatus() {
   try { out.trigger = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; }).length === 1; } catch (e) {}
   try {
     const d = JSON.parse(props.getProperty(PUSH_DAILY_ID_KEY) || 'null');
-    if (d && d.at > now) out.pending.push({ at: d.at, text: 'Reviews and the 4 AM reps' });
+    if (d && d.at > now) out.pending.push({ at: d.at, text: 'Reviews and the 6 AM reps' });
   } catch (e) {}
   const map = slotMap_();
   Object.keys(map).map(Number).filter(function(k) { return k > now; }).sort(function(x, y) { return x - y; }).forEach(function(k) {
@@ -2061,28 +2061,27 @@ function notifStatus() {
   return out;
 }
 
-// When the push for a New card's unlock goes out. The 4 AM unlocks ride on the 6 AM daily push (dailyPush), so they get none
-// of their own; the 6 PM unlocks get theirs at 8 PM; every other unlock gets a push at its own time. 0 = none.
+// When the push for a New card's unlock goes out. The 6 AM unlocks ride on the 6 AM daily push (dailyPush), so they get none
+// of their own; every other unlock (the 8 PM one too) gets a push at its own time. 0 = none.
 function learnPushTime_(unlockMs) {
   if (!unlockMs) return 0;
   const m = minsOfDay_(unlockMs);
-  if (m === DAY_START_MIN) return 0;
-  if (m === LEARN_SLOTS[LEARN_SLOTS.length - 1]) return unlockMs + 2 * 60 * 60 * 1000;
+  if (m === LEARN_SLOTS[0]) return 0;
   return unlockMs;
 }
 
 // The times of today's remaining slot pushes for a New card, from `now` on. A Learn card gets the slots from its current rep onward
-// (8, 10, 12, 2, 4 PM, and 8 PM for the 6 PM one); a Lock card gets the 8 PM one for the 6 PM unlock. A card that is waiting for tomorrow gets none.
+// (8, 10, 12, 2, 4 and 8 PM); a Lock card gets the 8 PM one (Lock PM). A card that is waiting for tomorrow gets none.
 function daySlotTimes_(card, now) {
   const endOfDay = atClock_(now, 1, DAY_START_MIN);
   if (card.unlockAt && card.unlockAt >= endOfDay) return [];
   const out = [];
   if (card.stage === 'lock') {
-    out.push(atClock_(now, 0, LOCK_PM_MIN) + 2 * 60 * 60 * 1000);
+    out.push(atClock_(now, 0, LOCK_PM_MIN));
   } else {
     for (let i = 1; i < LEARN_SLOTS.length; i++) {
       if (card.dot > i + 1) continue; // that rep is already done
-      out.push(atClock_(now, 0, LEARN_SLOTS[i]) + (i === LEARN_SLOTS.length - 1 ? 2 * 60 * 60 * 1000 : 0));
+      out.push(atClock_(now, 0, LEARN_SLOTS[i]));
     }
   }
   return out.filter(function(t) { return t > now + 30000; });
