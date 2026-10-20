@@ -674,11 +674,12 @@
     .hint-flag.off { opacity: .3; }
     .hint-flag.pulse svg { animation: bulbPulse .5s ease-out; }
     @keyframes bulbPulse { 40% { transform: scale(1.45); } }
-    .peek-cap { position: fixed; left: 50%; transform: translateX(-50%); z-index: 95; font: 600 12px/1 var(--font-ui, -apple-system, system-ui, sans-serif); color: #fff; background: rgba(40,40,40,.88); padding: 7px 12px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap; }
-    .peek-cap.on { opacity: 1; }
     .v-text.hinted .hz { transition: color .22s ease; }
-    body.peek .v-text.hinted .hz { color: var(--text-primary); }   /* holding the verse: the full words fade in, in place */
-    .hint-flag svg { width: 15px; height: 15px; display: block; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    body.peek .v-text.hinted.cv .hz, body.peek .v-text.hinted.cv .hu { color: var(--text-primary); }   /* holding the verse: the full words of the verse you are learning fade in, in place */
+    body.peek .v-text.hinted.cv .hu { text-decoration-color: transparent; }
+    body.peek .v-text.blurred.cv { filter: none; opacity: 1; background-color: transparent; }   /* ...and with hints off the blurred verse you are learning shows for as long as you hold */
+    .passage-status { transition: opacity .16s ease; }
+    .hint-flag svg { width: 18px; height: 18px; display: block; }   /* the bulb draws itself: outline, filled, filled with rays */
 
     /* 1. Mobile Default Typography (Touchscreens) */
     .passage-stream, .pv-text {
@@ -763,6 +764,7 @@
       user-select: none;
     }
     .v-text.hinted .hz { color: transparent; }
+    .v-text.hinted .hu { color: transparent; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--text-accent) 55%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; transition: color .22s ease; }   /* a hidden word: an underline where its first letter would be */
     .v-text.hinted .hl { -webkit-text-stroke: 0.35px currentColor; } /* a touch heavier without changing the letter's width */
 
     .notice {
@@ -3105,7 +3107,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-283';
+    const CLIENT_BUILD = 'sync-284';
 
     let queue = [];
     let currentIndex = 0;
@@ -3131,7 +3133,13 @@
 
     let parsedSegments = [];
     let segmentStates = [];
-    let hintMode = false;   // New tab: while on, revealed pieces show only their first letters (hidden ones stay hidden). The on / off choice is kept by the shell page, so it survives closing the app
+    // New tab hint level for the card on screen: 0 off, 1 first letter of every word, 2 first letter of every other word, 3 first letter of each phrase.
+    // Hidden words show an underline in place of their first letter, so nothing moves. A level belongs to one verse on one day; the shell page keeps it on this phone.
+    let hintLevel = 0;
+    let lvlMap = {};         // saved levels: "reference|verse|day" -> level
+    const lastLvl = {};      // the level a card was last at before the bulb switched hints off
+    let fullPieces = {};     // phrases tapped open to their full words while the card is at a hint level
+    let lvlFlashTimer = null;
     let revealCursor = -1;  // the piece revealed most recently; a tap reveals the next hidden piece after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
@@ -3240,7 +3248,13 @@
           if (mode !== 'learning') setMode('learning'); // saved like tapping the New tab
           learningIndex = 0;
           render();
-          if (at >= 0 && d.hint === true) { hintMode = true; renderCardBody(); }   // hints were on in the early view
+          if (at >= 0 && typeof d.hint === 'number') {   // the hint level the early view was showing
+            const c0 = learningCards[0], k = hintKey(c0);
+            hintLevel = isLearnCard(c0) ? Math.max(0, Math.min(3, d.hint)) : 0;
+            if (k) { if (hintLevel) lvlMap[k] = hintLevel; else delete lvlMap[k]; }
+            shellHintApplied = true;
+            applyLevelStates(c0); syncFlipState(); renderCardBody();
+          }
           const shown = Array.isArray(d.revealed) ? d.revealed : [];
           if (at >= 0 && shown.length && parsedSegments.length && (typeof d.n !== 'number' || d.n === parsedSegments.length)) {
             segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; });
@@ -3260,9 +3274,15 @@
       else if (d.type === "VR_REPLAY") replayLearn(d.items);
       else if (d.type === "VR_SHELL") {
         shellInfo = d; renderDiag();
-        if (!shellHintApplied && typeof d.hint === "boolean") {
+        if (!shellHintApplied && d.hl && typeof d.hl === "object") {
           shellHintApplied = true;
-          if (d.hint !== hintMode) { hintMode = d.hint; if (mode === 'learning' && learningCards.length) renderCardBody(); }
+          lvlMap = Object.assign({}, d.hl);
+          const c0 = learningCard();
+          if (isLearnCard(c0)) {
+            let L = lvlMap[hintKey(c0)] || 0;
+            if (!L && d.legacy === true) { L = 1; saveLevel(c0, 1); }   // the old hints-on switch becomes Level 1, once
+            if (L !== hintLevel) { hintLevel = L; fullPieces = {}; applyLevelStates(c0); syncFlipState(); renderCardBody(); }
+          }
         }
       }
       else if (d.type === "VR_CLIP_TEXT" && clipWait && d.id === clipWait.id) {
@@ -4274,6 +4294,7 @@
       parsedSegments = buildUnits(parseVerseSegments(card.text, card.reference), true);   // New tab: long verses split into phrases
       segmentStates = parsedSegments.map(() => 'hidden');
       revealCursor = -1;
+      startHints(card);
 
       cardEl.style.transition = "";
       cardEl.classList.remove("lu-settle");
@@ -4575,27 +4596,30 @@
       const allRevealed = revealedCount === parsedSegments.length;
       const isNew = mode === 'learning';
 
-      // A small bulb at the end of the status line (New tab only): blue while hints are on, faint while off. Tapping it switches hints.
-      const flag = isNew
-        ? '<span class="hint-flag' + (hintMode ? '' : ' off') + '" role="button" aria-label="Hints" onclick="hintFlagTap(event)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z"/></svg></span>'
-        : '';
-      const status = parsedSegments.length > 1
-        ? `${revealedCount} of ${parsedSegments.length} revealed`
-        : (allRevealed ? 'Revealed' : 'Tap to reveal');
       const lc = isNew ? learningCards[learningIndex] : null;
-      const multi = !!(lc && lc.stage === 'learn' && lc.verseCount > 1);
-      const verseTxt = multi ? `<span class="passage-status">Verse ${lc.verseIndex} of ${lc.verseCount}</span>` : '';
-      let html = `<div class="passage-toolbar"><span class="passage-status">${status}</span>${(verseTxt || flag) ? `<span class="pt-right">${verseTxt}${flag}</span>` : ''}</div>`;
+      const learn = !!(lc && lc.stage === 'learn');          // Learn cards have hints; Lock cards are a plain test, like Review
+      const multi = !!(learn && lc.verseCount > 1);
+      const cv = learn ? (lc.verseIndex || 1) - 1 : -1;     // the verse you are learning today
+      // The bar above a Learn card: which verse, and the hint bulb (outline, filled, filled with rays; faint when hints are off). Tapping the bulb switches hints.
+      const flag = learn
+        ? '<span class="hint-flag' + (hintLevel ? '' : ' off') + '" role="button" aria-label="Hints" onclick="hintFlagTap(event)">' + bulbSvg(hintLevel) + '</span>'
+        : '';
+      const status = learn
+        ? (multi ? `Verse ${lc.verseIndex} of ${lc.verseCount}` : 'Single verse')
+        : (parsedSegments.length > 1
+          ? `${revealedCount} of ${parsedSegments.length} revealed`
+          : (allRevealed ? 'Revealed' : 'Tap to reveal'));
+      let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${flag ? `<span class="pt-right">${flag}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
-        const isHint = isNew && isRev && hintMode;
+        const isHint = learn && isRev && hintLevel > 0 && !fullPieces[idx];
         // phrases of a split verse always show a small grey letter (a, b, c...), so you can see a verse is split before revealing anything
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
             ${seg.num ? `<sup class="v-num${multi && seg.vi !== lc.verseIndex - 1 ? ' dim' : ''}">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter ? `<span class="p-let">${seg.letter}</span>` : ''}
-            <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}">${isHint ? hintMarkup(seg.text) : escapeHtml(seg.text)}</span>
+            <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}${seg.vi === cv ? ' cv' : ''}">${isHint ? hintMarkup(seg.text, hintLevel) : escapeHtml(seg.text)}</span>
           </span>
         `;
       });
@@ -4604,23 +4628,40 @@
       body.innerHTML = html;
     }
 
-    // First letter of every word in blue, in place; the rest of the word is there but invisible, so nothing changes size or moves.
-    function hintMarkup(text) {
+    // The hint markup for one piece (a phrase on the New tab). Level 1: the first letter of every word. Level 2: every other word (the first, third, ...).
+    // Level 3: only the first word of the phrase. A word that is not shown keeps its width and has an underline where its first letter would be.
+    // The letter is blue; the rest of every word is there but invisible, so nothing changes size or moves.
+    function hintMarkup(text, level) {
+      let wi = -1;
       return String(text || "").split(/(\s+)/).map(function(w) {
         if (!w || /^\s+$/.test(w)) return w;
+        wi++;
         const m = w.match(/^([^A-Za-z0-9]*)([A-Za-z0-9])([\s\S]*)$/);
         if (!m) return '<span class="hz">' + escapeHtml(w) + '</span>';
-        return escapeHtml(m[1]) + '<span class="hl">' + escapeHtml(m[2]) + '</span><span class="hz">' + escapeHtml(m[3]) + '</span>';
+        const show = level === 1 || (level === 2 && wi % 2 === 0) || (level === 3 && wi === 0);
+        if (show) return escapeHtml(m[1]) + '<span class="hl">' + escapeHtml(m[2]) + '</span><span class="hz">' + escapeHtml(m[3]) + '</span>';
+        return escapeHtml(m[1]) + '<span class="hu">' + escapeHtml(m[2]) + '</span><span class="hz">' + escapeHtml(m[3]) + '</span>';
       }).join("");
+    }
+
+    // The hint bulb: Off = faint outline, Level 1 = outline, Level 2 = filled, Level 3 = filled with rays.
+    function bulbSvg(level) {
+      const body = "M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z";
+      return '<svg viewBox="-3 -4 30 30" aria-hidden="true">' +
+        (level >= 2 ? '<path d="' + body + '" fill="currentColor"/>' : '') +
+        '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        (level >= 3 ? '<path d="M12 -.5v-2M3.6 3.4 2.2 2M20.4 3.4 21.8 2M1 10H-.8M23 10h1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' : '') +
+        '</svg>';
     }
 
     // ── Reveal gestures ──
     // A "piece" is one phrase on the New tab and one whole verse on the Review tab.
     //   Tap              reveal the next hidden piece after the one revealed most recently (wrapping round to any still hidden)
     //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again
-    //   Hold             New tab only: hints on / off (while on, revealed pieces show only their first letters; hidden ones stay hidden)
-    //   Swipe right      reveal everything
-    //   Swipe left       hide everything
+    //   Hold             New tab, Learn cards: the full words of the verse you are learning show while you hold, then go back
+    //   Swipe right      Learn cards: one hint level easier (toward Off). Lock cards and Review: reveal everything
+    //   Swipe left       Learn cards: one hint level harder (toward Level 3). Lock cards and Review: hide everything
+    //   Bulb tap         Learn cards: hints off, or back on at the level the card was last at
     function nextHiddenAfter(from) {
       const n = segmentStates.length;
       for (let k = 1; k <= n; k++) {
@@ -4652,6 +4693,12 @@
     // Hiding one verse sends the next plain tap back to the start of the reference.
     function tapVerse(index) {
       if (isScoring || !hasActiveCard() || !parsedSegments[index]) return;
+      if (learningHints()) {   // at a hint level: a shown phrase flips between its hint and its full words; a hidden one is shown at the level
+        if (segmentStates[index] === 'hidden') { revealPiece(index); return; }
+        if (fullPieces[index]) delete fullPieces[index]; else fullPieces[index] = true;
+        renderCardBody();
+        return;
+      }
       const vi = parsedSegments[index].vi;
       const mine = [];
       parsedSegments.forEach(function(p, i) { if (p.vi === vi) mine.push(i); });
@@ -4685,58 +4732,92 @@
       renderCardBody();
     }
 
-    function toggleHintMode() {
-      if (isScoring || mode !== 'learning' || !hasActiveCard()) return;
-      hintMode = !hintMode;
+    // ── Hint levels (New tab, Learn cards) ──
+    const HINT_NAMES = ['Hints off', 'Level 1 \u00b7 First letters', 'Level 2 \u00b7 Every other word', 'Level 3 \u00b7 Each phrase'];
+    function learningCard() { return mode === 'learning' ? learningCards[learningIndex] : null; }
+    function isLearnCard(c) { return !!c && c.stage === 'learn'; }
+    function learningHints() { return hintLevel > 0 && isLearnCard(learningCard()); }
+    // A level belongs to one verse on one day (the day starts at 4 AM): a new verse, or a new day, starts at Off again.
+    function lvlDay() { const d = new Date(nowSrv() - 4 * 3600000); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+    function hintKey(c) { return isLearnCard(c) ? c.reference + "|" + (c.verseIndex || 1) + "|" + lvlDay() : ""; }
+    function startHints(card) {
+      hintLevel = isLearnCard(card) ? (lvlMap[hintKey(card)] || 0) : 0;
+      fullPieces = {};
+      applyLevelStates(card);
+      syncFlipState();
+    }
+    // With a hint level on, the verse you are learning is showing (at the level). With hints off it is blurred, except on rep 1 of a new verse, when there is nothing to recall yet.
+    function applyLevelStates(card) {
+      if (!isLearnCard(card)) return;
+      const cv = (card.verseIndex || 1) - 1, show = hintLevel > 0 || (card.dot || 1) === 1;
+      segmentStates = parsedSegments.map(function(p, i) { return p.vi === cv ? (show ? 'revealed' : 'hidden') : (segmentStates[i] || 'hidden'); });
+    }
+    function saveLevel(card, L) {
+      const k = hintKey(card); if (!k) return;
+      if (L > 0) lvlMap[k] = L; else delete lvlMap[k];
       shellHintApplied = true;
-      try { window.top.postMessage({ type: 'VR_HINT', on: hintMode }, '*'); } catch (e) {}
+      try { window.top.postMessage({ type: 'VR_HINT', key: k, level: L }, '*'); } catch (e) {}
+    }
+    function setHintLevel(L, quiet) {
+      const c = learningCard();
+      if (isScoring || !isLearnCard(c) || !hasActiveCard()) return;
+      L = Math.max(0, Math.min(3, L));
+      const k = hintKey(c);
+      if (hintLevel > 0) lastLvl[k] = hintLevel;
+      if (L > 0) lastLvl[k] = L;
+      const same = L === hintLevel;
+      hintLevel = L; fullPieces = {};
+      applyLevelStates(c);
+      syncFlipState();
+      saveLevel(c, L);
       renderCardBody();
-      const fl = document.querySelector(".hint-flag"); if (fl) fl.classList.add("pulse");
+      if (!same) { const fl = document.querySelector(".hint-flag"); if (fl) fl.classList.add("pulse"); }
+      if (!quiet) flashHintLabel(HINT_NAMES[L]);
+    }
+    function stepHintLevel(dir) { setHintLevel(hintLevel + dir); }
+    function toggleHintMode() {   // the bulb: off, or back on at the level this card was last at
+      const c = learningCard();
+      if (!isLearnCard(c)) return;
+      setHintLevel(hintLevel > 0 ? 0 : (lastLvl[hintKey(c)] || 1));
     }
     function hintFlagTap(e) { if (e) { e.stopPropagation(); e.preventDefault(); } toggleHintMode(); }
-    let shellHintApplied = false;   // the saved hint choice is applied once per page load, then your own taps rule
+    let shellHintApplied = false;   // the saved levels are applied once per page load, then your own changes rule
 
-    // Press and hold in the verse box (New tab): with hints off, the hold turns them on. With hints on, the full words show for as long as you
-    // hold, then hide again; still holding, slide down to turn hints off (the bulb at the top right of the box also switches them with a tap).
-    // The click that ends a hold must not also reveal a piece.
-    let heldBody = null, peeking = false, peekY0 = 0, peekFlipped = false, peekCapTimer = null;
-    const PEEK_SLIDE = 45;   // px down
-    function peekCaption(text, y) {
-      let c = document.getElementById("peekCap");
-      if (!c) { c = document.createElement("div"); c.id = "peekCap"; c.className = "peek-cap"; document.body.appendChild(c); }
-      clearTimeout(peekCapTimer);
-      if (text) { c.textContent = text; c.style.top = Math.max(8, y) + "px"; c.classList.add("on"); } else c.classList.remove("on");
+    // The left label of the bar says the new level for a moment, then goes back to the verse.
+    function swapLabel(el, text) { el.style.opacity = 0; setTimeout(function() { el.textContent = text; el.style.opacity = 1; }, 160); }
+    function flashHintLabel(text) {
+      const el = document.querySelector("#cardBody .passage-toolbar .passage-status"); if (!el) return;
+      clearTimeout(lvlFlashTimer);
+      swapLabel(el, text);
+      lvlFlashTimer = setTimeout(function() {
+        const e2 = document.querySelector("#cardBody .passage-toolbar .passage-status");
+        if (e2 && !peeking) swapLabel(e2, e2.getAttribute("data-base") || "");
+      }, 1500);
     }
+
+    // Press and hold in the verse box (Learn cards): the full words of the verse you are learning show for as long as you hold, then go back.
+    // The tap on the end of a hold must not also reveal a piece.
+    let heldBody = null, peeking = false;
     function startPeek(e) {
-      if (mode !== 'learning' || !hasActiveCard()) return;
-      peeking = true; peekFlipped = false; peekY0 = e.clientY;
+      if (mode !== 'learning' || !hasActiveCard() || !isLearnCard(learningCard())) return;
+      peeking = true;
       document.body.classList.add("peek");
-      try { document.getElementById("cardBody").setPointerCapture(e.pointerId); } catch (x) {}   // the box is redrawn when hints flip; the finger keeps reporting
-      if (!hintMode) {   // hints off: the hold itself turns them on (and shows the full words until you lift, like any hold)
-        toggleHintMode(); peekFlipped = true;
-        peekCaption("Hints on", peekY0 - 66);
-        return;
-      }
-      peekCaption("Slide down to turn hints off", peekY0 - 66);
+      const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
+      if (el) { clearTimeout(lvlFlashTimer); swapLabel(el, "Holding \u00b7 full words"); }
     }
     function endPeek() {
       if (!peeking) return;
       peeking = false;
       document.body.classList.remove("peek");
-      peekCaption("");
+      const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
+      if (el) swapLabel(el, el.getAttribute("data-base") || "");
     }
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
-      heldBody = attachLongPress(body, startPeek, function(e) { return mode === 'learning' && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
-      window.addEventListener("pointermove", function(e) {
-        if (!peeking || peekFlipped || e.clientY - peekY0 < PEEK_SLIDE) return;
-        peekFlipped = true;
-        toggleHintMode();
-        peekCaption(hintMode ? "Hints on" : "Hints off", peekY0 - 66);
-      });
+      heldBody = attachLongPress(body, startPeek, function(e) { return mode === 'learning' && isLearnCard(learningCard()) && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
       window.addEventListener("pointerup", endPeek);
       window.addEventListener("pointercancel", endPeek);
-      body.addEventListener("touchmove", function(e) { if (peeking && e.cancelable) e.preventDefault(); }, { passive: false });   // the slide must not scroll the verse
+      body.addEventListener("touchmove", function(e) { if (peeking && e.cancelable) e.preventDefault(); }, { passive: false });   // a hold must not scroll the verse
       body.addEventListener("click", function(e) {
         if (heldBody()) { e.stopImmediatePropagation(); e.preventDefault(); }
       }, true);
@@ -4766,7 +4847,8 @@
         if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
         tracking = false; swipeFired = true;
         if (isScoring || !hasActiveCard()) return;
-        if (dx > 0) setAllPieces(true); else setAllPieces(false);
+        if (mode === 'learning' && isLearnCard(learningCard())) stepHintLevel(dx > 0 ? -1 : 1);   // Learn cards: swipe right is easier, left is harder
+        else if (dx > 0) setAllPieces(true); else setAllPieces(false);
       });
       window.addEventListener("pointerup", function() { tracking = false; });
       window.addEventListener("pointercancel", function() { tracking = false; });
