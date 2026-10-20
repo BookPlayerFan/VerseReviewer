@@ -3162,7 +3162,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-300';
+    const CLIENT_BUILD = 'sync-301';
 
     let queue = [];
     let currentIndex = 0;
@@ -3315,7 +3315,7 @@
           const shown = Array.isArray(d.revealed) ? d.revealed : [];
           if (at >= 0 && shown.length && parsedSegments.length && (typeof d.n !== 'number' || d.n === parsedSegments.length)) {
             segmentStates = parsedSegments.map(function(_, i) { return shown.indexOf(i) >= 0 ? 'revealed' : 'hidden'; });
-            revealCursor = segmentStates.lastIndexOf('revealed');
+            resetTapCursor(learningCards[0]);
             syncFlipState();
             renderCardBody();
           }
@@ -4424,6 +4424,16 @@
       return curStart();
     }
 
+    // After the shown pieces change without a tap (the app opening from the early view, or the hint level changing): taps carry on from the last piece shown of
+    // another verse; with only the verse you are learning showing (or nothing), they start from the first verse (the verse you are learning first while it is hidden).
+    function resetTapCursor(card) {
+      if (!isLearnCard(card)) { revealCursor = segmentStates.lastIndexOf('revealed'); return; }
+      const cvi = (card.verseIndex || 1) - 1;
+      let lastOther = -1;
+      segmentStates.forEach(function(st, i) { if (st === 'revealed' && parsedSegments[i] && parsedSegments[i].vi !== cvi) lastOther = i; });
+      revealCursor = lastOther >= 0 ? lastOther : tapStart();
+    }
+
     let growPips = false;   // set for one paint: the new dots grow in (after the old ones shrank away)
     let lastPips = { ref: "", stage: "", now: 0 };   // what the dots last showed, to pop the one that just filled
     function paintLearningHeader(card) {
@@ -4838,6 +4848,7 @@
       if (!isLearnCard(card)) return;
       const cv = (card.verseIndex || 1) - 1, show = hintLevel > 0 || (card.dot || 1) === 1;
       segmentStates = parsedSegments.map(function(p, i) { return p.vi === cv ? (show ? 'revealed' : 'hidden') : (segmentStates[i] || 'hidden'); });
+      resetTapCursor(card);
     }
     function saveLevel(card, L) {
       const k = hintKey(card); if (!k) return;
