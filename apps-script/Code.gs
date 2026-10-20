@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-101'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-102'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2041,7 +2041,7 @@ function pushStatus() {
   const props = PropertiesService.getScriptProperties();
   const trig = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; });
   pushLog_('status: trigger', 'dailyPush', 0, trig.length === 1, trig.length + ' daily trigger(s)' + (trig.length ? ' (' + trig[0].getEventType() + ')' : ' - run installDailyPush()'));
-  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 4:00 and 4:15 in THIS zone and schedules the push for 6:00.');
+  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 4:00 and 4:15 in THIS zone. It builds the day (sort and deck), schedules the Learn / Lock pushes, and schedules the 6:00 morning push.');
   pushLog_('status: today', '', 0, null, 'last daily push marked ' + (props.getProperty(PUSH_DAILY_KEY) || 'never') + ', today is ' + todayKey_());
   pushLog_('status: key', 'ONESIGNAL_KEY', 0, !!props.getProperty('ONESIGNAL_KEY'), props.getProperty('ONESIGNAL_KEY') ? 'set' : 'NOT set');
   const slots = slotMap_();
@@ -2063,7 +2063,7 @@ function installDailyPush() {
     if (t.getHandlerFunction() === 'dailyPush') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('dailyPush').timeBased().atHour(4).nearMinute(0).everyDays(1).create();
-  console.log('Daily push trigger created for about 4:00 AM; it schedules the push for 6:00 AM.');
+  console.log('Daily trigger created for about 4:00 AM. Each morning it builds the day (sort and deck), schedules the Learn / Lock pushes, and schedules the 6:00 AM push.');
 }
 
 // Run from the editor to check the connection. View -> Logs shows the answer.
