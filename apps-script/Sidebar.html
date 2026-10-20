@@ -674,7 +674,7 @@
     @keyframes bulbPulse { 40% { transform: scale(1.45); } }
     .v-text.hinted .hz { transition: color .22s ease; }
     body.peek .v-text.hinted .hz, body.peek .v-text.hinted .hu { color: var(--text-primary); }   /* holding the verse: the full words of every verse showing (the one you are learning and any you revealed) fade in, in place */
-    body.peek .v-text.hinted .hu { text-decoration-color: transparent; }
+    body.peek .v-text.hinted .hu::after { opacity: 0; }   /* the dots fade out as the words fade in */
     body.peek .v-text.blurred.cv { filter: none; opacity: 1; background-color: transparent; }   /* ...and with hints off the blurred verse you are learning shows for as long as you hold */
     .passage-status { transition: opacity .16s ease; }
     .passage-status.done { color: #1b7a3a; }   /* "Verse 1 done" while the dots celebrate */
@@ -764,7 +764,8 @@
       user-select: none;
     }
     .v-text.hinted .hz { color: transparent; }
-    .v-text.hinted .hu { color: transparent; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--text-accent) 55%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; transition: color .22s ease; }   /* a hidden word: an underline where its first letter would be */
+    .v-text.hinted .hu { color: transparent; position: relative; transition: color .22s ease; }
+    .v-text.hinted .hu::after { content: ""; position: absolute; left: 50%; top: 55%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--text-accent); transition: opacity .22s ease; pointer-events: none; }   /* a hidden word: a dot where its first letter would be (drawn over the letter, so nothing changes size or moves) */
     .v-text.hinted .hl { -webkit-text-stroke: 0.35px currentColor; } /* a touch heavier without changing the letter's width */
 
     .notice {
@@ -3124,7 +3125,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-293';
+    const CLIENT_BUILD = 'sync-294';
 
     let queue = [];
     let currentIndex = 0;
@@ -3153,7 +3154,7 @@
     let parsedSegments = [];
     let segmentStates = [];
     // New tab hint level for the card on screen: 0 off, 1 first letter of every word, 2 first letter of every other word, 3 first letter of each phrase.
-    // Hidden words show an underline in place of their first letter, so nothing moves. A level belongs to one verse on one day; the shell page keeps it on this phone.
+    // Hidden words show a dot in place of their first letter, so nothing moves. A level belongs to one verse on one day; the shell page keeps it on this phone.
     let hintLevel = 0;
     let lvlMap = {};         // saved levels: "reference|verse|day" -> level
     const lastLvl = {};      // the level a card was last at before the bulb switched hints off
@@ -4679,7 +4680,7 @@
     }
 
     // The hint markup for one piece (a phrase on the New tab). Level 1: the first letter of every word. Level 2: every other word (the first, third, ...).
-    // Level 3: only the first word of the phrase. A word that is not shown keeps its width and has an underline where its first letter would be.
+    // Level 3: only the first word of the phrase. A word that is not shown keeps its width and has a dot where its first letter would be.
     // The letter is blue; the rest of every word is there but invisible, so nothing changes size or moves.
     function hintMarkup(text, level) {
       let wi = -1;
