@@ -3161,7 +3161,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-297';
+    const CLIENT_BUILD = 'sync-298';
 
     let queue = [];
     let currentIndex = 0;
@@ -4383,7 +4383,7 @@
       document.getElementById("sessionProgressFill").style.width = "0%";
       document.getElementById("btnFail").style.display = "none";            // one button on the New tab
       document.getElementById("btnFail").classList.remove("seen", "only", "review");
-      revealCursor = curStart();
+      revealCursor = tapStart();
       paintLearningHeader(card);
 
       const versionBadge = document.getElementById("cardVersion");
@@ -4410,6 +4410,17 @@
       if (!c || c.stage !== 'learn' || !(c.verseCount > 1)) return -1;
       const i = parsedSegments.findIndex(function(p) { return p.vi === c.verseIndex - 1; });
       return i > 0 ? i - 1 : -1;
+    }
+
+    // Where a plain tap starts on a Learn card of a multi-verse reference: with the verse you are learning not showing yet, the first tap shows it; once it is showing,
+    // taps go through the reference from its first verse (skipping what is already showing).
+    function tapStart() {
+      const c = mode === 'learning' ? learningCards[learningIndex] : null;
+      if (c && c.stage === 'learn' && c.verseCount > 1) {
+        const open = parsedSegments.some(function(p, i) { return p.vi === c.verseIndex - 1 && segmentStates[i] === 'hidden'; });
+        if (!open) return -1;
+      }
+      return curStart();
     }
 
     let growPips = false;   // set for one paint: the new dots grow in (after the old ones shrank away)
@@ -4486,7 +4497,7 @@
             segmentStates = parsedSegments.map(function() { return 'hidden'; });
             startHints(learningCards[0]);
           }
-          if (learningCards[0].verseIndex !== oldVerse || segmentStates.every(function(x) { return x === 'hidden'; })) revealCursor = curStart(); // taps start at the verse you are on
+          if (learningCards[0].verseIndex !== oldVerse || segmentStates.every(function(x) { return x === 'hidden'; })) revealCursor = tapStart(); // taps start at the verse you are on until it is showing, then from the first verse
           paintLearningHeader(learningCards[0]);
           renderCardBody();
           updateTabs();
@@ -4762,6 +4773,7 @@
     function revealPiece(i) {
       segmentStates[i] = 'revealed';
       revealCursor = i;
+      if (tapStart() === -1 && learningCard() && learningCard().verseCount > 1 && parsedSegments[i].vi === learningCard().verseIndex - 1) revealCursor = -1;   // the verse you are learning is now showing: the next tap starts from the first verse
       syncFlipState();
       renderCardBody();
     }
@@ -4778,7 +4790,7 @@
     }
 
     // New tab: tapping a verse reveals that verse's next hidden phrase; tapping it once it is all showing hides it again.
-    // Hiding one verse sends the next plain tap back to the start of the reference.
+    // Hiding one verse sends the next plain tap back to the start of the reference (to the verse you are learning first, while that one is not showing).
     function tapVerse(index) {
       if (isScoring || !hasActiveCard() || !parsedSegments[index]) return;
       if (learningHints()) {   // at a hint level: a shown phrase flips between its hint and its full words; a hidden one is shown at the level
@@ -4793,7 +4805,7 @@
       const hidden = mine.filter(function(i) { return segmentStates[i] === 'hidden'; });
       if (hidden.length) { revealPiece(hidden[0]); return; }
       mine.forEach(function(i) { segmentStates[i] = 'hidden'; });
-      revealCursor = curStart();
+      revealCursor = tapStart();
       syncFlipState();
       renderCardBody();
     }
@@ -4806,7 +4818,7 @@
       const allRevealed = segmentStates.every(s => s === 'revealed');
       const targetState = allRevealed ? 'hidden' : 'revealed';
       segmentStates = segmentStates.map(() => targetState);
-      revealCursor = targetState === 'revealed' ? segmentStates.length - 1 : curStart();
+      revealCursor = targetState === 'revealed' ? segmentStates.length - 1 : tapStart();
 
       syncFlipState();
       renderCardBody();
