@@ -825,6 +825,8 @@
 
     .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time) */
     .pt-right { display: inline-flex; align-items: center; gap: 10px; }
+    .pt-note { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; }   /* Review bar: Card N of M */
+    .pt-note b { font-weight: 800; }
     .v-num.dim { opacity: 0.45; }                           /* verses other than the one you are learning today */
     .lm-item { display: block; width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 700;
       background: var(--btn-restart-bg); color: var(--btn-restart-text); }
@@ -1439,10 +1441,12 @@
         <div class="help-sub">Verse box</div>
         <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
         <div class="help-row"><span>Reveal that verse's next phrase, or hide it again (New tab)</span><kbd>Tap a verse</kbd></div>
-        <div class="help-row"><span>First letters only, on / off (New tab)</span><kbd>Hold</kbd></div>
-        <div class="help-row"><span>Reveal all</span><kbd>Swipe right</kbd></div>
-        <div class="help-row"><span>Hide all</span><kbd>Swipe left</kbd></div>
-        <div class="help-note">A piece is a whole verse on Review and a phrase on New. A blue bulb on the status line means everything revealed shows only its first letters, until you hold again.</div>
+        <div class="help-row"><span>Hint level harder (New tab)</span><kbd>Swipe left</kbd></div>
+        <div class="help-row"><span>Hint level easier (New tab)</span><kbd>Swipe right</kbd></div>
+        <div class="help-row"><span>Hints off, or back on (New tab)</span><kbd>Tap the bulb</kbd></div>
+        <div class="help-row"><span>Full words while you hold (New tab)</span><kbd>Hold</kbd></div>
+        <div class="help-row"><span>Reveal all, or hide all (Review and Lock)</span><kbd>Hold</kbd></div>
+        <div class="help-note">A piece is a whole verse on Review and a phrase on New. The bulb on the New tab: faint is off, outline shows the first letter of every word, filled every other word, filled with rays only the start of each phrase. Each verse starts at Off every day.</div>
         <div class="help-sub">Holds</div>
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
@@ -3107,7 +3111,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-284';
+    const CLIENT_BUILD = 'sync-285';
 
     let queue = [];
     let currentIndex = 0;
@@ -4609,7 +4613,10 @@
         : (parsedSegments.length > 1
           ? `${revealedCount} of ${parsedSegments.length} revealed`
           : (allRevealed ? 'Revealed' : 'Tap to reveal'));
-      let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${flag ? `<span class="pt-right">${flag}</span>` : ''}</div>`;
+      // right side: the bulb on a Learn card, "Card N of M" on Review (the deck, as the progress bar counts it; not on a repeat card), nothing on a Lock card
+      let right = flag;
+      if (!isNew && baseCount > 0 && currentIndex < baseCount) right = `<span class="pt-note">Card <b>${currentIndex + 1}</b> of ${baseCount}</span>`;
+      let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
@@ -4659,8 +4666,9 @@
     //   Tap              reveal the next hidden piece after the one revealed most recently (wrapping round to any still hidden)
     //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again
     //   Hold             New tab, Learn cards: the full words of the verse you are learning show while you hold, then go back
-    //   Swipe right      Learn cards: one hint level easier (toward Off). Lock cards and Review: reveal everything
-    //   Swipe left       Learn cards: one hint level harder (toward Level 3). Lock cards and Review: hide everything
+    //                    Review and Lock cards: reveal everything, and it stays revealed; a hold when everything shows hides it all again
+    //   Swipe right      Learn cards only: one hint level easier (toward Off)
+    //   Swipe left       Learn cards only: one hint level harder (toward Level 3)
     //   Bulb tap         Learn cards: hints off, or back on at the level the card was last at
     function nextHiddenAfter(from) {
       const n = segmentStates.length;
@@ -4706,14 +4714,6 @@
       if (hidden.length) { revealPiece(hidden[0]); return; }
       mine.forEach(function(i) { segmentStates[i] = 'hidden'; });
       revealCursor = curStart();
-      syncFlipState();
-      renderCardBody();
-    }
-
-    function setAllPieces(reveal) {
-      if (isScoring || !hasActiveCard()) return;
-      segmentStates = segmentStates.map(function() { return reveal ? 'revealed' : 'hidden'; });
-      revealCursor = reveal ? segmentStates.length - 1 : curStart();
       syncFlipState();
       renderCardBody();
     }
@@ -4795,7 +4795,8 @@
       }, 1500);
     }
 
-    // Press and hold in the verse box (Learn cards): the full words of the verse you are learning show for as long as you hold, then go back.
+    // Press and hold in the verse box. Learn cards: the full words of the verse you are learning show for as long as you hold, then go back.
+    // Review and Lock cards: the hold is the reveal / hide switch for the whole verse (it stays as it is when you let go, and a revealed verse counts for Miss).
     // The tap on the end of a hold must not also reveal a piece.
     let heldBody = null, peeking = false;
     function startPeek(e) {
@@ -4814,7 +4815,9 @@
     }
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
-      heldBody = attachLongPress(body, startPeek, function(e) { return mode === 'learning' && isLearnCard(learningCard()) && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
+      heldBody = attachLongPress(body, function(e) {
+        if (mode === 'learning' && isLearnCard(learningCard())) startPeek(e); else toggleRevealAll();
+      }, function(e) { return !isScoring && hasActiveCard() && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
       window.addEventListener("pointerup", endPeek);
       window.addEventListener("pointercancel", endPeek);
       body.addEventListener("touchmove", function(e) { if (peeking && e.cancelable) e.preventDefault(); }, { passive: false });   // a hold must not scroll the verse
@@ -4836,6 +4839,7 @@
         tracking = false; swipeFired = false;
         if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
         if (e.target.closest("button") || e.target.closest(".hint-flag")) return;
+        if (!(mode === 'learning' && isLearnCard(learningCard()))) return;   // only Learn cards swipe (hint levels); Review and Lock use the hold
         if (e.pointerType === "touch" && (e.clientX < 14 || e.clientX > window.innerWidth - 14)) return;
         tracking = true; sx = e.clientX; sy = e.clientY;
       });
@@ -4847,8 +4851,7 @@
         if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
         tracking = false; swipeFired = true;
         if (isScoring || !hasActiveCard()) return;
-        if (mode === 'learning' && isLearnCard(learningCard())) stepHintLevel(dx > 0 ? -1 : 1);   // Learn cards: swipe right is easier, left is harder
-        else if (dx > 0) setAllPieces(true); else setAllPieces(false);
+        stepHintLevel(dx > 0 ? -1 : 1);   // swipe right is easier, left is harder
       });
       window.addEventListener("pointerup", function() { tracking = false; });
       window.addEventListener("pointercancel", function() { tracking = false; });
