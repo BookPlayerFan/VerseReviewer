@@ -3165,7 +3165,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-302';
+    const CLIENT_BUILD = 'sync-303';
 
     let queue = [];
     let currentIndex = 0;
@@ -6370,7 +6370,7 @@
       let msg;
       if (d.supported === false) msg = "This phone does not let the page list them";
       else if (!d.found) msg = "None listed on this phone";
-      else msg = "Closed " + d.closed + " of " + d.found + " (" + (d.tags || []).join(", ") + ")";
+      else msg = "Closed " + d.closed + " of " + d.found + " (" + (d.tags || []).join(", ") + ")" + (d.via ? " · by " + d.via : "");
       b.textContent = msg;
       clearTestTimer = setTimeout(function() { b.disabled = false; b.textContent = "Clear notifications"; }, 6000);
     }

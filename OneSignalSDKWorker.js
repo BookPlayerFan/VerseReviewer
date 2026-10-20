@@ -26,4 +26,28 @@ self.addEventListener("notificationclick", function(event) {
   } catch (e) {}
 });
 
+// The page asks this worker to close delivered notifications (the worker is what showed them). "fresh" = new-card reminders, "daily" = the
+// morning one, "all" = everything (the status panel's test button). The kind is the tag when it is ours, else the "vrkind" in the push's data.
+self.addEventListener("message", function(event) {
+  var m = event.data;
+  if (!m || m.type !== "VR_CLOSE") return;
+  var src = event.source;
+  event.waitUntil(self.registration.getNotifications().then(function(list) {
+    var out = { type: "VR_CLOSED", id: m.id, found: 0, closed: 0, tags: [] };
+    list.forEach(function(n) {
+      var kind = String(n.tag || "");
+      if (!/^vr-/.test(kind)) {
+        kind = "";
+        try { var k = JSON.stringify(n.data || {}).match(/"vrkind":"(vr-[a-z]+)"/); if (k) kind = k[1]; } catch (e) {}
+      }
+      out.found++;
+      out.tags.push(kind || "?");
+      if (m.all === true || (m.fresh === true && /^vr-new/.test(kind)) || (m.daily === true && kind === "vr-daily")) { try { n.close(); out.closed++; } catch (e) {} }
+    });
+    try { if (src) src.postMessage(out); } catch (e) {}
+  }, function() {
+    try { if (src) src.postMessage({ type: "VR_CLOSED", id: m.id, found: 0, closed: 0, tags: [], failed: true }); } catch (e) {}
+  }));
+});
+
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
