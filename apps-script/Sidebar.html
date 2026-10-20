@@ -673,8 +673,8 @@
     .hint-flag.pulse svg { animation: bulbPulse .5s ease-out; }
     @keyframes bulbPulse { 40% { transform: scale(1.45); } }
     .v-text.hinted .hz { transition: color .22s ease; }
-    body.peek .v-text.hinted.cv .hz, body.peek .v-text.hinted.cv .hu { color: var(--text-primary); }   /* holding the verse: the full words of the verse you are learning fade in, in place */
-    body.peek .v-text.hinted.cv .hu { text-decoration-color: transparent; }
+    body.peek .v-text.hinted .hz, body.peek .v-text.hinted .hu { color: var(--text-primary); }   /* holding the verse: the full words of every verse showing (the one you are learning and any you revealed) fade in, in place */
+    body.peek .v-text.hinted .hu { text-decoration-color: transparent; }
     body.peek .v-text.blurred.cv { filter: none; opacity: 1; background-color: transparent; }   /* ...and with hints off the blurred verse you are learning shows for as long as you hold */
     .passage-status { transition: opacity .16s ease; }
     .passage-status.done { color: #1b7a3a; }   /* "Verse 1 done" while the dots celebrate */
@@ -3124,7 +3124,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-292';
+    const CLIENT_BUILD = 'sync-293';
 
     let queue = [];
     let currentIndex = 0;
@@ -3748,7 +3748,9 @@
     function parseContext(text) {
       const out = [];
       let cur = null;
-      String(text || "").replace(/\r/g, "").split("\n").forEach(function(line) {
+      // A note kept on the sheet is one line (labels run on after a space); break it before each upper-case label so it reads as separate sections
+      const spaced = String(text || "").replace(/\r/g, "").replace(/\s+(?=(?:\*\*)?(?:SUMMARY|LEAD-UP|WHERE IT SITS|KEY WORD|SETTING|WHERE IT FITS|WORTH KNOWING|KEY POINT)(?:\*\*)?\s*:)/g, "\n");
+      spaced.split("\n").forEach(function(line) {
         const clean = line.replace(/\*\*/g, "").trim();
         const m = clean.match(/^(SUMMARY|LEAD[- ]UP|WHERE IT SITS|KEY WORD|SETTING|WHERE IT FITS|WORTH KNOWING|KEY POINT)\s*:\s*(.*)$/i);
         if (m) { const k = m[1].toUpperCase(); cur = { key: k === "LEAD UP" ? "LEAD-UP" : k, text: m[2] }; out.push(cur); }
@@ -4836,7 +4838,7 @@
       }, 1500);
     }
 
-    // Press and hold in the verse box. Learn cards: the full words of the verse you are learning show for as long as you hold, then go back.
+    // Press and hold in the verse box. Learn cards: the full words of every verse that is showing (the one you are learning and any you revealed) show for as long as you hold, then go back.
     // Review and Lock cards: the hold is the reveal / hide switch for the whole verse (it stays as it is when you let go, and a revealed verse counts for Miss).
     // The tap on the end of a hold must not also reveal a piece.
     let heldBody = null, peeking = false;

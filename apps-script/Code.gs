@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-97'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-98'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1527,12 +1527,33 @@ function askClaude_(system, user) {
   return ans;
 }
 
+// A kept note is stored as one line (no line breaks, which formats better in the sheet); the app puts the breaks back before each label when it shows it.
+function flattenContext_(text) {
+  return String(text || '').replace(/\s*[\r\n]+\s*/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+// One-off tidy-up: run this from the editor to turn every kept note on the Verses tab into one line. (Each note is also converted the next time it is opened.)
+function flattenAllContexts() {
+  const sheet = versesSheet_();
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const rng = sheet.getRange(2, CONTEXT_COL, sheet.getLastRow() - 1, 1);
+  let n = 0;
+  const out = rng.getValues().map(function(r) {
+    const v = r[0];
+    if (typeof v !== 'string' || !/^\s*SUMMARY\s*:/i.test(v) || !/[\r\n]/.test(v)) return [v];
+    n++;
+    return [flattenContext_(v)];
+  });
+  if (n) rng.setValues(out);
+  return n;
+}
+
 // True for a kept note in this app's format (it starts with SUMMARY:) that stops part way: no KEY POINT, or it ends mid-sentence.
 // Notes you type yourself in column I do not start with SUMMARY:, so they are never treated as cut off.
 function contextCutOff_(text) {
   const t = String(text || '').trim();
   if (!/^SUMMARY\s*:/i.test(t)) return false;
-  if (!/^KEY POINT\s*:/im.test(t)) return true;
+  if (!/(^|\s)KEY POINT\s*:/i.test(t)) return true;
   return !/[.!?…"'”’)\]]$/.test(t);
 }
 
@@ -1547,6 +1568,7 @@ function getVerseContext(reference, version, text, force) {
       kept = oldContext_(ref);
       if (kept) saveContext_(ref, kept); // move it to column I
     }
+    if (kept && /^\s*SUMMARY\s*:/i.test(kept) && /[\r\n]/.test(kept)) { kept = flattenContext_(kept); saveContext_(ref, kept); } // an older note with line breaks becomes one line
     if (kept && !contextCutOff_(kept)) return { ok: true, text: kept, cached: true };
     // a kept note that was cut off by an earlier build is asked for again below; if that fails it is still shown rather than lost
     cutKept = kept;
@@ -1562,6 +1584,7 @@ function getVerseContext(reference, version, text, force) {
 
   const ans = askClaude_(CONTEXT_SYSTEM, contextPrompt_(ref, cleanRef_(version), body));
   if (!ans.ok) return cutKept ? { ok: true, text: cutKept, cached: true, partial: true } : ans;
+  ans.text = flattenContext_(ans.text); // one line on the sheet; the app breaks it into sections when it shows it
   const kept = saveContext_(ref, ans.text);
   return { ok: true, text: ans.text, cached: false, kept: kept, model: CONTEXT_MODEL };
 }
