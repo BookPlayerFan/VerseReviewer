@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-100'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-101'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1969,6 +1969,51 @@ function dailyPush() {
     props.setProperty(PUSH_DAILY_KEY, today);
     if (r.json && r.json.id && at > now + 30000) props.setProperty(PUSH_DAILY_ID_KEY, JSON.stringify({ id: r.json.id, at: at }));
   }
+}
+
+// Run from the editor to see whether load balancing is doing its job (read-only; View -> Logs / the execution log shows the answer).
+// 1) the review load on each of the next 45 days (verses, and the word load that balancing uses, with a bar), 2) every Platinum+ verse and how
+// many days its date sits from the exact interval (last review date + the level's interval). Bronze to Gold are always exact, so they are not listed.
+function checkLoadBalance() {
+  const data = readSheetData_();
+  const today = today_();
+  const DAY = 86400000;
+  const per = {};
+  const moved = [];
+  let plus = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (!cleanRef_(data[i][5])) continue;
+    const lvl = levelOf_(data[i][4]);
+    if (lvl < 1) continue;
+    const due = toMidnight_(data[i][1]);
+    if (!due) continue;
+    const k = Math.max(0, Math.round((due.getTime() - today.getTime()) / DAY));   // overdue counts as today
+    const p = per[k] || (per[k] = { n: 0, load: 0 });
+    p.n++; p.load += verseLoad_(data[i][7]);
+    const cfg = GROUP_CONFIG[lvl];
+    const last = toMidnight_(data[i][2]);
+    if (cfg && (cfg.early || cfg.late) && last) {
+      plus++;
+      const off = Math.round((due.getTime() - last.getTime()) / DAY) - cfg.interval;
+      moved.push({ ref: cleanRef_(data[i][5]), name: cfg.name, off: off, k: k });
+    }
+  }
+  const lines = ['LOAD BY DAY (next 45 days)   day | verses | load'];
+  for (let k = 0; k <= 45; k++) {
+    const p = per[k] || { n: 0, load: 0 };
+    const d = new Date(today.getTime()); d.setDate(d.getDate() + k);
+    const label = k === 0 ? 'today (incl. overdue)' : Utilities.formatDate(d, Session.getScriptTimeZone(), 'EEE MMM d');
+    lines.push(('+' + k + '    ').slice(0, 4) + ' ' + (label + '                      ').slice(0, 22) + ('   ' + p.n).slice(-3) + '  ' + ('     ' + p.load.toFixed(1)).slice(-6) + '  ' + new Array(Math.round(p.load) + 1).join('#'));
+  }
+  console.log(lines.join('\n'));
+  const shifted = moved.filter(function(m) { return m.off !== 0; });
+  const hist = {};
+  moved.forEach(function(m) { hist[m.off] = (hist[m.off] || 0) + 1; });
+  console.log('PLATINUM AND ABOVE: ' + plus + ' verse(s); ' + shifted.length + ' sit off their exact interval. Days off -> count: ' + JSON.stringify(hist));
+  shifted.sort(function(a, b) { return a.k - b.k; }).forEach(function(m) {
+    console.log('  ' + m.ref + ' (' + m.name + ') ' + (m.off < 0 ? Math.abs(m.off) + ' day(s) early' : m.off + ' day(s) late') + ', due in ' + m.k + ' day(s)');
+  });
+  console.log(plus ? 'A verse moves only when another day is clearly quieter, so a short or empty list can be normal.' : 'No Platinum+ verses yet, so nothing is moved by balancing.');
 }
 
 // The 6:00 AM daily push is scheduled at about 4:00. If everything it would mention (due reviews, the 6 AM Learn / Lock cards) is finished before it
