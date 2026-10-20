@@ -679,6 +679,8 @@
     body.peek .v-text.hinted.cv .hu { text-decoration-color: transparent; }
     body.peek .v-text.blurred.cv { filter: none; opacity: 1; background-color: transparent; }   /* ...and with hints off the blurred verse you are learning shows for as long as you hold */
     .passage-status { transition: opacity .16s ease; }
+    .passage-status.done { color: #1b7a3a; }   /* "Verse 1 done" while the dots celebrate */
+    @media (prefers-color-scheme: dark) { .passage-status.done { color: #7fdca0; } }
     .hint-flag svg { width: 18px; height: 18px; display: block; }   /* the bulb draws itself: outline, filled, filled with rays */
 
     /* 1. Mobile Default Typography (Touchscreens) */
@@ -3122,7 +3124,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-288';
+    const CLIENT_BUILD = 'sync-289';
 
     let queue = [];
     let currentIndex = 0;
@@ -5018,18 +5020,22 @@
         isScoring = true;
         fillCurrentPip();
         setTimeout(pipFinale, PIP_FILL_MS);
+        const nextVerse = (card.verseIndex || 1) < (card.verseCount || 1);
+        if (nextVerse) setTimeout(function() { if (startedIn === epoch) swapDoneLabel("Verse " + (card.verseIndex || 1) + " done \u2713"); }, 450);   // the bar says the verse is done while the dots celebrate
         setTimeout(function() {
           if (startedIn !== epoch) return;
-          // the dots shrink away (and the pill turns into Lock), then the next state grows in
-          learnHeaderExit((card.verseIndex || 1) >= (card.verseCount || 1), function() {
+          // the dots lift into the pill (which turns into Lock after the last verse), then the next state comes out of it
+          learnHeaderExit(!nextVerse, function() {
             if (startedIn !== epoch) return;
             isScoring = false;
             growPips = true;
+            const ghost = nextVerse && mode === 'learning' ? verseGhost() : null;         // the verse you just finished stays on screen while the next one fades in over it
             const now = learningCards.concat(learningHeld).find(function(x) { return x.reference === card.reference; });
             if (now && now.rep === card.rep) applyLearnCard(predictLearn(card, kind));   // the server has not answered yet: show the next state
             else if (mode === 'learning') render();                                        // it has: the card is already updated underneath
             else updateTabs();
             growPips = false;
+            if (ghost) verseGhostFade(ghost);
           });
         }, PIP_FILL_MS + PIP_FINALE_MS);
       } else {
@@ -5314,6 +5320,30 @@
         pill.animate([from, { color: accent, borderColor: "color-mix(in srgb, " + accent + " 45%, transparent)", backgroundColor: "color-mix(in srgb, " + accent + " 12%, transparent)" }], { duration: 750, easing: "ease-out", fill: "forwards" });
       }
       setTimeout(done, LIFT_MS + (pips.length - 1) * LIFT_STEP_MS + 80);
+    }
+    // The bar's left label changes to green text for a moment ("Verse 1 done"); the next paint of the bar puts the normal label back.
+    function swapDoneLabel(text) {
+      const el = document.querySelector("#cardBody .passage-toolbar .passage-status"); if (!el) return;
+      clearTimeout(lvlFlashTimer);
+      el.style.opacity = 0;
+      setTimeout(function() { el.textContent = text; el.classList.add("done"); el.style.opacity = 1; }, 160);
+    }
+    // Moving on to the next verse: the box you were looking at is copied and held over the real one, then it blurs and fades out as the new verse fades in underneath.
+    const VERSE_FADE_MS = 550;
+    function verseGhost() {
+      const body = document.getElementById("cardBody");
+      if (!body) return null;
+      const r = body.getBoundingClientRect(), g = body.cloneNode(true);
+      g.removeAttribute("id"); g.removeAttribute("onclick"); g.classList.add("vgh");
+      g.style.cssText = "position:fixed;left:" + r.left + "px;top:" + r.top + "px;width:" + r.width + "px;height:" + r.height + "px;margin:0;pointer-events:none;z-index:50;overflow:hidden;transition:opacity " + VERSE_FADE_MS + "ms ease, filter " + VERSE_FADE_MS + "ms ease;";
+      document.body.appendChild(g);
+      return g;
+    }
+    function verseGhostFade(g) {
+      const nb = document.getElementById("cardBody");
+      if (nb) { nb.style.transition = "none"; nb.style.opacity = "0"; void nb.offsetWidth; nb.style.transition = "opacity " + VERSE_FADE_MS + "ms ease"; nb.style.opacity = "1"; }
+      requestAnimationFrame(function() { g.style.opacity = "0"; g.style.filter = "blur(4px)"; });
+      setTimeout(function() { g.remove(); const b2 = document.getElementById("cardBody"); if (b2) { b2.style.transition = ""; b2.style.opacity = ""; } }, VERSE_FADE_MS + 100);
     }
     // The new dots come out of the pill, one after another, once the old ones have gone into it.
     function pipsEmerge(delay0) {
