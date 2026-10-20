@@ -2438,14 +2438,16 @@
     // Peek: the first words swap in over the reference with a soft wipe, in the rank's colour, for about two seconds.
     // The rank pill stays where it is; the version tag is covered while the words show. Returns false when there is no room.
     const PEEK_MS = 2100;
-    // The rank pill's spot shows when the verse is next reviewed while the peek is up: "Oct 31 \u00b7 11 days" ("Oct 21 \u00b7 Tomorrow", "Oct 20 \u00b7 Today" when it is that close);
+    // The rank pill's spot shows when the verse is next reviewed while the peek is up: "Oct 31 \u00b7 11 days" ("Today", "Tomorrow" when it is that close);
     // when that does not fit beside the first words it shrinks to "Oct 31", and when even that does not fit the pill simply stays. Nothing for a verse with no review date.
     function dueTexts(v) {
       if (!v || !(v.g > 0) || v.d === null || v.d === undefined) return [];
       const d = Math.max(0, v.d | 0);
+      if (d === 0) return ["Today"];
+      if (d === 1) return ["Tomorrow"];
       const t = new Date(); t.setDate(t.getDate() + d);
       const md = t.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      return [md + " \u00b7 " + (d === 0 ? "Today" : d === 1 ? "Tomorrow" : d + " days"), md];
+      return [md + " \u00b7 " + d + " days", md];
     }
     function peekSwap(item, words, v) {
       const nameEl = item.querySelector(".vl-ref > span, .fail-ref");
@@ -3159,7 +3161,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-296';
+    const CLIENT_BUILD = 'sync-297';
 
     let queue = [];
     let currentIndex = 0;
