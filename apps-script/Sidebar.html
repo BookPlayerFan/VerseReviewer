@@ -1441,8 +1441,8 @@
         <div class="help-sub">Verse box</div>
         <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
         <div class="help-row"><span>Reveal that verse's next phrase, or hide it again (New tab)</span><kbd>Tap a verse</kbd></div>
-        <div class="help-row"><span>Hint level harder (New tab)</span><kbd>Swipe left</kbd></div>
-        <div class="help-row"><span>Hint level easier (New tab)</span><kbd>Swipe right</kbd></div>
+        <div class="help-row"><span>Hint level harder (New tab)</span><kbd>Swipe right</kbd></div>
+        <div class="help-row"><span>Hint level easier (New tab)</span><kbd>Swipe left</kbd></div>
         <div class="help-row"><span>Hints off, or back on (New tab)</span><kbd>Tap the bulb</kbd></div>
         <div class="help-row"><span>Full words while you hold (New tab)</span><kbd>Hold</kbd></div>
         <div class="help-row"><span>Reveal all, or hide all (Review and Lock)</span><kbd>Hold</kbd></div>
@@ -2845,7 +2845,7 @@
     function showMapKey(which, head) {
       hideVerseTip(); closePeek();
       const dim = document.createElement("div");
-      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.18)";
+      dim.className = "pk-dim"; dim.id = "pkDim"; dim.style.background = "rgba(0, 0, 0, 0.45)";   // as dark as behind the info panel
       dim.onclick = function(e) { e.stopPropagation(); closePeek(); };
       document.body.appendChild(dim);
       const b = document.createElement("div");
@@ -2872,6 +2872,10 @@
           row.appendChild(nm); row.appendChild(bk); b.appendChild(row);
         });
       });
+      const btns = document.createElement("div"); btns.className = "pv-btns";   // the same Close button as the info panel
+      const cl = document.createElement("button"); cl.type = "button"; cl.className = "pv-close"; cl.textContent = "Close";
+      cl.onclick = function(e) { e.stopPropagation(); closePeek(); };
+      btns.appendChild(cl); b.appendChild(btns);
       document.body.appendChild(b);
       const r = head.getBoundingClientRect();
       // below the heading, or above it when there is no room
@@ -3111,7 +3115,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-285';
+    const CLIENT_BUILD = 'sync-286';
 
     let queue = [];
     let currentIndex = 0;
@@ -4667,8 +4671,8 @@
     //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again
     //   Hold             New tab, Learn cards: the full words of the verse you are learning show while you hold, then go back
     //                    Review and Lock cards: reveal everything, and it stays revealed; a hold when everything shows hides it all again
-    //   Swipe right      Learn cards only: one hint level easier (toward Off)
-    //   Swipe left       Learn cards only: one hint level harder (toward Level 3)
+    //   Swipe left       Learn cards only: one hint level easier (toward Off)
+    //   Swipe right      Learn cards only: one hint level harder (toward Level 3)
     //   Bulb tap         Learn cards: hints off, or back on at the level the card was last at
     function nextHiddenAfter(from) {
       const n = segmentStates.length;
@@ -4851,7 +4855,7 @@
         if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
         tracking = false; swipeFired = true;
         if (isScoring || !hasActiveCard()) return;
-        stepHintLevel(dx > 0 ? -1 : 1);   // swipe right is easier, left is harder
+        stepHintLevel(dx > 0 ? 1 : -1);   // swipe right is harder, left is easier
       });
       window.addEventListener("pointerup", function() { tracking = false; });
       window.addEventListener("pointercancel", function() { tracking = false; });
