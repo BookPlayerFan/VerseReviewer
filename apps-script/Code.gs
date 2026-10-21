@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-114'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-115'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2461,25 +2461,34 @@ function checkVerseSplits() {
 // Run checkLearnPlan() from the editor. It changes nothing. It shows what a "volume unit" plan would do to your learn days: a learn step is worth about
 // LEARN_UNIT words, a step costs a day, and a step that runs past the unit costs more and more. So a long verse splits into parts (at its best break) and short
 // neighbouring verses of one reference join into one step. Whole verses are only ever joined with other whole verses; a split verse stands on its own.
-const LEARN_UNIT = 30;          // words one learn step is worth; a step is free of any size cost up to this
+// Everything below is a share of one volume unit (30 words = 100%), so changing LEARN_UNIT rescales the whole plan.
+//   up to 100%    an ideal step. Whole verses join when together they are about 100% or less.
+//   40% and up    a part of a split verse should be at least this big (smaller costs extra), and a verse alone under it is a good reason to join.
+//   about 130%    where one verse starts to be worth splitting into parts (39 words; a clean sentence break tips it a little earlier, no natural pause a little later).
+// None of these is a hard rule. Each is the point where one choice starts to cost more than another, and the breaks, the evenness and the tiny verses nudge it.
+const LEARN_UNIT = 30;          // words in one volume unit (100%)
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
-const LEARN_OVER_SCALE = 50;    // a step over the unit costs (words over / this) squared: about 40 words is where a verse starts to be worth splitting
-const LEARN_JOIN_SCALE = 1;     // a JOINED step over the unit costs (words over / this) squared: verses join when they total about 30 words or less
-const LEARN_SPLIT_COST = 0.37;  // each extra part of a split verse costs this much more, so a split has to be worth it: on average from 40 words (a clean sentence break tips about a word earlier, no natural pause a couple of words later)
-const LEARN_ALONE_SCALE = 16;   // a verse that stays a step on its own and has fewer than LEARN_MIN_PART words costs (words short)^2 / this: a tiny step is a good reason to join
-const LEARN_EVEN_SCALE = 150;   // uneven parts cost (words from the even size) squared / this
-const LEARN_MIN_PART = 12;      // a part of a split verse shorter than this costs extra (not forbidden: a long verse with one good cut still splits)
-const LEARN_MIN_SCALE = 4;      // that extra is (words short of the minimum) squared / this
+const LEARN_SPLIT_AT = 1.30;    // a verse about this share of the unit is where a split starts to be worth it
+const LEARN_JOIN_AT = 1.00;     // verses join up to about this share of the unit
+const LEARN_MIN_PART = 0.40;    // a part of a split verse smaller than this share costs extra
+const LEARN_SPLIT_COST = 0.37;  // each extra part of a split verse costs this much more, so a split has to be worth it
+const LEARN_TYPICAL_BREAK = 0.45;   // the usual cost of the break itself: used only to place LEARN_SPLIT_AT
+const LEARN_JOIN_SLACK = 0.033;     // a joined step over LEARN_JOIN_AT by this much (one word) costs one more step, so it stops there
+const LEARN_SHORT_COEF = 225;       // a part under the minimum costs (share short)^2 x this
+const LEARN_ALONE_COEF = 56;        // a verse that stays a step on its own under the minimum costs (share short)^2 x this: a tiny step is a good reason to join
+const LEARN_EVEN_COEF = 6;          // uneven parts cost (share from the even size)^2 x this
 const LEARN_BREAK_COST = { sentence: 0.3, semicolon: 0.4, comma: 0.6, other: 1.5 };   // a verse boundary costs 0
+// a verse over the unit costs (share over)^2 x this; set so that at LEARN_SPLIT_AT it costs the same as splitting
+const LEARN_OVER_COEF = (LEARN_EXTRA_DAY + LEARN_SPLIT_COST + LEARN_TYPICAL_BREAK) / Math.pow(LEARN_SPLIT_AT - 1, 2);
 
-function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words); return (d * d) / LEARN_MIN_SCALE; }
-// A joined step is judged more strictly than a single verse: two verses only join when together they are about one unit (30 words) or less.
-function learnJoinCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_JOIN_SCALE; }
-function learnAloneCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words); return (d * d) / LEARN_ALONE_SCALE; }
-function learnStepCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_OVER_SCALE; }
+function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words / LEARN_UNIT); return LEARN_SHORT_COEF * d * d; }
+function learnAloneCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words / LEARN_UNIT); return LEARN_ALONE_COEF * d * d; }
+// A joined step is judged more strictly than a single verse: verses only join when together they are about one unit or less.
+function learnJoinCost_(words) { const over = Math.max(0, words / LEARN_UNIT - LEARN_JOIN_AT) / LEARN_JOIN_SLACK; return LEARN_EXTRA_DAY + over * over; }
+function learnStepCost_(words) { const over = Math.max(0, words / LEARN_UNIT - 1); return LEARN_EXTRA_DAY + LEARN_OVER_COEF * over * over; }
 
 // The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after, bounds }
-// A cut costs by how natural the break is (sentence end best, plain comma worse), a part under LEARN_MIN_PART words costs a little extra, and parts that are
+// A cut costs by how natural the break is (sentence end best, plain comma worse), a part under LEARN_MIN_PART of the unit costs a little extra, and parts that are
 // uneven cost a little extra too, so with two equally good breaks the more even one wins. None of these is a hard rule: a cost only decides between choices.
 function planVerse_(text) {
   const phrases = splitPhrases_(text);
@@ -2503,7 +2512,7 @@ function planVerse_(text) {
     for (let p = 0; p < k; p++) {
       const w = pre[bounds[p + 1]] - pre[bounds[p]];
       cost += learnStepCost_(w);
-      if (k > 1) cost += learnShortCost_(w) + ((w - mean) * (w - mean)) / LEARN_EVEN_SCALE;
+      if (k > 1) cost += learnShortCost_(w) + LEARN_EVEN_COEF * ((w - mean) / LEARN_UNIT) * ((w - mean) / LEARN_UNIT);
     }
     cuts.forEach(function(c) { cost += breakAfter(c - 1) + LEARN_SPLIT_COST; });
     if (!best || cost < best.cost - 1e-9) best = { cost: cost, bounds: bounds };
@@ -2608,7 +2617,7 @@ function checkLearnPlan() {
     }
   }
   const out = [
-    'LEARN PLAN SIMULATION (unit ' + LEARN_UNIT + ' words; extra step costs ' + LEARN_EXTRA_DAY + '; a verse over the unit costs (over/' + LEARN_OVER_SCALE + ')^2, a joined step (over/' + LEARN_JOIN_SCALE + ')^2; short parts under ' + LEARN_MIN_PART + ' and uneven parts cost a little)',
+    'LEARN PLAN SIMULATION (volume unit ' + LEARN_UNIT + ' words = 100%: verses join up to about ' + Math.round(LEARN_JOIN_AT * 100) + '% (' + Math.round(LEARN_JOIN_AT * LEARN_UNIT) + ' words); a verse starts to split from about ' + Math.round(LEARN_SPLIT_AT * 100) + '% (' + Math.round(LEARN_SPLIT_AT * LEARN_UNIT) + ' words); parts are at least ' + Math.round(LEARN_MIN_PART * 100) + '% (' + Math.round(LEARN_MIN_PART * LEARN_UNIT) + ' words); all soft costs, no hard limits)',
     'references: ' + refs + '   learn steps today (one per verse): ' + stepsNow + '   with this plan: ' + stepsNew + '   (' + (stepsNew - stepsNow >= 0 ? '+' : '') + (stepsNew - stepsNow) + ')',
     'JOINED: ' + joinedVerses + ' verses would join into ' + joinedSteps + ' steps (saves ' + (joinedVerses - joinedSteps) + ' steps)',
     'SPLIT:  ' + splitVerses + ' verses would split (adds ' + splitExtra + ' steps)',
