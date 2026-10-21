@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-110'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-111'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2464,7 +2464,8 @@ function checkVerseSplits() {
 const LEARN_UNIT = 30;          // words one learn step is worth; a step is free of any size cost up to this
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
 const LEARN_OVER_SCALE = 50;    // a step over the unit costs (words over / this) squared: about 40 words is where a verse starts to be worth splitting
-const LEARN_JOIN_SCALE = 3;     // a JOINED step over the unit costs (words over / this) squared: joins stop at about 31 words
+const LEARN_JOIN_SCALE = 6;     // a JOINED step over the unit costs (words over / this) squared: joining stops being worth it at about 32 words
+const LEARN_SPLIT_COST = 0.6;   // each extra part of a split verse costs this much more (a split has to be clearly worth it: about 40 words)
 const LEARN_EVEN_SCALE = 150;   // uneven parts cost (words from the even size) squared / this
 const LEARN_MIN_PART = 12;      // a part of a split verse shorter than this costs extra (not forbidden: a long verse with one good cut still splits)
 const LEARN_MIN_SCALE = 4;      // that extra is (words short of the minimum) squared / this
@@ -2502,7 +2503,7 @@ function planVerse_(text) {
       cost += learnStepCost_(w);
       if (k > 1) cost += learnShortCost_(w) + ((w - mean) * (w - mean)) / LEARN_EVEN_SCALE;
     }
-    cuts.forEach(function(c) { cost += breakAfter(c - 1); });
+    cuts.forEach(function(c) { cost += breakAfter(c - 1) + LEARN_SPLIT_COST; });
     if (!best || cost < best.cost - 1e-9) best = { cost: cost, bounds: bounds };
   }
   tryCuts([]);
