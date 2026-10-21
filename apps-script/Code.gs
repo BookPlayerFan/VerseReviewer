@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-116'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-117'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -71,9 +71,9 @@ const GROUP_CONFIG = {
   8: { name: "Diamond",           interval: 360, repsNeeded: 1, early: 7,  late: 4,  costEarly: 0.25, costLate: 0.5 }
 };
 
-// How much a verse counts toward a day's review load: its word count / 30, never less than 1 (opening and scoring a card has a
+// How much a verse counts toward a day's review load: its word count / 25 (the volume unit), never less than 1 (opening and scoring a card has a
 // fixed cost) and never more than 5 (one very long passage cannot dominate). Prices below are in "short verses" of this load.
-const LOAD_WORDS = 30;
+const LOAD_WORDS = 25;   // the volume unit: the review load, the schedule leveling, the calendar colours and the learn plan all count in it
 const LOAD_MAX = 5;
 function verseLoad_(text) {
   const n = String(text || '').replace(/\[\d+\]/g, ' ').split(/\s+/).filter(Boolean).length;
@@ -2466,7 +2466,7 @@ function checkVerseSplits() {
 //   50% and up    a part (12.5 words, the same as a phrase) of a split verse should be at least this big (smaller costs extra), and a verse alone under it is a good reason to join.
 //   about 160%    where one verse starts to be worth splitting into parts (40 words; a clean sentence break tips it a little earlier, no natural pause a little later).
 // None of these is a hard rule. Each is the point where one choice starts to cost more than another, and the breaks, the evenness and the tiny verses nudge it.
-const LEARN_UNIT = 25;          // words in one volume unit (100%)
+const LEARN_UNIT = LOAD_WORDS;  // words in one volume unit (100%): the same unit the review load uses
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
 const LEARN_SPLIT_AT = 1.60;    // a verse about this share of the unit is where a split starts to be worth it
 const LEARN_JOIN_AT = 1.20;     // verses join up to about this share of the unit

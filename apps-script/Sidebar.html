@@ -2017,9 +2017,9 @@
     // The next 14 days of reviews (today first); overdue verses count as due today. Opened from the "due tomorrow" button.
     // Upcoming reviews as a calendar: weeks run across, every day shows its number of references due, and the shade follows the day's word load
     // (amber is a very heavy day). Runs of empty weeks fold into one line. Tap a day to peek at its verses.
-    // Three colours for a day's word load (about a point per 30 words, at least 1 per verse), judged on the load rounded to a whole number:
-    // light 1-7, medium 8-14, heavy 15 and up (so 7.4 shows as 7, light; 7.5 shows as 8, medium).
-    const LOAD_LIGHT_MAX = 7, LOAD_MEDIUM_MAX = 14;
+    // Three colours for a day's word load (about a point per 25 words, at least 1 per verse), judged on the load rounded to a whole number:
+    // green 1-10, blue 11-20, amber 21 and up (so 10.4 shows as 10, green; 10.5 shows as 11, blue).
+    const LOAD_LIGHT_MAX = 10, LOAD_MEDIUM_MAX = 20;
     function loadStep(load) { const n = Math.round(load); return n <= LOAD_LIGHT_MAX ? 1 : n <= LOAD_MEDIUM_MAX ? 2 : 3; }
     function renderUpcoming(placeholder) {
       const box = document.getElementById("upList");
@@ -3168,7 +3168,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-320';
+    const CLIENT_BUILD = 'sync-321';
 
     let queue = [];
     let currentIndex = 0;
