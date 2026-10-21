@@ -671,7 +671,7 @@
       letter-spacing: 0.5px;
       line-height: 15px;
     }
-    .hint-flag { display: inline-flex; align-items: center; color: var(--text-accent); cursor: pointer; padding: 8px; margin: -8px; transition: opacity .25s; -webkit-tap-highlight-color: transparent; }   /* the bulb is the hints switch; the padding is its tap area, the margin keeps the layout the same */
+    .hint-flag { display: inline-flex; align-items: center; color: var(--text-accent); padding: 8px; margin: -8px; transition: opacity .25s; -webkit-tap-highlight-color: transparent; }   /* the bulb is the hints switch; the padding is its tap area, the margin keeps the layout the same */
     .hint-flag.off { opacity: .3; }
     .hint-flag.pulse svg { animation: bulbPulse .5s ease-out; }
     @keyframes bulbPulse { 40% { transform: scale(1.45); } }
@@ -766,6 +766,8 @@
       color: var(--text-accent);
       user-select: none;
     }
+    .v-text.peek3 { filter: none; opacity: 1; background-color: transparent; }   /* Review / Lock hold: the first three words are clear, the rest stays blurred */
+    .v-text.peek3 .pk3r { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); border-radius: 4px; }
     .v-text.hinted .hz { color: transparent; }
     .v-text.hinted .hu { color: transparent; position: relative; transition: color .22s ease; }
     .v-text.hinted .hu::after { content: ""; position: absolute; left: 50%; top: 55%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--text-accent); transition: opacity .22s ease; pointer-events: none; }   /* a hidden word: a dot where its first letter would be (drawn over the letter, so nothing changes size or moves) */
@@ -1444,13 +1446,12 @@
       <div class="help-scroll" id="helpPaneCtl">
         <div class="help-sub">Verse box</div>
         <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
-        <div class="help-row"><span>Reveal that verse's next phrase, or hide it again (New tab)</span><kbd>Tap a verse</kbd></div>
-        <div class="help-row"><span>Hint level harder (New tab)</span><kbd>Swipe right</kbd></div>
-        <div class="help-row"><span>Hint level easier (New tab)</span><kbd>Swipe left</kbd></div>
-        <div class="help-row"><span>Hints off, or back on (New tab)</span><kbd>Tap the bulb</kbd></div>
-        <div class="help-row"><span>Full words while you hold (New tab)</span><kbd>Hold</kbd></div>
-        <div class="help-row"><span>Reveal all, or hide all (Review and Lock)</span><kbd>Hold</kbd></div>
-        <div class="help-note">A piece is a whole verse on Review and a phrase on New. The bulb on the New tab: faint is off, outline shows the first letter of every word, filled every other word, filled with rays only the start of each phrase. Each verse starts at Off every day.</div>
+        <div class="help-row"><span>Reveal all</span><kbd>Swipe right</kbd></div>
+        <div class="help-row"><span>Hide all</span><kbd>Swipe left</kbd></div>
+        <div class="help-row"><span>Less help, more help (New tab)</span><kbd>Swipe down, up</kbd></div>
+        <div class="help-row"><span>Peek: full words (New tab)</span><kbd>Hold</kbd></div>
+        <div class="help-row"><span>Peek: first 3 words (Review and Lock)</span><kbd>Hold</kbd></div>
+        <div class="help-note">A piece is a phrase on New and a whole verse on Review and Lock. Tapping stops when everything shows. On New, tap shows the verse you are learning first, then goes through the reference from its first verse. A long swipe crosses several hint levels; on a long verse that scrolls, swipe on the bar above it instead. The bulb on the bar shows the hint level: lit with rays is Full (plain words), filled is Letters (first letter of every word), half filled is Alternate (every other word), an outline is Phrase starts (only the first word of each phrase), faint is Off. The name flashes on the bar for a moment. Each verse starts at Full every day.</div>
         <div class="help-sub">Holds</div>
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
@@ -3147,7 +3148,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-306';
+    const CLIENT_BUILD = 'sync-307';
 
     let queue = [];
     let currentIndex = 0;
@@ -4692,7 +4693,7 @@
       const cv = learn ? (lc.verseIndex || 1) - 1 : -1;     // the verse you are learning today
       // The bar above a Learn card: which verse, and the hint bulb (outline, filled, filled with rays; faint when hints are off). Tapping the bulb switches hints.
       const flag = learn
-        ? '<span class="hint-flag' + (hintLevel === 5 ? ' off' : '') + '" role="button" aria-label="Hints" onclick="hintFlagTap(event)">' + bulbSvg(hintLevel) + '</span>'
+        ? '<span class="hint-flag' + (hintLevel === 5 ? ' off' : '') + '" aria-label="Hint level">' + bulbSvg(hintLevel) + '</span>'
         : '';
       const status = learn
         ? (multi ? `Verse ${lc.verseIndex} of ${lc.verseCount}` : 'Single verse')
@@ -4751,14 +4752,14 @@
     }
 
     // ── Reveal gestures ──
-    // A "piece" is one phrase on the New tab and one whole verse on the Review tab.
-    //   Tap              reveal the next hidden piece after the one revealed most recently (wrapping round to any still hidden)
-    //   Tap a verse      New tab only: reveal that verse's next hidden phrase; tap it once it is all showing to hide it again (the same at a hint level: phrases show at the level, then the verse blurs again)
-    //   Hold             New tab, Learn cards: the full words of the verse you are learning show while you hold, then go back
-    //                    Review and Lock cards: reveal everything, and it stays revealed; a hold when everything shows hides it all again
-    //   Swipe left       Learn cards only: one hint level easier (toward Off)
-    //   Swipe right      Learn cards only: one hint level harder (toward Level 3)
-    //   Bulb tap         Learn cards: hints off, or back on at the level the card was last at
+    // A "piece" is one phrase on the New tab and one whole verse on the Review and Lock tabs.
+    //   Tap, anywhere   reveal the next hidden piece, in order, and stop once everything shows (nothing hides by tapping).
+    //                   New: the verse you are learning first (if it is not showing), then from the first verse of the reference.
+    //   Hold            a peek that ends when you let go and reveals nothing.
+    //                   New: the full words show, at any level (through the blur at Off). Review / Lock: the first three words of the passage come out of the blur.
+    //   Swipe right     reveal all pieces (every card)
+    //   Swipe left      hide all pieces (every card)
+    //   Swipe up/down   Learn cards: hint level by distance (see below)
     function nextHiddenAfter(from) {
       const n = segmentStates.length;
       for (let k = 1; k <= n; k++) {
@@ -4778,28 +4779,14 @@
 
     function handleVerseClick(index, event) {
       if (event) event.stopPropagation();
-      if (mode === 'learning') tapVerse(index); else handleContainerClick(event);
+      handleContainerClick(event);
     }
 
     function handleContainerClick(event) {
       if (isScoring || !hasActiveCard()) return;
+      if (event && event.target && event.target.closest && event.target.closest(".passage-toolbar")) return;   // the bar is for swiping the level, not for tapping
       const i = nextHiddenAfter(revealCursor);
       if (i !== -1) revealPiece(i);
-    }
-
-    // New tab: tapping a verse reveals that verse's next hidden phrase; tapping it once it is all showing hides it again.
-    // Hiding one verse sends the next plain tap back to the start of the reference (to the verse you are learning first, while that one is not showing).
-    function tapVerse(index) {
-      if (isScoring || !hasActiveCard() || !parsedSegments[index]) return;
-      const vi = parsedSegments[index].vi;
-      const mine = [];
-      parsedSegments.forEach(function(p, i) { if (p.vi === vi) mine.push(i); });
-      const hidden = mine.filter(function(i) { return segmentStates[i] === 'hidden'; });
-      if (hidden.length) { revealPiece(hidden[0]); return; }
-      mine.forEach(function(i) { segmentStates[i] = 'hidden'; });
-      revealCursor = tapStart();
-      syncFlipState();
-      renderCardBody();
     }
 
     // Used by the R key: reveal everything, or hide everything if it is all showing.
@@ -4812,6 +4799,15 @@
       segmentStates = segmentStates.map(() => targetState);
       revealCursor = targetState === 'revealed' ? segmentStates.length - 1 : tapStart();
 
+      syncFlipState();
+      renderCardBody();
+    }
+
+    // Swipe right / left: every piece shown, or every piece hidden (Learn pieces show at the current hint level).
+    function setAllPieces(show) {
+      if (isScoring || !hasActiveCard()) return;
+      segmentStates = segmentStates.map(function() { return show ? 'revealed' : 'hidden'; });
+      revealCursor = show ? segmentStates.length - 1 : tapStart();
       syncFlipState();
       renderCardBody();
     }
@@ -4860,12 +4856,6 @@
       if (!quiet) flashHintLabel(HINT_NAMES[L]);
     }
     function stepHintLevel(dir) { setHintLevel(hintLevel + dir); }   // dir > 0: less help (toward Off), dir < 0: more help (toward Full)
-    function toggleHintMode() {   // the bulb: Off, or back to the level this card was last at
-      const c = learningCard();
-      if (!isLearnCard(c)) return;
-      setHintLevel(hintLevel < 5 ? 5 : (lastLvl[hintKey(c)] || 1));
-    }
-    function hintFlagTap(e) { if (e) { e.stopPropagation(); e.preventDefault(); } toggleHintMode(); }
     let shellHintApplied = false;   // the saved levels are applied once per page load, then your own changes rule
 
     // The left label of the bar says the new level for a moment, then goes back to the verse.
@@ -4880,28 +4870,40 @@
       }, 1500);
     }
 
-    // Press and hold in the verse box. Learn cards: the full words of every verse that is showing (the one you are learning and any you revealed) show for as long as you hold, then go back.
-    // Review and Lock cards: the hold is the reveal / hide switch for the whole verse (it stays as it is when you let go, and a revealed verse counts for Miss).
+    // Press and hold in the verse box is a peek; it never reveals anything and it ends when you let go.
+    // Learn cards: the full words of every verse that is showing (and the verse you are learning, even blurred at Off) show for as long as you hold.
+    // Review and Lock cards: the first three words of the passage come out of the blur in place, to confirm you have the start of it right.
     // The tap on the end of a hold must not also reveal a piece.
-    let heldBody = null, peeking = false;
+    let heldBody = null, peeking = false, peek3 = null;
     function startPeek(e) {
-      if (mode !== 'learning' || !hasActiveCard() || !isLearnCard(learningCard())) return;
+      if (!hasActiveCard()) return;
+      const learn = mode === 'learning' && isLearnCard(learningCard());
       peeking = true;
-      document.body.classList.add("peek");
+      if (learn) document.body.classList.add("peek"); else peekFirstWords();
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
-      if (el) { clearTimeout(lvlFlashTimer); swapLabel(el, "Holding \u00b7 full words"); }
+      if (el) { clearTimeout(lvlFlashTimer); swapLabel(el, learn ? "Holding \u00b7 full words" : "Peeking: first 3 words"); }
+    }
+    function peekFirstWords() {
+      const el = document.querySelector("#cardBody .v-text");
+      if (!el || !el.classList.contains("blurred")) return;   // already showing: nothing to peek at
+      const m = el.textContent.match(/^(\s*\S+(?:\s+\S+){0,2})([\s\S]*)$/);
+      if (!m) return;
+      peek3 = { el: el, html: el.innerHTML };
+      el.classList.remove("blurred"); el.classList.add("peek3");
+      el.innerHTML = '<span class="pk3">' + escapeHtml(m[1]) + '</span><span class="pk3r">' + escapeHtml(m[2]) + '</span>';
     }
     function endPeek() {
       if (!peeking) return;
       peeking = false;
       document.body.classList.remove("peek");
+      if (peek3) { peek3.el.innerHTML = peek3.html; peek3.el.classList.remove("peek3"); peek3.el.classList.add("blurred"); peek3 = null; }
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
       if (el) swapLabel(el, el.getAttribute("data-base") || "");
     }
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
       heldBody = attachLongPress(body, function(e) {
-        if (mode === 'learning' && isLearnCard(learningCard())) startPeek(e); else toggleRevealAll();
+        startPeek(e);
       }, function(e) { return !isScoring && hasActiveCard() && !e.target.closest("button") && !e.target.closest(".hint-flag"); });
       window.addEventListener("pointerup", endPeek);
       window.addEventListener("pointercancel", endPeek);
@@ -4929,31 +4931,36 @@
     window.addEventListener("resize", function() { syncSwipeAxis(); });
     function attachSwipe() {
       const body = document.getElementById("cardBody");
-      let tracking = false, active = false, sx = 0, sy = 0, startLevel = 1;
+      let tracking = false, active = "", vert = false, sx = 0, sy = 0, startLevel = 1;
       body.addEventListener("pointerdown", function(e) {
-        tracking = false; active = false; swipeFired = false;
+        tracking = false; active = ""; swipeFired = false;
         if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
         if (e.target.closest("button") || e.target.closest(".hint-flag")) return;
-        if (!(mode === 'learning' && isLearnCard(learningCard()))) return;   // only Learn cards have hint levels
-        if (!cardFits() && !e.target.closest(".passage-toolbar")) return;   // a long verse scrolls; only the bar changes the level
-        if (e.pointerType === "touch" && (e.clientX < 14 || e.clientX > window.innerWidth - 14)) return;
+        if (e.pointerType === "touch" && (e.clientX < 14 || e.clientX > window.innerWidth - 14)) return;   // the very edge of the screen is iOS's
+        // sideways (reveal all / hide all) works on every card; up and down (hint level) only on Learn cards, and only where the verse box does not scroll (or from the bar)
+        vert = mode === 'learning' && isLearnCard(learningCard()) && (cardFits() || !!e.target.closest(".passage-toolbar"));
         tracking = true; sx = e.clientX; sy = e.clientY; startLevel = hintLevel;
       });
       body.addEventListener("pointermove", function(e) {
         if (!tracking) return;
         if (peeking) { tracking = false; return; }
-        const dx = e.clientX - sx, dy = e.clientY - sy;
+        const dx = e.clientX - sx, dy = e.clientY - sy, ax = Math.abs(dx), ay = Math.abs(dy);
         if (!active) {
-          if (Math.abs(dy) < VSWIPE_START || Math.abs(dy) < Math.abs(dx) * 1.2) return;
-          active = true; swipeFired = true;
+          if (ax >= SWIPE_MIN && ax >= ay * SWIPE_RATIO) {
+            active = "h"; swipeFired = true;
+            setAllPieces(dx > 0);   // right: reveal all, left: hide all
+            return;
+          }
+          if (!vert || ay < VSWIPE_START || ay < ax * 1.2) return;
+          active = "v"; swipeFired = true;
         }
-        if (isScoring || !hasActiveCard()) return;
-        const steps = Math.floor((Math.abs(dy) - VSWIPE_START) / VSWIPE_STEP) + 1;
+        if (active !== "v" || isScoring || !hasActiveCard()) return;
+        const steps = Math.floor((ay - VSWIPE_START) / VSWIPE_STEP) + 1;
         const target = Math.max(1, Math.min(5, startLevel + (dy > 0 ? steps : -steps)));
         if (target !== hintLevel) setHintLevel(target);
       });
-      window.addEventListener("pointerup", function() { tracking = false; active = false; });
-      window.addEventListener("pointercancel", function() { tracking = false; active = false; });
+      window.addEventListener("pointerup", function() { tracking = false; active = ""; });
+      window.addEventListener("pointercancel", function() { tracking = false; active = ""; });
       // the click that can follow a swipe must not also reveal a piece
       body.addEventListener("click", function(e) {
         if (swipeFired) { swipeFired = false; e.stopImmediatePropagation(); e.preventDefault(); }
