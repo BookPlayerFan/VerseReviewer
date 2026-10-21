@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-109'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-110'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2464,12 +2464,15 @@ function checkVerseSplits() {
 const LEARN_UNIT = 30;          // words one learn step is worth; a step is free of any size cost up to this
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
 const LEARN_OVER_SCALE = 50;    // a step over the unit costs (words over / this) squared: about 40 words is where a verse starts to be worth splitting
+const LEARN_JOIN_SCALE = 3;     // a JOINED step over the unit costs (words over / this) squared: joins stop at about 31 words
 const LEARN_EVEN_SCALE = 150;   // uneven parts cost (words from the even size) squared / this
 const LEARN_MIN_PART = 12;      // a part of a split verse shorter than this costs extra (not forbidden: a long verse with one good cut still splits)
 const LEARN_MIN_SCALE = 4;      // that extra is (words short of the minimum) squared / this
 const LEARN_BREAK_COST = { sentence: 0.1, semicolon: 0.3, comma: 0.6, other: 1.5 };   // a verse boundary costs 0
 
 function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words); return (d * d) / LEARN_MIN_SCALE; }
+// A joined step is judged more strictly than a single verse: two verses only join when together they are about one unit (30 words) or less.
+function learnJoinCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_JOIN_SCALE; }
 function learnStepCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_OVER_SCALE; }
 
 // The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after, bounds }
@@ -2530,7 +2533,7 @@ function planReference_(verses) {
     let sum = words[j - 1];
     for (let i = j - 2; i >= 0; i--) {                                    // verses i..j-1 as one joined step
       sum += words[i];
-      const c = best[i] + learnStepCost_(sum);
+      const c = best[i] + learnJoinCost_(sum);
       if (c < best[j] - 1e-9) { best[j] = c; from[j] = i; }
     }
   }
@@ -2596,7 +2599,7 @@ function checkLearnPlan() {
     }
   }
   const out = [
-    'LEARN PLAN SIMULATION (unit ' + LEARN_UNIT + ' words; extra step costs ' + LEARN_EXTRA_DAY + '; over the unit costs (over/' + LEARN_OVER_SCALE + ')^2; short parts under ' + LEARN_MIN_PART + ' and uneven parts cost a little)',
+    'LEARN PLAN SIMULATION (unit ' + LEARN_UNIT + ' words; extra step costs ' + LEARN_EXTRA_DAY + '; a verse over the unit costs (over/' + LEARN_OVER_SCALE + ')^2, a joined step (over/' + LEARN_JOIN_SCALE + ')^2; short parts under ' + LEARN_MIN_PART + ' and uneven parts cost a little)',
     'references: ' + refs + '   learn steps today (one per verse): ' + stepsNow + '   with this plan: ' + stepsNew + '   (' + (stepsNew - stepsNow >= 0 ? '+' : '') + (stepsNew - stepsNow) + ')',
     'JOINED: ' + joinedVerses + ' verses would join into ' + joinedSteps + ' steps (saves ' + (joinedVerses - joinedSteps) + ' steps)',
     'SPLIT:  ' + splitVerses + ' verses would split (adds ' + splitExtra + ' steps)',
