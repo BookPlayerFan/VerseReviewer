@@ -710,6 +710,13 @@
       cursor: pointer;
       display: inline;
     }
+    /* A reference learned in parts: one block per part */
+    .step-blk { position: relative; margin: 0 0 10px 8px; padding: 2px 0 2px 20px; border-left: 3px solid rgba(150, 150, 150, 0.35); border-radius: 2px; }
+    .step-blk.on { border-left-color: var(--text-accent); }
+    .step-n { position: absolute; left: -13px; top: 2px; width: 21px; height: 21px; box-sizing: border-box; border-radius: 50%; text-align: center;
+      font: 700 11px/19px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0; text-align: center;
+      background: var(--bg-body, var(--bg-card)); border: 1px solid rgba(150, 150, 150, 0.5); color: var(--text-muted); }
+    .step-blk.on .step-n { border: 1.5px solid var(--text-accent); color: var(--text-accent); }
 
     .v-num {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -3150,7 +3157,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-316';
+    const CLIENT_BUILD = 'sync-317';
 
     let queue = [];
     let currentIndex = 0;
@@ -3276,7 +3283,7 @@
             f: c.reference, v: c.version || "", day: c.day || 0,
             stage: c.stage === 'lock' ? 'lock' : 'learn', vi: c.verseIndex || 1, vc: c.verseCount || 1, dot: c.dot || 1,
             part: c.lockPart || "", label: c.label || "Review", unlockAt: c.unlockAt || 0,
-            hdr: c.stage === 'lock' ? '' : learnStatus(c),
+            hdr: c.stage === 'lock' ? '' : learnStatus(c), blk: c.stage !== 'lock' && c.pm && c.verseCount > 1 ? 1 : 0,
             segs: learnUnits(c).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
           };
         });
@@ -4781,7 +4788,15 @@
       let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
+      // A reference learned in parts: each part is its own block with a bar down the left and its number, the part you are on in blue.
+      const blocks = !!(learn && lc.pm && lc.verseCount > 1);
+      let openStep = -1;
       parsedSegments.forEach((seg, idx) => {
+        if (blocks && seg.vi !== openStep) {
+          if (openStep !== -1) html += '</div>';
+          openStep = seg.vi;
+          html += '<div class="step-blk' + (seg.vi === cv ? ' on' : '') + '"><span class="step-n">' + (seg.vi + 1) + '</span>';
+        }
         const pv = pieceView(idx, learn, cv);
         // phrases of a split verse always show a small grey letter (a, b, c...), so you can see a verse is split before revealing anything
         html += `
@@ -4791,6 +4806,7 @@
           </span>
         `;
       });
+      if (blocks && openStep !== -1) html += '</div>';
       html += '</div>';
 
       body.innerHTML = html;
