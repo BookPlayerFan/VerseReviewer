@@ -837,7 +837,7 @@
     }
     .btn-pass.clear { background: var(--btn-restart-bg); color: var(--btn-restart-text); }   /* repeat cards: blue, like the New tab's Review button */
 
-    .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time) */
+    .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time); a Review card before anything is revealed: inert */
     .pt-right { display: inline-flex; align-items: center; gap: 10px; }
     .pt-note { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; }   /* Review bar: Card N of M */
     .pt-note b { font-weight: 800; }
@@ -3154,7 +3154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-325';
+    const CLIENT_BUILD = 'sync-326';
 
     let queue = [];
     let currentIndex = 0;
@@ -4340,6 +4340,12 @@
       const c = queue[currentIndex];
       return !!c && (c.group === 0 || isFlipped);
     }
+    // Pass / Level Up / Recover follow the same rule as Miss: some of the verse must be showing. A repeat card's Clear (you keep looking at it until you know it) is exempt.
+    function canPass() {
+      if (mode === 'learning') return true;
+      const c = queue[currentIndex];
+      return !!c && (c.group === 0 || c.isRepeat || isFlipped);
+    }
 
     function render() {
       closeContext();
@@ -5025,10 +5031,11 @@
       updateFailLock();
     }
 
-    // Fail is always on screen in Review, but dimmed and inert until some of the verse text is showing.
+    // Miss and Pass (Level Up, Recover) are always on screen in Review, but dimmed and inert until some of the verse text is showing.
     function updateFailLock() {
       const b = document.getElementById("btnFail");
       b.classList.toggle("locked", mode !== 'learning' && hasActiveCard() && !canFail());
+      document.getElementById("btnPass").classList.toggle("locked", mode !== 'learning' && hasActiveCard() && !canPass());
     }
 
     // ───────────── Scoring ─────────────
@@ -5247,6 +5254,7 @@
       if (mode === 'learning') { scoreLearning(action); return; }
       if (isScoring || currentIndex >= activeEnd()) return;
       if (action === "Fail" && !canFail()) return;
+      if (action === "Pass" && !canPass()) return;
       if (action === "Fail" && queue[currentIndex].isRepeat) return; // repeat cards have no Repeat button (the D key must not sneak one in)
 
       isScoring = true;
