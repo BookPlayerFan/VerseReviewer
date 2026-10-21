@@ -775,7 +775,8 @@
       color: var(--text-accent);
       user-select: none;
     }
-    .v-text.peek3 { filter: none; opacity: 1; background-color: transparent; }   /* Review / Lock hold: the first three words are clear, the rest stays blurred */
+    .v-text.peek3 { filter: none; opacity: 1; background-color: transparent; transition: none; }   /* no fade in either direction: a fade would show the whole verse clear for a moment */
+    .v-text.nt { transition: none !important; }   /* Review / Lock hold: the first three words are clear, the rest stays blurred */
     .v-text.peek3 .pk3r { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); border-radius: 4px; }
     .v-text.hinted .hz { color: transparent; }
     .v-text.hinted .hu { color: transparent; position: relative; transition: color .22s ease; }
@@ -1083,10 +1084,10 @@
       background: var(--text-muted); color: var(--bg-card); font-size: 10px; font-weight: 700;
       border-radius: 99px; padding: 1px 6px; line-height: 14px; }
     .tab.on .tab-count { background: var(--text-accent); }
-    /* Alerts: no numbers. A short accent bar over a tab that is not showing but has something waiting.
+    /* Alerts: no numbers. A short accent bar over a tab while its stack still has cards (it stays when the tab is selected and goes when the last card is done).
        The counts are still kept in the hidden spans (they feed the page's own checks). */
     .tab .tab-count { display: none !important; }
-    .tab.has:not(.on)::before { content: ""; position: absolute; top: -14px; left: 50%; width: 34px; margin-left: -17px; height: 3px;
+    .tab.has::before { content: ""; position: absolute; top: -14px; left: 50%; width: 34px; margin-left: -17px; height: 3px;
       border-radius: 0 0 3px 3px; background: var(--text-accent); z-index: 3; }
     .progress-track { display: none !important; }   /* the blue progress line is retired; progress will live in the status bar */
     #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
@@ -3167,7 +3168,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-319';
+    const CLIENT_BUILD = 'sync-320';
 
     let queue = [];
     let currentIndex = 0;
@@ -4195,7 +4196,7 @@
     // Aim is about PHRASE_TARGET words per phrase; up to PHRASE_CAP (25% more) is allowed when it gives a cleaner break.
     // Breaks go where the sentence naturally pauses: sentence ends first, then ; : dashes, then a comma before
     // and / but / that / who ..., and plain commas last. Lists ("faith, hope, and love") are kept together.
-    const PHRASE_TARGET = 12, PHRASE_CAP = 15, PHRASE_MIN = 5;
+    const PHRASE_TARGET = 12.5, PHRASE_CAP = 15, PHRASE_MIN = 5;
     const PHRASE_CONJ = /^(and|but|for|so|yet|or|nor|that|because|who|whom|whose|which|when|while|if|though|although|since|until|unless|whether|as|then|therefore|thus|lest|where|whoever|whatever|whenever|wherever)$/;
 
     function splitPhrases(text) {
@@ -4994,7 +4995,11 @@
       if (!peeking) return;
       peeking = false;
       document.body.classList.remove("peek");
-      if (peek3) { peek3.el.innerHTML = peek3.html; peek3.el.classList.remove("peek3"); peek3.el.classList.add("blurred"); peek3 = null; }
+      if (peek3) {
+        const pe = peek3.el; pe.classList.add("nt");   // snap back to blurred: the blur's own fade would show the whole verse for a moment
+        pe.innerHTML = peek3.html; pe.classList.remove("peek3"); pe.classList.add("blurred"); peek3 = null;
+        void pe.offsetWidth; requestAnimationFrame(function() { pe.classList.remove("nt"); });
+      }
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
       if (el) swapLabel(el, el.getAttribute("data-base") || "");
     }
