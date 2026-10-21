@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-108'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-109'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2463,7 +2463,8 @@ function checkVerseSplits() {
 // neighbouring verses of one reference join into one step. Whole verses are only ever joined with other whole verses; a split verse stands on its own.
 const LEARN_UNIT = 30;          // words one learn step is worth; a step is free of any size cost up to this
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
-const LEARN_OVER_SCALE = 25;    // a step over the unit costs (words over / this) squared
+const LEARN_OVER_SCALE = 50;    // a step over the unit costs (words over / this) squared: about 40 words is where a verse starts to be worth splitting
+const LEARN_EVEN_SCALE = 150;   // uneven parts cost (words from the even size) squared / this
 const LEARN_MIN_PART = 12;      // a part of a split verse shorter than this costs extra (not forbidden: a long verse with one good cut still splits)
 const LEARN_MIN_SCALE = 4;      // that extra is (words short of the minimum) squared / this
 const LEARN_BREAK_COST = { sentence: 0.1, semicolon: 0.3, comma: 0.6, other: 1.5 };   // a verse boundary costs 0
@@ -2471,43 +2472,50 @@ const LEARN_BREAK_COST = { sentence: 0.1, semicolon: 0.3, comma: 0.6, other: 1.5
 function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words); return (d * d) / LEARN_MIN_SCALE; }
 function learnStepCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_OVER_SCALE; }
 
-// The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after }
+// The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after, bounds }
+// A cut costs by how natural the break is (sentence end best, plain comma worse), a part under LEARN_MIN_PART words costs a little extra, and parts that are
+// uneven cost a little extra too, so with two equally good breaks the more even one wins. None of these is a hard rule: a cost only decides between choices.
 function planVerse_(text) {
   const phrases = splitPhrases_(text);
   const lens = phrases.map(splitWords_);
   const n = lens.length;
   const pre = [0]; lens.forEach(function(l) { pre.push(pre[pre.length - 1] + l); });
+  const total = pre[n];
   function breakAfter(i) {
-    const w = phrases[i].replace(/[”"’')\]]+$/, '');
+    const w = phrases[i].replace(/[\u201d"\u2019')\]]+$/, '');
     if (/[.!?]$/.test(w)) return LEARN_BREAK_COST.sentence;
-    if (/[;:—–]$/.test(w)) return LEARN_BREAK_COST.semicolon;
+    if (/[;:\u2014\u2013]$/.test(w)) return LEARN_BREAK_COST.semicolon;
     if (/,$/.test(w)) return LEARN_BREAK_COST.comma;
     return LEARN_BREAK_COST.other;
   }
-  const maxK = Math.min(4, n);
-  const dp = [];
-  for (let k = 0; k <= maxK; k++) dp.push(new Array(n + 1).fill(null));
-  dp[0][0] = { cost: 0, prev: -1 };
-  for (let k = 1; k <= maxK; k++) {
-    for (let j = k; j <= n; j++) {
-      for (let i = k - 1; i < j; i++) {
-        if (!dp[k - 1][i]) continue;
-        let c = dp[k - 1][i].cost + learnStepCost_(pre[j] - pre[i]) + (k > 1 ? breakAfter(i - 1) + learnShortCost_(pre[j] - pre[i]) + (k === 2 ? learnShortCost_(pre[i]) : 0) : 0);
-        if (!dp[k][j] || c < dp[k][j].cost - 1e-9) dp[k][j] = { cost: c, prev: i };
-      }
+  let best = null;
+  function tryCuts(cuts) {   // cuts: increasing phrase indexes where a new part starts
+    const bounds = [0].concat(cuts, [n]);
+    const k = bounds.length - 1;
+    const mean = total / k;
+    let cost = 0;
+    for (let p = 0; p < k; p++) {
+      const w = pre[bounds[p + 1]] - pre[bounds[p]];
+      cost += learnStepCost_(w);
+      if (k > 1) cost += learnShortCost_(w) + ((w - mean) * (w - mean)) / LEARN_EVEN_SCALE;
+    }
+    cuts.forEach(function(c) { cost += breakAfter(c - 1); });
+    if (!best || cost < best.cost - 1e-9) best = { cost: cost, bounds: bounds };
+  }
+  tryCuts([]);
+  for (let i = 1; i < n; i++) {
+    tryCuts([i]);
+    for (let j = i + 1; j < n; j++) {
+      tryCuts([i, j]);
+      for (let m = j + 1; m < n; m++) tryCuts([i, j, m]);
     }
   }
-  let bestK = 1;
-  for (let k = 2; k <= maxK; k++) if (dp[k][n] && dp[k][n].cost < dp[bestK][n].cost - 1e-9) bestK = k;
-  const cuts = []; let j = n;
-  for (let kk = bestK; kk > 1; kk--) { const i = dp[kk][j].prev; cuts.unshift(i); j = i; }
-  const bounds = [0].concat(cuts, [n]);
-  const sizes = [], after = [];
+  const bounds = best.bounds, sizes = [], after = [];
   for (let p = 0; p + 1 < bounds.length; p++) {
     sizes.push(pre[bounds[p + 1]] - pre[bounds[p]]);
     if (p + 2 < bounds.length) after.push(phrases.slice(bounds[p], bounds[p + 1]).join(' ').split(/\s+/).slice(-4).join(' '));
   }
-  return { cost: dp[bestK][n].cost, sizes: sizes, after: after, bounds: bounds };
+  return { cost: best.cost, sizes: sizes, after: after, bounds: bounds };
 }
 
 // The learn steps of a whole reference: [{ verses: [first, last] (0-based), sizes: [words per part], text }]
@@ -2588,7 +2596,7 @@ function checkLearnPlan() {
     }
   }
   const out = [
-    'LEARN PLAN SIMULATION (unit ' + LEARN_UNIT + ' words; extra step costs ' + LEARN_EXTRA_DAY + '; over the unit costs (over/' + LEARN_OVER_SCALE + ')^2)',
+    'LEARN PLAN SIMULATION (unit ' + LEARN_UNIT + ' words; extra step costs ' + LEARN_EXTRA_DAY + '; over the unit costs (over/' + LEARN_OVER_SCALE + ')^2; short parts under ' + LEARN_MIN_PART + ' and uneven parts cost a little)',
     'references: ' + refs + '   learn steps today (one per verse): ' + stepsNow + '   with this plan: ' + stepsNew + '   (' + (stepsNew - stepsNow >= 0 ? '+' : '') + (stepsNew - stepsNow) + ')',
     'JOINED: ' + joinedVerses + ' verses would join into ' + joinedSteps + ' steps (saves ' + (joinedVerses - joinedSteps) + ' steps)',
     'SPLIT:  ' + splitVerses + ' verses would split (adds ' + splitExtra + ' steps)',
