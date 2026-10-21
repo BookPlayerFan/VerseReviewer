@@ -3148,7 +3148,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-307';
+    const CLIENT_BUILD = 'sync-308';
 
     let queue = [];
     let currentIndex = 0;
@@ -4919,7 +4919,7 @@
     const SWIPE_MIN = 25;      // px sideways: used by the swipe-to-go-back screens
     const SWIPE_RATIO = 1.2;   // sideways must beat vertical by this much
     const VSWIPE_START = 14;   // px before the first step
-    const VSWIPE_STEP = 44;    // px for each further step
+    const VSWIPE_STEP = 80;    // px for each further step
     let swipeFired = false;
     function cardFits() { const b = document.getElementById("cardBody"); return !!b && b.scrollHeight <= b.clientHeight + 1; }
     function syncSwipeAxis() {   // a verse that fits does not scroll, so the box gives the vertical swipe to the hint level; the bar always does
