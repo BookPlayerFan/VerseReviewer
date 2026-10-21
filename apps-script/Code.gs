@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-105'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-106'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2447,4 +2447,115 @@ function checkVerseSplits() {
     lines.push(('  ' + r.label + '                              ').slice(0, 34) + ('   ' + r.words).slice(-4) + 'w  ' + r.phrases.join('+') + '  | flat ' + r.flat + ' | sliding ' + r.slide.parts + cut);
   });
   console.log(lines.join('\n'));
+}
+
+// ───────────── Learn plan simulation (read only) ─────────────
+// Run checkLearnPlan() from the editor. It changes nothing. It shows what a "volume unit" plan would do to your learn days: a learn step is worth about
+// LEARN_UNIT words, a step costs a day, and a step that runs past the unit costs more and more. So a long verse splits into parts (at its best break) and short
+// neighbouring verses of one reference join into one step. Whole verses are only ever joined with other whole verses; a split verse stands on its own.
+const LEARN_UNIT = 30;          // words one learn step is worth; a step is free of any size cost up to this
+const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
+const LEARN_OVER_SCALE = 25;    // a step over the unit costs (words over / this) squared
+const LEARN_BREAK_COST = { sentence: 0.1, semicolon: 0.3, comma: 0.6, other: 1.5 };   // a verse boundary costs 0
+
+function learnStepCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_OVER_SCALE; }
+
+// The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after }
+function planVerse_(text) {
+  const phrases = splitPhrases_(text);
+  const lens = phrases.map(splitWords_);
+  const n = lens.length;
+  const pre = [0]; lens.forEach(function(l) { pre.push(pre[pre.length - 1] + l); });
+  function breakAfter(i) {
+    const w = phrases[i].replace(/[”"’')\]]+$/, '');
+    if (/[.!?]$/.test(w)) return LEARN_BREAK_COST.sentence;
+    if (/[;:—–]$/.test(w)) return LEARN_BREAK_COST.semicolon;
+    if (/,$/.test(w)) return LEARN_BREAK_COST.comma;
+    return LEARN_BREAK_COST.other;
+  }
+  const maxK = Math.min(4, n);
+  const dp = [];
+  for (let k = 0; k <= maxK; k++) dp.push(new Array(n + 1).fill(null));
+  dp[0][0] = { cost: 0, prev: -1 };
+  for (let k = 1; k <= maxK; k++) {
+    for (let j = k; j <= n; j++) {
+      for (let i = k - 1; i < j; i++) {
+        if (!dp[k - 1][i]) continue;
+        const c = dp[k - 1][i].cost + learnStepCost_(pre[j] - pre[i]) + (k > 1 ? breakAfter(i - 1) : 0);
+        if (!dp[k][j] || c < dp[k][j].cost - 1e-9) dp[k][j] = { cost: c, prev: i };
+      }
+    }
+  }
+  let bestK = 1;
+  for (let k = 2; k <= maxK; k++) if (dp[k][n] && dp[k][n].cost < dp[bestK][n].cost - 1e-9) bestK = k;
+  const cuts = []; let j = n;
+  for (let kk = bestK; kk > 1; kk--) { const i = dp[kk][j].prev; cuts.unshift(i); j = i; }
+  const bounds = [0].concat(cuts, [n]);
+  const sizes = [], after = [];
+  for (let p = 0; p + 1 < bounds.length; p++) {
+    sizes.push(pre[bounds[p + 1]] - pre[bounds[p]]);
+    if (p + 2 < bounds.length) after.push(phrases.slice(bounds[p], bounds[p + 1]).join(' ').split(/\s+/).slice(-4).join(' '));
+  }
+  return { cost: dp[bestK][n].cost, sizes: sizes, after: after };
+}
+
+// The learn steps of a whole reference: [{ verses: [first, last] (0-based), sizes: [words per part], text }]
+function planReference_(verses) {
+  const m = verses.length;
+  const words = verses.map(function(v) { return splitWords_(v.text); });
+  const own = verses.map(function(v) { return planVerse_(v.text); });
+  const best = new Array(m + 1).fill(Infinity), from = new Array(m + 1).fill(0);
+  best[0] = 0;
+  for (let j = 1; j <= m; j++) {
+    best[j] = best[j - 1] + own[j - 1].cost; from[j] = j - 1;            // the verse alone (split or not): tried first, so a tie keeps the verses apart
+    let sum = words[j - 1];
+    for (let i = j - 2; i >= 0; i--) {                                    // verses i..j-1 as one joined step
+      sum += words[i];
+      const c = best[i] + learnStepCost_(sum);
+      if (c < best[j] - 1e-9) { best[j] = c; from[j] = i; }
+    }
+  }
+  const steps = [];
+  for (let j = m; j > 0; j = from[j]) {
+    const i = from[j];
+    if (j - i === 1) steps.unshift({ first: i, last: i, sizes: own[i].sizes, after: own[i].after });
+    else { let w = 0; for (let k = i; k < j; k++) w += words[k]; steps.unshift({ first: i, last: j - 1, sizes: [w], after: [] }); }
+  }
+  return steps;
+}
+
+function checkLearnPlan() {
+  const data = readSheetData_();
+  let refs = 0, stepsNow = 0, stepsNew = 0, joinedVerses = 0, joinedSteps = 0, splitVerses = 0, splitExtra = 0, changed = 0;
+  const lines = [];
+  for (let i = 1; i < data.length; i++) {
+    const ref = cleanRef_(data[i][5]);
+    if (!ref) continue;
+    const verses = splitVerses_(data[i][7]);
+    if (!verses.length) continue;
+    const steps = planReference_(verses);
+    refs++; stepsNow += verses.length; stepsNew += steps.reduce(function(a, s) { return a + s.sizes.length; }, 0);
+    let changes = false;
+    const desc = steps.map(function(s) {
+      const label = s.first === s.last ? 'v' + (verses[s.first].num || (s.first + 1)) : 'v' + (verses[s.first].num || (s.first + 1)) + '+' + (verses[s.last].num || (s.last + 1));
+      if (s.first !== s.last) { joinedVerses += s.last - s.first + 1; joinedSteps++; changes = true; return label + ' (' + s.sizes[0] + 'w) JOINED'; }
+      if (s.sizes.length > 1) { splitVerses++; splitExtra += s.sizes.length - 1; changes = true; return label + ' (' + s.sizes.join(' / ') + 'w) SPLIT'; }
+      return label + ' (' + s.sizes[0] + 'w)';
+    });
+    if (changes) {
+      changed++;
+      const now = verses.length, nw = steps.reduce(function(a, s) { return a + s.sizes.length; }, 0);
+      lines.push('  ' + (ref + '                              ').slice(0, 26) + (Number(data[i][4]) === 0 ? '[learning] ' : '           ') + now + ' -> ' + nw + ' steps | ' + desc.join(' · '));
+    }
+  }
+  const out = [
+    'LEARN PLAN SIMULATION (unit ' + LEARN_UNIT + ' words; extra step costs ' + LEARN_EXTRA_DAY + '; over the unit costs (over/' + LEARN_OVER_SCALE + ')^2)',
+    'references: ' + refs + '   learn steps today (one per verse): ' + stepsNow + '   with this plan: ' + stepsNew + '   (' + (stepsNew - stepsNow >= 0 ? '+' : '') + (stepsNew - stepsNow) + ')',
+    'JOINED: ' + joinedVerses + ' verses would join into ' + joinedSteps + ' steps (saves ' + (joinedVerses - joinedSteps) + ' steps)',
+    'SPLIT:  ' + splitVerses + ' verses would split (adds ' + splitExtra + ' steps)',
+    'references that would change: ' + changed + ' of ' + refs + '   ([learning] = still in the learn phase now; a plan only applies to references started after the change)',
+    '',
+    'CHANGED REFERENCES (verses today -> steps with the plan)'
+  ].concat(lines);
+  console.log(out.join('\n'));
 }

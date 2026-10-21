@@ -3149,7 +3149,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-310';
+    const CLIENT_BUILD = 'sync-311';
 
     let queue = [];
     let currentIndex = 0;
@@ -4833,7 +4833,7 @@
     }
 
     // ── Hint levels (New tab, Learn cards) ──
-    const HINT_NAMES = ['', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];   // index = level
+    const HINT_NAMES = ['', 'Plain words', 'First letters', 'Every other word', 'Phrase starts', 'Blurred, no help'];   // what the bar says for a moment when the level changes (the number itself is the icon)   // index = level
     function learningCard() { return mode === 'learning' ? learningCards[learningIndex] : null; }
     function isLearnCard(c) { return !!c && c.stage === 'learn'; }
     function learningHints() { return hintLevel >= 2 && hintLevel <= 4 && isLearnCard(learningCard()); }
