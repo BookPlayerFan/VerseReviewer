@@ -611,7 +611,6 @@
     /* A New card with a rep waiting: the filled dots turn amber, a gentle reminder (late-2 is no longer used) */
     .pips-container.late-1 .pip.filled { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245, 158, 11, 0.45); }
     .pips-container.late-1 .pip.cur { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25); }
-    .meta-tag .late-note { margin-left: 8px; font-size: 12px; font-weight: 700; color: var(--text-repeat); vertical-align: middle; }
     .pips-container.late-2 .pip.cur { border-color: #e5484d; box-shadow: 0 0 0 2px rgba(229, 72, 77, 0.25); }
     .pips-container.late-2 .pip.filled { background: #e5484d; border-color: #e5484d; box-shadow: 0 0 5px rgba(229, 72, 77, 0.45); }
 
@@ -3155,7 +3154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-322';
+    const CLIENT_BUILD = 'sync-323';
 
     let queue = [];
     let currentIndex = 0;
@@ -5188,14 +5187,6 @@
       const pips = document.getElementById("cardPips");
       pips.classList.toggle("late-1", lv === 1);
       pips.classList.toggle("late-2", lv >= 2);
-      // a small note beside the Learn / Lock pill, only while a rep is behind
-      const meta = document.getElementById("cardMeta");
-      let ln = meta.querySelector(".late-note");
-      const behind = card ? lateNow(card).late : 0;
-      if (behind > 0 && meta.querySelector(".rank-badge.is-new")) {
-        if (!ln) { ln = document.createElement("span"); ln.className = "late-note"; meta.appendChild(ln); }
-        ln.textContent = behind + (behind === 1 ? " rep behind" : " reps behind");
-      } else if (ln) ln.remove();
     }
     function scheduleLate(card) {
       if (lateTimer) { clearTimeout(lateTimer); lateTimer = null; }
