@@ -3154,7 +3154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-324';
+    const CLIENT_BUILD = 'sync-325';
 
     let queue = [];
     let currentIndex = 0;
@@ -5109,6 +5109,9 @@
       learnPending = true;
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
+      // Every Review press on reps 2 to 6 of a step makes the next rep one hint level harder (never past 5). It adds one to whatever level you are on, so a level
+      // you changed yourself carries on from there. Rep 1 does not add, so reps 1 and 2 are both at the starting level; rep 7 ends the step (the next one starts at Full).
+      if (kind === 'press' && card.stage === 'learn' && (card.dot || 1) >= 2 && (card.dot || 1) <= 6 && hintLevel < 5) setHintLevel(hintLevel + 1, true);
       if (promote) {
         notePts(card.reference, textVerses(card.text, card.reference) * ptsOf(1), 1);      // a new card in Bronze: one Treasury point per verse
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
