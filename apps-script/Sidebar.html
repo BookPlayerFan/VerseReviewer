@@ -3147,7 +3147,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-305';
+    const CLIENT_BUILD = 'sync-306';
 
     let queue = [];
     let currentIndex = 0;
@@ -3177,7 +3177,7 @@
     let segmentStates = [];
     // New tab hint level for the card on screen: 0 off, 1 first letter of every word, 2 first letter of every other word, 3 first letter of each phrase.
     // Hidden words show a dot in place of their first letter, so nothing moves. A level belongs to one verse on one day; the shell page keeps it on this phone.
-    let hintLevel = 0;
+    let hintLevel = 1;       // 1 Full, 2 Letters, 3 Alternate, 4 Phrase starts, 5 Off (blurred). A new verse always starts at Full.
     let lvlMap = {};         // saved levels: "reference|verse|day" -> level
     const lastLvl = {};      // the level a card was last at before the bulb switched hints off
     let fullPieces = {};     // phrases tapped open to their full words while the card is at a hint level
@@ -3292,8 +3292,8 @@
           render();
           if (at >= 0 && typeof d.hint === 'number') {   // the hint level the early view was showing
             const c0 = learningCards[0], k = hintKey(c0);
-            hintLevel = isLearnCard(c0) ? Math.max(0, Math.min(3, d.hint)) : 0;
-            if (k) { if (hintLevel) lvlMap[k] = hintLevel; else delete lvlMap[k]; }
+            hintLevel = isLearnCard(c0) ? Math.max(1, Math.min(5, d.hint || 1)) : 1;
+            if (k) { if (hintLevel !== 1) lvlMap[k] = hintLevel; else delete lvlMap[k]; }
             shellHintApplied = true;
             applyLevelStates(c0); syncFlipState(); renderCardBody();
           }
@@ -3326,8 +3326,7 @@
           lvlMap = Object.assign({}, d.hl);
           const c0 = learningCard();
           if (isLearnCard(c0)) {
-            let L = lvlMap[hintKey(c0)] || 0;
-            if (!L && d.legacy === true) { L = 1; saveLevel(c0, 1); }   // the old hints-on switch becomes Level 1, once
+            const L = lvlMap[hintKey(c0)] || 1;
             if (L !== hintLevel) { hintLevel = L; fullPieces = {}; applyLevelStates(c0); syncFlipState(); renderCardBody(); }
           }
         }
@@ -4693,7 +4692,7 @@
       const cv = learn ? (lc.verseIndex || 1) - 1 : -1;     // the verse you are learning today
       // The bar above a Learn card: which verse, and the hint bulb (outline, filled, filled with rays; faint when hints are off). Tapping the bulb switches hints.
       const flag = learn
-        ? '<span class="hint-flag' + (hintLevel ? '' : ' off') + '" role="button" aria-label="Hints" onclick="hintFlagTap(event)">' + bulbSvg(hintLevel) + '</span>'
+        ? '<span class="hint-flag' + (hintLevel === 5 ? ' off' : '') + '" role="button" aria-label="Hints" onclick="hintFlagTap(event)">' + bulbSvg(hintLevel) + '</span>'
         : '';
       const status = learn
         ? (multi ? `Verse ${lc.verseIndex} of ${lc.verseCount}` : 'Single verse')
@@ -4708,18 +4707,19 @@
       html += '<div class="passage-stream">';
       parsedSegments.forEach((seg, idx) => {
         const isRev = segmentStates[idx] === 'revealed';
-        const isHint = learn && isRev && hintLevel > 0 && !fullPieces[idx];
+        const isHint = learn && isRev && hintLevel >= 2 && hintLevel <= 4 && !fullPieces[idx];   // Letters, Alternate, Phrase starts; Full shows the plain words
         // phrases of a split verse always show a small grey letter (a, b, c...), so you can see a verse is split before revealing anything
         html += `
           <span class="verse-unit" data-idx="${idx}" onclick="handleVerseClick(${idx}, event)">
             ${seg.num ? `<sup class="v-num${multi && seg.vi !== lc.verseIndex - 1 ? ' dim' : ''}">${escapeHtml(seg.num)}</sup>` : ''}${seg.letter ? `<span class="p-let">${seg.letter}</span>` : ''}
-            <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}${seg.vi === cv ? ' cv' : ''}">${isHint ? hintMarkup(seg.text, hintLevel) : escapeHtml(seg.text)}</span>
+            <span class="v-text ${isHint ? 'hinted' : (isRev ? 'revealed' : 'blurred')}${seg.vi === cv ? ' cv' : ''}">${isHint ? hintMarkup(seg.text, hintLevel - 1) : escapeHtml(seg.text)}</span>
           </span>
         `;
       });
       html += '</div>';
 
       body.innerHTML = html;
+      syncSwipeAxis();
     }
 
     // The hint markup for one piece (a phrase on the New tab). Level 1: the first letter of every word. Level 2: every other word (the first, third, ...).
@@ -4739,12 +4739,14 @@
     }
 
     // The hint bulb: Off = faint outline, Level 1 = outline, Level 2 = filled, Level 3 = filled with rays.
+    // The hints bulb: the brighter it is, the more help you have. Full = filled with rays, Letters = filled, Alternate = half filled, Phrase starts = bright outline, Off = faint outline.
     function bulbSvg(level) {
       const body = "M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z";
       return '<svg viewBox="-3 -4 30 30" aria-hidden="true">' +
-        (level >= 2 ? '<path d="' + body + '" fill="currentColor"/>' : '') +
+        (level <= 2 ? '<path d="' + body + '" fill="currentColor"/>' : '') +
+        (level === 3 ? '<defs><clipPath id="bulbHalf"><rect x="0" y="9.5" width="24" height="9"/></clipPath></defs><path clip-path="url(#bulbHalf)" d="' + body + '" fill="currentColor"/>' : '') +
         '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.5 1.5 2.6h4c0-1.1.6-1.9 1.5-2.6A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-        (level >= 3 ? '<path d="M12 -.5v-2M3.6 3.4 2.2 2M20.4 3.4 21.8 2M1 10H-.8M23 10h1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' : '') +
+        (level === 1 ? '<path d="M12 -.5v-2M3.6 3.4 2.2 2M20.4 3.4 21.8 2M1 10H-.8M23 10h1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' : '') +
         '</svg>';
     }
 
@@ -4815,39 +4817,39 @@
     }
 
     // ── Hint levels (New tab, Learn cards) ──
-    const HINT_NAMES = ['Hints off', 'Level 1 \u00b7 First letters', 'Level 2 \u00b7 Every other word', 'Level 3 \u00b7 Each phrase'];
+    const HINT_NAMES = ['', 'Full', 'Letters', 'Alternate', 'Phrase starts', 'Off'];   // index = level
     function learningCard() { return mode === 'learning' ? learningCards[learningIndex] : null; }
     function isLearnCard(c) { return !!c && c.stage === 'learn'; }
-    function learningHints() { return hintLevel > 0 && isLearnCard(learningCard()); }
-    // A level belongs to one verse on one day (the day runs midnight to midnight): a new verse, or a new day, starts at Off again.
+    function learningHints() { return hintLevel >= 2 && hintLevel <= 4 && isLearnCard(learningCard()); }
+    // A level belongs to one verse on one day (the day runs midnight to midnight): a new verse, or a new day, starts at Full again.
     function lvlDay() { const d = new Date(nowSrv()); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
-    function hintKey(c) { return isLearnCard(c) ? c.reference + "|" + (c.verseIndex || 1) + "|" + lvlDay() : ""; }
+    function hintKey(c) { return isLearnCard(c) ? c.reference + "|" + (c.verseIndex || 1) + "|" + lvlDay() + "|v2" : ""; }
     function startHints(card) {
-      hintLevel = isLearnCard(card) ? (lvlMap[hintKey(card)] || 0) : 0;
+      hintLevel = isLearnCard(card) ? (lvlMap[hintKey(card)] || 1) : 1;
       fullPieces = {};
       applyLevelStates(card);
       syncFlipState();
     }
-    // With a hint level on, the verse you are learning is showing (at the level). With hints off it is blurred, except on rep 1 of a new verse, when there is nothing to recall yet.
+    // The verse you are learning is showing (plain at Full, as hints at Letters / Alternate / Phrase starts). At Off it is blurred.
     function applyLevelStates(card) {
       if (!isLearnCard(card)) return;
-      const cv = (card.verseIndex || 1) - 1, show = hintLevel > 0 || (card.dot || 1) === 1;
+      const cv = (card.verseIndex || 1) - 1, show = hintLevel < 5;
       segmentStates = parsedSegments.map(function(p, i) { return p.vi === cv ? (show ? 'revealed' : 'hidden') : (segmentStates[i] || 'hidden'); });
       resetTapCursor(card);
     }
     function saveLevel(card, L) {
       const k = hintKey(card); if (!k) return;
-      if (L > 0) lvlMap[k] = L; else delete lvlMap[k];
+      if (L !== 1) lvlMap[k] = L; else delete lvlMap[k];   // Full is the start, so nothing is saved for it
       shellHintApplied = true;
       try { window.top.postMessage({ type: 'VR_HINT', key: k, level: L }, '*'); } catch (e) {}
     }
     function setHintLevel(L, quiet) {
       const c = learningCard();
       if (isScoring || !isLearnCard(c) || !hasActiveCard()) return;
-      L = Math.max(0, Math.min(3, L));
+      L = Math.max(1, Math.min(5, L));
       const k = hintKey(c);
-      if (hintLevel > 0) lastLvl[k] = hintLevel;
-      if (L > 0) lastLvl[k] = L;
+      if (hintLevel < 5) lastLvl[k] = hintLevel;
+      if (L < 5) lastLvl[k] = L;
       const same = L === hintLevel;
       hintLevel = L; fullPieces = {};
       applyLevelStates(c);
@@ -4857,11 +4859,11 @@
       if (!same) { const fl = document.querySelector(".hint-flag"); if (fl) fl.classList.add("pulse"); }
       if (!quiet) flashHintLabel(HINT_NAMES[L]);
     }
-    function stepHintLevel(dir) { setHintLevel(hintLevel + dir); }
-    function toggleHintMode() {   // the bulb: off, or back on at the level this card was last at
+    function stepHintLevel(dir) { setHintLevel(hintLevel + dir); }   // dir > 0: less help (toward Off), dir < 0: more help (toward Full)
+    function toggleHintMode() {   // the bulb: Off, or back to the level this card was last at
       const c = learningCard();
       if (!isLearnCard(c)) return;
-      setHintLevel(hintLevel > 0 ? 0 : (lastLvl[hintKey(c)] || 1));
+      setHintLevel(hintLevel < 5 ? 5 : (lastLvl[hintKey(c)] || 1));
     }
     function hintFlagTap(e) { if (e) { e.stopPropagation(); e.preventDefault(); } toggleHintMode(); }
     let shellHintApplied = false;   // the saved levels are applied once per page load, then your own changes rule
@@ -4909,35 +4911,49 @@
       }, true);
     }
 
-    // Swipe sideways in the verse box. It fires as soon as the finger has clearly gone sideways (no need to lift),
-    // mostly-vertical drags are left alone so a long verse still scrolls (the box allows vertical panning only),
-    // and the very edge of the screen is left to iOS.
-    const SWIPE_MIN = 25;      // px sideways
+    // Swipe up or down on a New (Learn) card changes the hint level by distance: the first level as soon as the finger has clearly gone up or down, then one more
+    // per VSWIPE_STEP px, so one long swipe can cross all five (up = more help, toward Full; down = less help, toward Off). It only works where the verse box does not scroll;
+    // a long verse keeps its scrolling and the status bar above it takes the swipe instead. The very edge of the screen is left to iOS.
+    const SWIPE_MIN = 25;      // px sideways: used by the swipe-to-go-back screens
     const SWIPE_RATIO = 1.2;   // sideways must beat vertical by this much
+    const VSWIPE_START = 14;   // px before the first step
+    const VSWIPE_STEP = 44;    // px for each further step
     let swipeFired = false;
+    function cardFits() { const b = document.getElementById("cardBody"); return !!b && b.scrollHeight <= b.clientHeight + 1; }
+    function syncSwipeAxis() {   // a verse that fits does not scroll, so the box gives the vertical swipe to the hint level; the bar always does
+      const b = document.getElementById("cardBody"); if (!b) return;
+      const learn = mode === 'learning' && isLearnCard(learningCard());
+      b.style.touchAction = (learn && cardFits()) ? 'none' : 'pan-y';
+      const tb = b.querySelector('.passage-toolbar'); if (tb) tb.style.touchAction = learn ? 'none' : '';
+    }
+    window.addEventListener("resize", function() { syncSwipeAxis(); });
     function attachSwipe() {
       const body = document.getElementById("cardBody");
-      let tracking = false, sx = 0, sy = 0;
+      let tracking = false, active = false, sx = 0, sy = 0, startLevel = 1;
       body.addEventListener("pointerdown", function(e) {
-        tracking = false; swipeFired = false;
+        tracking = false; active = false; swipeFired = false;
         if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
         if (e.target.closest("button") || e.target.closest(".hint-flag")) return;
-        if (!(mode === 'learning' && isLearnCard(learningCard()))) return;   // only Learn cards swipe (hint levels); Review and Lock use the hold
+        if (!(mode === 'learning' && isLearnCard(learningCard()))) return;   // only Learn cards have hint levels
+        if (!cardFits() && !e.target.closest(".passage-toolbar")) return;   // a long verse scrolls; only the bar changes the level
         if (e.pointerType === "touch" && (e.clientX < 14 || e.clientX > window.innerWidth - 14)) return;
-        tracking = true; sx = e.clientX; sy = e.clientY;
+        tracking = true; sx = e.clientX; sy = e.clientY; startLevel = hintLevel;
       });
       body.addEventListener("pointermove", function(e) {
         if (!tracking) return;
         if (peeking) { tracking = false; return; }
         const dx = e.clientX - sx, dy = e.clientY - sy;
-        if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }   // a vertical scroll
-        if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
-        tracking = false; swipeFired = true;
+        if (!active) {
+          if (Math.abs(dy) < VSWIPE_START || Math.abs(dy) < Math.abs(dx) * 1.2) return;
+          active = true; swipeFired = true;
+        }
         if (isScoring || !hasActiveCard()) return;
-        stepHintLevel(dx > 0 ? 1 : -1);   // swipe right is harder, left is easier
+        const steps = Math.floor((Math.abs(dy) - VSWIPE_START) / VSWIPE_STEP) + 1;
+        const target = Math.max(1, Math.min(5, startLevel + (dy > 0 ? steps : -steps)));
+        if (target !== hintLevel) setHintLevel(target);
       });
-      window.addEventListener("pointerup", function() { tracking = false; });
-      window.addEventListener("pointercancel", function() { tracking = false; });
+      window.addEventListener("pointerup", function() { tracking = false; active = false; });
+      window.addEventListener("pointercancel", function() { tracking = false; active = false; });
       // the click that can follow a swipe must not also reveal a piece
       body.addEventListener("click", function(e) {
         if (swipeFired) { swipeFired = false; e.stopImmediatePropagation(); e.preventDefault(); }
