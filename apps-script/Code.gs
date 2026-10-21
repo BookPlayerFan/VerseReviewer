@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-104'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-105'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2270,4 +2270,181 @@ function syncPushes(kind) {
 function scheduleTodayPushes() {
   const r = syncSlotPushes_();
   pushLog_('status: slots', '', 0, null, r.sent + ' slot push(es) scheduled, ' + r.cancelled + ' cancelled, for the rest of today');
+}
+
+// ───────────── Verse split report (read only) ─────────────
+// Run checkVerseSplits() from the editor (View -> Logs / Execution log). It changes nothing. For every verse on the sheet it shows how many words it has,
+// how the phrase splitter cuts it, and how many Learn parts it would get under two candidate rules, so you can see what a long-verse split would do:
+//   FLAT     40 or more words = 2 parts, 80 or more = 3, 120 or more = 4 (every part under 40 words).
+//   SLIDING  weighs the saving of shorter parts against the cost of an extra day and of how clean the break is (sentence end best, comma worse, mid-clause worst).
+// The phrase splitter below is a copy of the one the app uses (Sidebar.html), kept identical so the numbers match what you see on the New tab.
+const SPLIT_PHRASE_TARGET = 12, SPLIT_PHRASE_CAP = 15, SPLIT_PHRASE_MIN = 5;
+const SPLIT_PHRASE_CONJ = /^(and|but|for|so|yet|or|nor|that|because|who|whom|whose|which|when|while|if|though|although|since|until|unless|whether|as|then|therefore|thus|lest|where|whoever|whatever|whenever|wherever)$/;
+
+function splitPhrases_(text) {
+  const whole = String(text || "").trim();
+  // words; an em dash with no spaces ("authorities\u2014all") is a possible break, so it is cut there and glued back after
+  const words = [], glue = [];
+  whole.split(/\s+/).filter(Boolean).forEach(function(tok) {
+    const parts = tok.match(/[^\u2014]+\u2014?|\u2014/g) || [tok];
+    parts.forEach(function(p, k) { words.push(p); glue.push(k > 0); });
+  });
+  const n = words.length;
+  if (n <= SPLIT_PHRASE_CAP) return [whole];
+
+  const core = function(w) { return w.replace(/[”"’')\]]+$/, ""); };           // word without closing quotes
+  const bare = function(w) { return w.replace(/^[“"‘'(\[]+/, "").replace(/[^A-Za-z']+$/, "").toLowerCase(); };
+  const punct = words.map(function(w) { return /[,;:.!?—–]$/.test(core(w)); });
+  const itemLen = new Array(n).fill(0);   // words since the previous punctuation (for spotting lists)
+  let last = -1;
+  for (let i = 0; i < n; i++) { if (punct[i]) { itemLen[i] = i - last; last = i; } }
+
+  function isListComma(i) {
+    if (itemLen[i] > 3) return false;
+    const p = i - itemLen[i];
+    if (p >= 0 && /,$/.test(core(words[p])) && itemLen[p] <= 3) return true;   // second short item in a row
+    let j = i + 1; while (j < n && !punct[j]) j++;
+    return j < n && (j - i) <= 3 && /,$/.test(core(words[j]));                  // next item is short and a comma item too
+  }
+  function firmAfter(i) { return i < 0 || i >= n - 1 || /[.!?;]$/.test(core(words[i])); }
+  // cost of ending a phrase after word i
+  function breakCost(i) {
+    const w = core(words[i]), next = bare(words[i + 1]);
+    if (/[.!?;]$/.test(w)) return 0;
+    if (/[:—–]$/.test(w)) return 0.5;
+    if (/,$/.test(w)) return isListComma(i) ? 4 : (SPLIT_PHRASE_CONJ.test(next) ? 0.3 : 1);
+    return SPLIT_PHRASE_CONJ.test(next) ? 3 : 5;                                          // no pause here: last resort
+  }
+  const sentEnd = words.map(function(w) { return /[.!?]$/.test(core(w)) ? 1 : 0; });
+  const sentSum = [0]; for (let i = 0; i < n; i++) sentSum.push(sentSum[i] + sentEnd[i]);
+  function pieceCost(from, to) {   // words from..to-1
+    const L = to - from;
+    let c = 1;                                                                       // each extra phrase costs a little
+    c += sentSum[to - 1] - sentSum[from];                                            // a phrase running across a sentence end
+    if (L > SPLIT_PHRASE_TARGET) c += (L - SPLIT_PHRASE_TARGET) * 0.2;
+    if (L < 8) c += (8 - L) * 0.5;
+    if (L < SPLIT_PHRASE_MIN && !(firmAfter(from - 1) && firmAfter(to - 1))) c += 3;       // very short bit that isn't a whole sentence
+    c += Math.pow((L - 16) / 16, 2) * 0.6;                                           // gentle pull toward even sizes
+    return c;
+  }
+
+  const best = new Array(n + 1).fill(Infinity), from = new Array(n + 1).fill(0);
+  best[0] = 0;
+  for (let j = 1; j <= n; j++) {
+    for (let i = Math.max(0, j - SPLIT_PHRASE_CAP); i < j; i++) {
+      if (best[i] === Infinity) continue;
+      const c = best[i] + pieceCost(i, j) + (j < n ? breakCost(j - 1) : 0);
+      if (c < best[j]) { best[j] = c; from[j] = i; }
+    }
+  }
+  const cuts = [];
+  for (let j = n; j > 0; j = from[j]) cuts.unshift([from[j], j]);
+  return cuts.map(function(c) {
+    let t = "";
+    for (let i = c[0]; i < c[1]; i++) t += (i > c[0] && !glue[i] ? " " : "") + words[i];
+    return t;
+  });
+}
+
+
+const SPLIT_FLAT_WORDS = 40;       // flat rule: one more part for every this many words
+const SPLIT_PART_SCALE = 25;       // sliding rule: a part of this many words costs 1.0, and the cost grows with the square of the length
+const SPLIT_EXTRA_DAY = 1.0;       // sliding rule: the price of taking one more day
+const SPLIT_BREAK_COST = { sentence: 0, semicolon: 0.3, comma: 0.6, other: 1.5 };   // sliding rule: how unclean a break is
+
+function splitWords_(t) { return String(t || '').split(/\s+/).filter(Boolean).length; }
+function flatParts_(words) { return words < SPLIT_FLAT_WORDS ? 1 : Math.floor(words / SPLIT_FLAT_WORDS) + 1; }
+
+// The verses of a reference as [{ num, text }], from the [n] markers (text before the first marker is the first verse).
+function splitVerses_(text) {
+  const t = String(text === null || text === undefined ? '' : text);
+  const out = [];
+  const re = /\[(\d+)\]/g;
+  let m, last = 0, num = '';
+  while ((m = re.exec(t)) !== null) {
+    const chunk = t.substring(last, m.index).trim();
+    if (chunk) out.push({ num: num, text: chunk });
+    num = m[1]; last = re.lastIndex;
+  }
+  const tail = t.substring(last).trim();
+  if (tail) out.push({ num: num, text: tail });
+  return out;
+}
+
+// The sliding rule: split the phrases into k parts (k = 1 to 4) at phrase boundaries, and take the k with the lowest total cost.
+// Returns { parts, sizes (words per part), after (the last words of each part but the last) }.
+function slidingParts_(phrases) {
+  const lens = phrases.map(splitWords_);
+  const n = lens.length, total = lens.reduce(function(a, b) { return a + b; }, 0);
+  const pre = [0]; lens.forEach(function(l) { pre.push(pre[pre.length - 1] + l); });
+  function breakAfter(i) {   // the cost of ending a part after phrase i
+    const w = phrases[i].replace(/[\u201d"\u2019')\]]+$/, '');
+    if (/[.!?]$/.test(w)) return SPLIT_BREAK_COST.sentence;
+    if (/[;:\u2014\u2013]$/.test(w)) return SPLIT_BREAK_COST.semicolon;
+    if (/,$/.test(w)) return SPLIT_BREAK_COST.comma;
+    return SPLIT_BREAK_COST.other;
+  }
+  function partCost(from, to) { const L = pre[to] - pre[from]; return Math.pow(L / SPLIT_PART_SCALE, 2); }
+  let best = { cost: partCost(0, n), cuts: [] };
+  const maxK = Math.min(4, n);
+  // dp[k][j] = cheapest way to cover the first j phrases with k parts
+  const dp = [];
+  for (let k = 0; k <= maxK; k++) { dp.push(new Array(n + 1).fill(null)); }
+  dp[0][0] = { cost: 0, prev: -1 };
+  for (let k = 1; k <= maxK; k++) {
+    for (let j = k; j <= n; j++) {
+      for (let i = k - 1; i < j; i++) {
+        if (!dp[k - 1][i]) continue;
+        const c = dp[k - 1][i].cost + partCost(i, j) + (k > 1 ? SPLIT_EXTRA_DAY + breakAfter(i - 1) : 0);
+        if (!dp[k][j] || c < dp[k][j].cost) dp[k][j] = { cost: c, prev: i };
+      }
+    }
+    if (dp[k][n] && dp[k][n].cost < best.cost) {
+      const cuts = []; let j = n;
+      for (let kk = k; kk > 1; kk--) { const i = dp[kk][j].prev; cuts.unshift(i); j = i; }
+      best = { cost: dp[k][n].cost, cuts: cuts };
+    }
+  }
+  const bounds = [0].concat(best.cuts, [n]);
+  const sizes = [], after = [];
+  for (let p = 0; p + 1 < bounds.length; p++) {
+    sizes.push(pre[bounds[p + 1]] - pre[bounds[p]]);
+    if (p + 2 < bounds.length) after.push(phrases.slice(bounds[p], bounds[p + 1]).join(' ').split(/\s+/).slice(-4).join(' '));
+  }
+  return { parts: sizes.length, sizes: sizes, after: after, total: total };
+}
+
+function checkVerseSplits() {
+  const data = readSheetData_();
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const ref = cleanRef_(data[i][5]);
+    if (!ref) continue;
+    const verses = splitVerses_(data[i][7]);
+    verses.forEach(function(v, k) {
+      const words = splitWords_(v.text);
+      const phrases = splitPhrases_(v.text);
+      const sl = slidingParts_(phrases);
+      rows.push({ label: ref + (verses.length > 1 ? '  (verse ' + (v.num || (k + 1)) + ')' : ''), words: words, phrases: phrases.map(splitWords_), flat: flatParts_(words), slide: sl });
+    });
+  }
+  if (!rows.length) { console.log('No verses on the sheet.'); return; }
+  const bins = [['under 20', 0, 19], ['20-29', 20, 29], ['30-34', 30, 34], ['35-39', 35, 39], ['40-59', 40, 59], ['60-79', 60, 79], ['80 and over', 80, 1e9]];
+  const lines = ['VERSE LENGTHS (' + rows.length + ' verses; a multi-verse reference counts each verse)'];
+  bins.forEach(function(b) {
+    const n = rows.filter(function(r) { return r.words >= b[1] && r.words <= b[2]; }).length;
+    lines.push(('  ' + b[0] + '            ').slice(0, 16) + ('   ' + n).slice(-4) + '  ' + new Array(Math.min(n, 40) + 1).join('#'));
+  });
+  const flatSplit = rows.filter(function(r) { return r.flat > 1; }).length, slideSplit = rows.filter(function(r) { return r.slide.parts > 1; }).length;
+  const differ = rows.filter(function(r) { return r.flat !== r.slide.parts; }).length;
+  lines.push('');
+  lines.push('FLAT rule (40/80/120) would split ' + flatSplit + ' verse(s); SLIDING rule would split ' + slideSplit + '; they differ on ' + differ + '.');
+  lines.push('');
+  lines.push('LONGEST FIRST   words | phrases | flat parts | sliding parts (words per part, where it cuts)');
+  rows.sort(function(a, b) { return b.words - a.words; });
+  rows.filter(function(r) { return r.words >= 28 || r.flat > 1 || r.slide.parts > 1; }).forEach(function(r) {
+    const cut = r.slide.parts > 1 ? ' ' + r.slide.sizes.join(' / ') + ', after "' + r.slide.after.join('", "') + '"' : '';
+    lines.push(('  ' + r.label + '                              ').slice(0, 34) + ('   ' + r.words).slice(-4) + 'w  ' + r.phrases.join('+') + '  | flat ' + r.flat + ' | sliding ' + r.slide.parts + cut);
+  });
+  console.log(lines.join('\n'));
 }
