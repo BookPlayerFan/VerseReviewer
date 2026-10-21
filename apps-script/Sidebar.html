@@ -3150,7 +3150,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-314';
+    const CLIENT_BUILD = 'sync-315';
 
     let queue = [];
     let currentIndex = 0;
@@ -6140,10 +6140,12 @@
         box.appendChild(e);
         return;
       }
-      // Oldest added first. Verses added on the same day (the sheet only keeps the date) stay in sheet order; verses with no date go last.
+      // Oldest added first. Verses added on the same day (the sheet only keeps the date) go in Bible order; verses with no date go last.
       const ordered = shown.slice().sort(function(x, y) {
         const ax = x.a || "9999", ay = y.a || "9999";
-        return ax < ay ? -1 : ax > ay ? 1 : (x.r || 0) - (y.r || 0);
+        if (ax !== ay) return ax < ay ? -1 : 1;
+        const px = parseRef(x.f), py = parseRef(y.f);   // same day: Bible order
+        return (px.book - py.book) || (px.chapter - py.chapter) || (px.verse - py.verse) || (x.r || 0) - (y.r || 0);
       });
       const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       ordered.forEach(function(it) {
