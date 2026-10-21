@@ -1083,6 +1083,12 @@
       background: var(--text-muted); color: var(--bg-card); font-size: 10px; font-weight: 700;
       border-radius: 99px; padding: 1px 6px; line-height: 14px; }
     .tab.on .tab-count { background: var(--text-accent); }
+    /* Alerts: no numbers. A short accent bar over a tab that is not showing but has something waiting.
+       The counts are still kept in the hidden spans (they feed the page's own checks). */
+    .tab .tab-count { display: none !important; }
+    .tab.has:not(.on)::before { content: ""; position: absolute; top: -14px; left: 50%; width: 34px; margin-left: -17px; height: 3px;
+      border-radius: 0 0 3px 3px; background: var(--text-accent); z-index: 3; }
+    .progress-track { display: none !important; }   /* the blue progress line is retired; progress will live in the status bar */
     #verseListView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 40; }
     #verseListView .picker-list { flex: none; overflow: visible; }
     #verseListView .picker-close { display: none; }
@@ -1893,6 +1899,8 @@
       const nc = document.getElementById("tabNewCount");
       const n = unseenCount();
       nc.textContent = n; nc.style.display = n > 0 ? "" : "none";
+      document.getElementById("tabReview").classList.toggle("has", left > 0);
+      document.getElementById("tabNew").classList.toggle("has", n > 0);
       scheduleBadgeReturn();
     }
 
@@ -3159,7 +3167,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-318';
+    const CLIENT_BUILD = 'sync-319';
 
     let queue = [];
     let currentIndex = 0;
