@@ -84,6 +84,8 @@
     *::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
     html, body {
+      -webkit-text-size-adjust: 100%;   /* iOS must not enlarge the text on its own (it can after the app wakes up) */
+      text-size-adjust: 100%;
       position: fixed;
       inset: 0;
       width: 100%;
@@ -3145,7 +3147,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-304';
+    const CLIENT_BUILD = 'sync-305';
 
     let queue = [];
     let currentIndex = 0;
