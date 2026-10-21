@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-113'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-114'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2466,6 +2466,7 @@ const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
 const LEARN_OVER_SCALE = 50;    // a step over the unit costs (words over / this) squared: about 40 words is where a verse starts to be worth splitting
 const LEARN_JOIN_SCALE = 1;     // a JOINED step over the unit costs (words over / this) squared: verses join when they total about 30 words or less
 const LEARN_SPLIT_COST = 0.37;  // each extra part of a split verse costs this much more, so a split has to be worth it: on average from 40 words (a clean sentence break tips about a word earlier, no natural pause a couple of words later)
+const LEARN_ALONE_SCALE = 16;   // a verse that stays a step on its own and has fewer than LEARN_MIN_PART words costs (words short)^2 / this: a tiny step is a good reason to join
 const LEARN_EVEN_SCALE = 150;   // uneven parts cost (words from the even size) squared / this
 const LEARN_MIN_PART = 12;      // a part of a split verse shorter than this costs extra (not forbidden: a long verse with one good cut still splits)
 const LEARN_MIN_SCALE = 4;      // that extra is (words short of the minimum) squared / this
@@ -2474,6 +2475,7 @@ const LEARN_BREAK_COST = { sentence: 0.3, semicolon: 0.4, comma: 0.6, other: 1.5
 function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words); return (d * d) / LEARN_MIN_SCALE; }
 // A joined step is judged more strictly than a single verse: two verses only join when together they are about one unit (30 words) or less.
 function learnJoinCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_JOIN_SCALE; }
+function learnAloneCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words); return (d * d) / LEARN_ALONE_SCALE; }
 function learnStepCost_(words) { const over = Math.max(0, words - LEARN_UNIT); return LEARN_EXTRA_DAY + (over * over) / LEARN_OVER_SCALE; }
 
 // The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after, bounds }
@@ -2530,7 +2532,7 @@ function planReference_(verses) {
   const best = new Array(m + 1).fill(Infinity), from = new Array(m + 1).fill(0);
   best[0] = 0;
   for (let j = 1; j <= m; j++) {
-    best[j] = best[j - 1] + own[j - 1].cost; from[j] = j - 1;            // the verse alone (split or not): tried first, so a tie keeps the verses apart
+    best[j] = best[j - 1] + own[j - 1].cost + (own[j - 1].sizes.length === 1 ? learnAloneCost_(words[j - 1]) : 0); from[j] = j - 1;            // the verse alone (split or not): tried first, so a tie keeps the verses apart
     let sum = words[j - 1];
     for (let i = j - 2; i >= 0; i--) {                                    // verses i..j-1 as one joined step
       sum += words[i];
@@ -2587,9 +2589,15 @@ function checkLearnPlan() {
     const steps = planReference_(verses);
     refs++; stepsNow += verses.length; stepsNew += steps.reduce(function(a, s) { return a + s.sizes.length; }, 0);
     let changes = false;
+    const startNum = (/:(\d+)/.exec(ref) || [])[1];
+    const numOf = function(k) { return verses[k].num || (k === 0 && startNum ? startNum : String(k + 1)); };   // the first verse of a passage has no [n] marker: its number is the one in the reference
     const desc = steps.map(function(s) {
-      const label = s.first === s.last ? 'v' + (verses[s.first].num || (s.first + 1)) : 'v' + (verses[s.first].num || (s.first + 1)) + '+' + (verses[s.last].num || (s.last + 1));
-      if (s.first !== s.last) { joinedVerses += s.last - s.first + 1; joinedSteps++; changes = true; return label + ' (' + s.sizes[0] + 'w) JOINED'; }
+      const label = s.first === s.last ? 'v' + numOf(s.first) : 'v' + numOf(s.first) + (s.last - s.first > 1 ? '-' : '+') + numOf(s.last);
+      if (s.first !== s.last) {
+        joinedVerses += s.last - s.first + 1; joinedSteps++; changes = true;
+        const each = []; for (let k = s.first; k <= s.last; k++) each.push(splitWords_(verses[k].text));
+        return label + ' (' + each.join(' + ') + ' = ' + s.sizes[0] + 'w) JOINED';
+      }
       if (s.sizes.length > 1) { splitVerses++; splitExtra += s.sizes.length - 1; changes = true; return label + ' (' + s.sizes.join(' / ') + 'w) SPLIT'; }
       return label + ' (' + s.sizes[0] + 'w)';
     });
