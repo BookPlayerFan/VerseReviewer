@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-117'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-118'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -640,6 +640,23 @@ function getDueCards(includeNew, preRead) {
 //     (held repeats are failed verses waiting at the end of the queue until the Practice button starts them)
 
 const SESSION_KEY = 'VR_SESSION';
+// The hint level of the card being learned, kept as one small line so every phone shows the same level: { k: "reference|verse|day|v2", l: 1..5, t: ms }.
+// A phone only uses it when k is the card it is showing; a new verse, step or day starts at Full as before. The last change wins.
+const HINT_KEY = 'VR_HINT';
+function readHint_() {
+  try {
+    const h = JSON.parse(store_().getProperty(HINT_KEY) || 'null');
+    if (h && typeof h.k === 'string' && h.k && Number(h.l) >= 1 && Number(h.l) <= 5) return { k: h.k, l: Number(h.l), t: Number(h.t) || 0 };
+  } catch (e) {}
+  return null;
+}
+function setHint(key, level) {
+  const k = String(key || '').slice(0, 200), l = Math.round(Number(level));
+  if (!k || !(l >= 1 && l <= 5)) return { ok: false };
+  const t = nowMs_();
+  store_().setProperty(HINT_KEY, JSON.stringify({ k: k, l: l, t: t }));
+  return { ok: true, t: t };
+}
 const SESSION_VER_KEY = 'VR_SESSION_V'; // tiny "date|version" marker so polling needs only one read
 
 function store_() {
@@ -834,7 +851,8 @@ function hydrate_(s, preRead) {
     seen: seenFor_(s, learning),
     tomorrow: dueTomorrowCount_(data),
     tomorrowLoad: dueTomorrowLoad_(data),
-    treasury: treasuryTotal_(data)
+    treasury: treasuryTotal_(data),
+    hint: readHint_()
   };
 }
 
@@ -950,7 +968,7 @@ function checkSession(clientVersion, clientDate) {
   const changed = !marker ||
                   marker !== clientDate + '|' + Number(clientVersion) ||
                   marker.split('|')[0] !== today;
-  return { changed: changed, build: BUILD, client: clientExpected_(), marker: marker || '', today: today };
+  return { changed: changed, build: BUILD, client: clientExpected_(), marker: marker || '', today: today, hint: readHint_() };
 }
 
 // Run this from the Apps Script editor to see what the server has stored (View -> Logs).

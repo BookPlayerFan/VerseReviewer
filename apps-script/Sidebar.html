@@ -3154,7 +3154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-323';
+    const CLIENT_BUILD = 'sync-324';
 
     let queue = [];
     let currentIndex = 0;
@@ -3184,6 +3184,7 @@
     let segmentStates = [];
     // New tab hint level for the card on screen: 0 off, 1 first letter of every word, 2 first letter of every other word, 3 first letter of each phrase.
     // Hidden words show a dot in place of their first letter, so nothing moves. A level belongs to one verse on one day; the shell page keeps it on this phone.
+    let localHintAt = 0, hintPending = null, hintSendTimer = null;   // syncing the hint level with the server (see saveLevel)
     let hintLevel = 1;       // 1 Full, 2 Letters, 3 Alternate, 4 Phrase starts, 5 Off (blurred). A new verse always starts at Full.
     let lvlMap = {};         // saved levels: "reference|verse|day" -> level
     const lastLvl = {};      // the level a card was last at before it went to Level 5
@@ -3420,6 +3421,7 @@
       problemCount = 0;
       updateSyncWarning();
       setSummaryBusy(false);
+      applyServerHint(session.hint, false);   // before the first paint, so the card opens at the level your other phone left it
       render();
       notifyReady();
 
@@ -4858,6 +4860,29 @@
       if (L !== 1) lvlMap[k] = L; else delete lvlMap[k];   // Full is the start, so nothing is saved for it
       shellHintApplied = true;
       try { window.top.postMessage({ type: 'VR_HINT', key: k, level: L }, '*'); } catch (e) {}
+      localHintAt = nowSrv(); hintPending = { k: k, L: L };   // and to the server, so your other phone shows the same level (a burst of swipes sends only the last)
+      clearTimeout(hintSendTimer); hintSendTimer = setTimeout(function() { hintSendTimer = null; sendHint(); }, 500);
+    }
+    function sendHint() {
+      const h = hintPending; if (!h) return;
+      try {
+        google.script.run
+          .withSuccessHandler(function(r) { if (hintPending === h && r && r.ok) hintPending = null; })
+          .withFailureHandler(function() {})   // kept in hintPending: the next sync check sends it again
+          .setHint(h.k, h.L);
+      } catch (e) {}
+    }
+    // The level another phone set for the card being learned (from the server). Only used for that same card; a newer change made on this phone wins.
+    function applyServerHint(h, live) {
+      if (!h || typeof h.k !== "string" || !h.k || !(h.l >= 1 && h.l <= 5)) return;
+      if (hintPending || !(h.t > localHintAt)) return;
+      if (h.l !== 1) lvlMap[h.k] = h.l; else delete lvlMap[h.k];
+      shellHintApplied = true;
+      try { window.top.postMessage({ type: 'VR_HINT', key: h.k, level: h.l }, '*'); } catch (e) {}
+      const c = learningCard();
+      if (live && mode === "learning" && isLearnCard(c) && hasActiveCard() && !isScoring && hintKey(c) === h.k && hintLevel !== h.l) {
+        hintLevel = h.l; fullPieces = {}; applyLevelStates(c); syncFlipState(); renderCardBody();
+      }
     }
     function setHintLevel(L, quiet) {
       const c = learningCard();
@@ -6433,6 +6458,7 @@
     function syncCheck() {
       if (document.visibilityState === "hidden") return;
       if (submitFailed && !inFlight) retrySubmit();
+      if (hintPending && !hintSendTimer) sendHint();
       if (isFetching || isRefreshing || isScoring || pendingCount() > 0) return;
 
       if (!loadedAt) {
@@ -6446,6 +6472,7 @@
           if (!res) { noteCheck("empty reply"); return; }
           if (res.build) serverBuild = res.build;
           if (res.client) noteClientBuild(res.client);
+          if (res.hint) applyServerHint(res.hint, true);
           if (!res.changed) { noteCheck("up to date"); return; }
           noteCheck("changed on server, loading");
           // Re-check: the user may have started scoring while the request was in flight.
