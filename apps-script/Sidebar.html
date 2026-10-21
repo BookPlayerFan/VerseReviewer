@@ -3150,7 +3150,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-315';
+    const CLIENT_BUILD = 'sync-316';
 
     let queue = [];
     let currentIndex = 0;
@@ -3276,7 +3276,8 @@
             f: c.reference, v: c.version || "", day: c.day || 0,
             stage: c.stage === 'lock' ? 'lock' : 'learn', vi: c.verseIndex || 1, vc: c.verseCount || 1, dot: c.dot || 1,
             part: c.lockPart || "", label: c.label || "Review", unlockAt: c.unlockAt || 0,
-            segs: buildUnits(parseVerseSegments(c.text, c.reference), true).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
+            hdr: c.stage === 'lock' ? '' : learnStatus(c),
+            segs: learnUnits(c).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
           };
         });
         const sig = JSON.stringify(cards);
@@ -4245,6 +4246,50 @@
       });
     }
 
+    // ── Learn steps (parts) ──
+    // A reference started under the learn plan arrives with card.plan: its steps as [firstVerse, lastVerse, parts, firstPhrase, endPhrase] (0-based). A step is
+    // whole verses (two or more are joined into one step) or one part of a long verse, cut at phrase breaks. Every piece carries the step it belongs to in
+    // `vi` (the way it carries its verse on an older reference), so revealing, hints and the early view all work per step with no other change.
+    function learnUnits(card) {
+      const units = buildUnits(parseVerseSegments(card.text, card.reference), true);
+      const plan = card && card.stage !== 'lock' ? card.plan : null;
+      if (!plan || !plan.length) return units;
+      const seen = {};
+      units.forEach(function(u) {
+        const k = seen[u.vi] = seen[u.vi] === undefined ? 0 : seen[u.vi] + 1;   // which phrase of its verse this piece is
+        for (let si = 0; si < plan.length; si++) {
+          const p = plan[si];
+          if (u.vi >= p[0] && u.vi <= p[1] && (p[2] <= 1 || (k >= p[3] && k < p[4]))) { u.verse = u.vi; u.vi = si; break; }
+        }
+      });
+      return units;
+    }
+    function stepWord(card) { return card && card.pm ? "Part" : "Verse"; }
+    // What a step covers, for the bar: "v17\u201318" (joined verses), "v13 a\u2013b" (part of a verse), "a\u2013b" (part of a single-verse reference).
+    function stepCover(card) {
+      const pl = card.plan, p = pl && pl[(card.verseIndex || 1) - 1];
+      if (!p) return "";
+      const segs = parseVerseSegments(card.text, card.reference);
+      const numOf = function(i) { return segs[i] && segs[i].num ? segs[i].num : String(i + 1); };
+      const many = segs.length > 1;
+      if (p[2] > 1) {
+        const a = String.fromCharCode(97 + p[3]), b = String.fromCharCode(97 + p[4] - 1);
+        return (many ? "v" + numOf(p[0]) + " " : "") + (a === b ? a : a + "\u2013" + b);
+      }
+      if (!many) return "";
+      return p[0] === p[1] ? "v" + numOf(p[0]) : "v" + numOf(p[0]) + "\u2013" + numOf(p[1]);
+    }
+    // The line at the left of the bar above a Learn card.
+    function learnStatus(card) {
+      const vc = card.verseCount || 1;
+      if (card.pm) {
+        const cov = stepCover(card);
+        if (vc === 1) return cov ? "Verses " + cov.replace(/^v/, "") : "Single verse";   // the whole reference joined into one step
+        return "Part " + (card.verseIndex || 1) + " of " + vc + (cov ? " \u00b7 " + cov : "");
+      }
+      return vc > 1 ? "Verse " + (card.verseIndex || 1) + " of " + vc : "Single verse";
+    }
+
     // Flatten verses into the pieces that are shown and revealed. New tab: long verses split into phrases (a, b, c...).
     // Review tab: one piece per verse. Only the first piece of a verse carries the verse number.
     function buildUnits(segs, split) {
@@ -4358,7 +4403,7 @@
       summaryEl.style.display = "none";
 
       isFlipped = false;
-      parsedSegments = buildUnits(parseVerseSegments(card.text, card.reference), true);   // New tab: long verses split into phrases
+      parsedSegments = learnUnits(card);   // New tab: long verses split into phrases; each piece's vi is its learn step
       segmentStates = parsedSegments.map(() => 'hidden');
       revealCursor = -1;
       startHints(card);
@@ -4474,7 +4519,7 @@
     function lockedText(card) {
       const when = clockWords(card.unlockAt);
       if (card.stage === 'lock') return card.lockPart === 'pm' ? "Promote opens " + when : "Lock opens " + when;
-      if ((card.dot || 1) === 1) return card.verseIndex > 1 ? "Verse " + card.verseIndex + " starts " + when : "Starts " + when;
+      if ((card.dot || 1) === 1) return card.verseIndex > 1 ? stepWord(card) + " " + card.verseIndex + " starts " + when : "Starts " + when;
       return "Next review " + when;
     }
 
@@ -4524,7 +4569,7 @@
       if (isLocked(card)) add(label + " Now", label === "Review" ? "" : "go", function() { pressLearning("now"); });
       if (card.stage === 'learn') {
         const last = !(card.verseIndex < card.verseCount);
-        add(last ? "Skip to Lock" : "Next Verse", "alt", function() { pressLearning("skip"); });
+        add(last ? "Skip to Lock" : (card.pm ? "Next Part" : "Next Verse"), "alt", function() { pressLearning("skip"); });
       }
       if (card.stage === 'lock' && !isLocked(card)) add("Keep in Lock another day", "alt", function() { pressLearning("again"); });
       add("Cards in progress \u203a", "alt", function() { openProgressList(); });
@@ -4726,7 +4771,7 @@
         ? '<span class="hint-flag' + (hintLevel === 5 ? ' off' : '') + '" role="button" aria-label="Hint level" onclick="hintFlagTap(event)">' + bulbSvg(hintLevel) + '</span>'
         : '';
       const status = learn
-        ? (multi ? `Verse ${lc.verseIndex} of ${lc.verseCount}` : 'Single verse')
+        ? learnStatus(lc)
         : (parsedSegments.length > 1
           ? `${revealedCount} of ${parsedSegments.length} revealed`
           : (allRevealed ? 'Revealed' : 'Tap to reveal'));
@@ -5106,7 +5151,7 @@
         fillCurrentPip();
         setTimeout(pipFinale, PIP_FILL_MS);
         const nextVerse = (card.verseIndex || 1) < (card.verseCount || 1);
-        if (nextVerse) setTimeout(function() { if (startedIn === epoch) swapDoneLabel("Verse " + (card.verseIndex || 1) + " done \u2713"); }, 450);   // the bar says the verse is done while the dots celebrate
+        if (nextVerse) setTimeout(function() { if (startedIn === epoch) swapDoneLabel(stepWord(card) + " " + (card.verseIndex || 1) + " done \u2713"); }, 450);   // the bar says the verse is done while the dots celebrate
         setTimeout(function() {
           if (startedIn !== epoch) return;
           // the dots lift into the pill (which turns into Lock after the last verse), then the next state comes out of it
@@ -5133,11 +5178,11 @@
     function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
     function lDayBase(ms) { return ms; }   // days run midnight to midnight (same as the server's learnDayBase_)
     function lDayStart(ms) { return lAt(lDayBase(ms), 1, L_SLOTS[0]); }   // when the next day's first rep opens (6 AM)
-    function lInfo(rep, n) {
+    function lInfo(rep, n, pm) {
       const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
       if (rep <= total) {
         o.verseIndex = Math.ceil(rep / 7); o.dot = ((rep - 1) % 7) + 1;
-        if (o.dot === 7) o.label = o.verseIndex < n ? 'Next Verse' : 'Learned';
+        if (o.dot === 7) o.label = o.verseIndex < n ? (pm ? 'Next Part' : 'Next Verse') : 'Learned';
       } else {
         o.stage = 'lock'; o.verseIndex = n; o.dot = 0;
         if (rep === total + 1) { o.lockPart = 'am'; } else { o.lockPart = 'pm'; o.label = 'Promote'; }
@@ -5196,7 +5241,7 @@
       }, Math.min(Math.max(next - nowSrv(), 0) + 500, 2147483000));
     }
     // The line in the hold menu: where this card stands against the day's schedule.
-    function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? "Verse " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
+    function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? stepWord(card) + " " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
     function repStatus(card) {
       const part = repPart(card);
       const late = lateNow(card).late;
@@ -5207,7 +5252,7 @@
       return { text: part + " \u00b7 " + text, level: lv };
     }
     function predictLearn(card, kind) {
-      const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n);
+      const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n, card.pm);
       let nr, unlock;
       if (kind === 'again') {
         nr = 7 * n + 1; unlock = lDayStart(now);
@@ -5218,7 +5263,7 @@
       } else {
         const pm = lAt(now, 0, 1200); nr = rep + 1; unlock = pm > now ? pm : 0;
       }
-      return Object.assign({}, card, lInfo(nr, n), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 });
+      return Object.assign({}, card, lInfo(nr, n, card.pm), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 });
     }
 
     function scoreCard(action) {
