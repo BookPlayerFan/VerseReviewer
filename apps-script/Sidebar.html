@@ -1099,8 +1099,6 @@
     #picker { z-index: 70; }
     .picker-actions { display: inline-flex; gap: 14px; align-items: center; }
     #picker .picker-close:first-child { color: var(--text-accent); font-weight: 600; }
-    .picker-divider { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-meta);
-      padding: 16px 4px 6px; border-bottom: 1px solid var(--border-card); }
     .picker-note { font-size: 13px; color: var(--badge-pass); min-height: 0; margin: -4px 0 8px; font-weight: 600; }
     .picker-note:empty { display: none; }
     .paste-area { width: 100%; min-height: 200px; resize: none; outline: none; border: 1px solid var(--border-card); border-radius: 10px;
@@ -1253,9 +1251,12 @@
     .picker-list { --fade: var(--bg-card); flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
     #treasuryView, #searchView, #upcomingView { touch-action: pan-y; }
-    .picker-item { display: block; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0;
+    .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
       box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
       color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
+    .picker-item .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+    .picker-item .pk-added { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
+    .picker-item .pk-parts { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); }
     .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
 
     .notice.is-error { color: var(--badge-fail); }
@@ -3149,7 +3150,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-313';
+    const CLIENT_BUILD = 'sync-314';
 
     let queue = [];
     let currentIndex = 0;
@@ -6139,27 +6140,35 @@
         box.appendChild(e);
         return;
       }
-      // Verses that have waited more than 14 days go below a divider (Bible order is kept within each group).
-      const LONG_WAIT = 14;
-      const recent = shown.filter(function(it) { return !(it.d > LONG_WAIT); });
-      const old = shown.filter(function(it) { return it.d > LONG_WAIT; });
-      const ordered = recent.concat(old);
-      ordered.forEach(function(it, idx) {
-        if (old.length && recent.length && idx === recent.length) {
-          const dv = document.createElement("div");
-          dv.className = "picker-divider";
-          dv.textContent = "Waiting over 14 days";
-          box.appendChild(dv);
-        } else if (old.length && !recent.length && idx === 0) {
-          const dv = document.createElement("div");
-          dv.className = "picker-divider";
-          dv.textContent = "Waiting over 14 days";
-          box.appendChild(dv);
-        }
+      // Oldest added first. Verses added on the same day (the sheet only keeps the date) stay in sheet order; verses with no date go last.
+      const ordered = shown.slice().sort(function(x, y) {
+        const ax = x.a || "9999", ay = y.a || "9999";
+        return ax < ay ? -1 : ax > ay ? 1 : (x.r || 0) - (y.r || 0);
+      });
+      const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      ordered.forEach(function(it) {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "picker-item";
-        b.textContent = it.f;
+        const main = document.createElement("span");
+        main.className = "pk-main";
+        const ref = document.createElement("span");
+        ref.className = "pk-ref";
+        ref.textContent = it.f;
+        main.appendChild(ref);
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(it.a || "");
+        if (m) {
+          const sub = document.createElement("span");
+          sub.className = "pk-added";
+          sub.textContent = "Added " + MON[Number(m[2]) - 1] + " " + Number(m[3]);
+          main.appendChild(sub);
+        }
+        b.appendChild(main);
+        const n = Math.max(1, Number(it.n) || 1);
+        const parts = document.createElement("span");
+        parts.className = "pk-parts";
+        parts.textContent = n + (n === 1 ? " part" : " parts");
+        b.appendChild(parts);
         const heldItem = attachLongPress(b, function() { showPreview(it, true, true); });
         b.onclick = function() { if (heldItem()) return; showPreview(it); };
         box.appendChild(b);

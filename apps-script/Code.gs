@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-106'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-107'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1286,7 +1286,10 @@ function listUnassigned() {
       // Days since the date in column C (when it was added), or null if there is none.
       const added = toMidnight_(data[i][2]);
       const waiting = added ? Math.max(0, Math.round((todayMs - added.getTime()) / 86400000)) : null;
-      out.push({ r: i + 1, f: ref, v: String(data[i][6] || '').trim(), t: String(data[i][7] || '').trim(), d: waiting });
+      // a = the add date as yyyy-MM-dd (or ''), n = how many parts it takes to learn (for now one per verse; the split/join plan will replace this).
+      const a = added ? Utilities.formatDate(added, Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
+      const t = String(data[i][7] || '').trim();
+      out.push({ r: i + 1, f: ref, v: String(data[i][6] || '').trim(), t: t, d: waiting, a: a, n: verseCount_(t) });
     }
   }
   return out;
