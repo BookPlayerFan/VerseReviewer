@@ -611,10 +611,9 @@
     /* A New card with a rep waiting: the filled dots turn amber, a gentle reminder (late-2 is no longer used) */
     .pips-container.late-1 .pip.filled { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245, 158, 11, 0.45); }
     .pips-container.late-1 .pip.cur { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25); }
+    .meta-tag .late-note { margin-left: 8px; font-size: 12px; font-weight: 700; color: var(--text-repeat); vertical-align: middle; }
     .pips-container.late-2 .pip.cur { border-color: #e5484d; box-shadow: 0 0 0 2px rgba(229, 72, 77, 0.25); }
     .pips-container.late-2 .pip.filled { background: #e5484d; border-color: #e5484d; box-shadow: 0 0 5px rgba(229, 72, 77, 0.45); }
-    .lm-st.late-1 { color: #d98200; font-weight: 700; }
-    .lm-st.late-2 { color: #e5484d; font-weight: 700; }
 
     /* Fast-Track Glowing Pip */
     .fast-track-pip {
@@ -844,18 +843,7 @@
     .pt-note { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; }   /* Review bar: Card N of M */
     .pt-note b { font-weight: 800; }
     .v-num.dim { opacity: 0.45; }                           /* verses other than the one you are learning today */
-    .lm-item { display: block; width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 700;
-      background: var(--btn-restart-bg); color: var(--btn-restart-text); }
-    .lm-item.go { background: var(--btn-pass-bg); color: var(--btn-pass-text); }
-    .lm-item.alt { background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border-card); }
-    .lm-item.lm-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; text-align: left; font-weight: 600; }
-    .lm-row .lm-l { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-    .lm-row .lm-ref { font-weight: 700; }
-    .lm-row small { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    .lm-row .lm-r { font-size: 12px; font-weight: 700; color: var(--text-accent); flex: none; text-align: right; }
-    #lmList.lm-scroll { max-height: 52vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .vp-note { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-align: center; }
-    .lm-note { font-size: 13px; color: var(--text-muted); text-align: center; margin: 0 0 8px; }
     .shortcut-hint { font-size: 11px; opacity: 0.65; font-weight: 500; margin-top: 2px; }
     @media (max-width: 480px) {
       .shortcut-hint { display: none; }
@@ -1273,6 +1261,15 @@
     .picker-item .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .picker-item .pk-added { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
     .picker-item .pk-parts { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); }
+    .ip-head { display: flex; justify-content: space-between; margin: 12px 4px 2px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-meta); }
+    .ip-head:first-child { margin-top: 2px; }
+    .ip-divider { height: 1px; margin: 14px 0 0; background: var(--text-meta); opacity: .45; }
+    .ip-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
+      box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500; color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
+    .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+    .ip-item .ip-when { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
+    .ip-item .ip-when.open { color: var(--text-accent); font-weight: 600; }
+    .ip-item .ip-part { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); text-align: right; }
     .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
 
     .notice.is-error { color: var(--badge-fail); }
@@ -1474,7 +1471,6 @@
         <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
         <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
         <div class="help-row"><span>Undo the last review</span><kbd>Hold Review tab</kbd></div>
-        <div class="help-row"><span>Press early, or skip ahead (New tab)</span><kbd>Hold the button</kbd></div>
         <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
         <div class="help-sub">Verse lists</div>
         <div class="help-row"><span>Open a book on the map; switch books while one is open</span><kbd>Tap its tile</kbd></div>
@@ -1501,14 +1497,6 @@
     </div>
   </div>
 
-  <div class="pv" id="learnMenu" onclick="if (event.target === this) closeLearnMenu()">
-    <div class="pv-card">
-      <div class="pv-head" id="lmTitle" style="color: var(--text-primary); font-size: 16px;">Options</div>
-      <div class="lm-note" id="lmNote"></div>
-      <div id="lmList"></div>
-      <div class="pv-btns"><button type="button" class="pv-close" id="lmCancel" onclick="closeLearnMenu()">Cancel</button></div>
-    </div>
-  </div>
 
   <div class="pv" id="pasteModal" onclick="if (event.target === this) closePaste()">
     <div class="pv-card paste-card">
@@ -2552,7 +2540,6 @@
       const st = vpState;
       if (!st) return;
       vpState = null;
-      if (st.fromProgress && !instant) setTimeout(function() { if (!vpState) openProgressList(); }, 220);   // the peek came from the Cards in progress list: back to it
       ctxToken++; // an answer still on its way is kept, but not drawn
       if (st.ro) { try { st.ro.disconnect(); } catch (e) {} }
       const done = function() { if (st.dim.parentNode) st.dim.parentNode.removeChild(st.dim); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap); };
@@ -3168,7 +3155,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-321';
+    const CLIENT_BUILD = 'sync-322';
 
     let queue = [];
     let currentIndex = 0;
@@ -3268,9 +3255,6 @@
       const heldTab = attachLongPress(tn, function() { addNewVerse(); });
       tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       // hold the Review tab to undo the last review (asks first)
-      const pb = document.getElementById("btnPass");
-      const heldPass = attachLongPress(pb, function() { openLearnMenu(); }, function() { return mode === "learning" && !!learningCards[learningIndex] && !isScoring; });
-      pb.addEventListener("click", function(e) { if (heldPass()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       const tr = document.getElementById("tabReview");
       const heldRevTab = attachLongPress(tr, function() { openUndoConfirm(); });
       tr.addEventListener("click", function(e) { if (heldRevTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
@@ -4572,42 +4556,8 @@
     }
 
     // ── Hold menu on the New card's button ──
-    function openLearnMenu() {
-      const card = learningCards[learningIndex];
-      if (!card || isScoring || learnPending) return;
-      const list = document.getElementById("lmList");
-      list.textContent = "";
-      const add = function(text, cls, fn) {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "lm-item " + cls; b.textContent = text;
-        b.onclick = function() { closeLearnMenu(); fn(); };
-        list.appendChild(b);
-      };
-      const label = card.label || "Review";
-      if (isLocked(card)) add(label + " Now", label === "Review" ? "" : "go", function() { pressLearning("now"); });
-      if (card.stage === 'learn') {
-        const last = !(card.verseIndex < card.verseCount);
-        add(last ? "Skip to Lock" : (card.pm ? "Next Part" : "Next Verse"), "alt", function() { pressLearning("skip"); });
-      }
-      if (card.stage === 'lock' && !isLocked(card)) add("Keep in Lock another day", "alt", function() { pressLearning("again"); });
-      add("Cards in progress \u203a", "alt", function() { openProgressList(); });
-      lmShowCancel("Cancel");
-      document.getElementById("lmTitle").textContent = card.reference;
-      const note = document.getElementById("lmNote"), st = repStatus(card);
-      note.className = "lm-note";
-      note.textContent = "";
-      const stLine = document.createElement("div");
-      stLine.className = st.level ? "lm-st late-" + st.level : "lm-st";
-      stLine.textContent = st.text;
-      note.appendChild(stLine);
-      if (isLocked(card)) { const lk = document.createElement("div"); lk.textContent = lockedText(card); note.appendChild(lk); }
-      document.getElementById("learnMenu").classList.add("open");
-    }
-    function closeLearnMenu() { document.getElementById("learnMenu").classList.remove("open"); }
-    function lmShowCancel(t) { const b = document.getElementById("lmCancel"); if (b) b.textContent = t; document.getElementById("lmList").classList.remove("lm-scroll"); }
-
-    // Cards in progress: every verse in Learn or Lock, in the order the New tab shows them, each with when it opens. Read only: tapping one peeks at its verse
-    // (a Lock card that is not open yet stays out of the tab until its time) and closing the peek returns to the list.
+    // Cards in progress: every verse in Learn or Lock, in the order the New tab shows them, each with when it opens. Shown at the top of the Choose a verse page.
+    // Read only: tapping one peeks at its verse (a Lock card that is not open yet stays out of the tab until its time).
     function progressWhen(c) {
       if (!isLocked(c)) return "Open now";
       const d = new Date(c.unlockAt), t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -4615,33 +4565,6 @@
       const tm = new Date(today.getTime() + 86400000);
       return "Opens " + (sameDay ? "" : d.toDateString() === tm.toDateString() ? "tomorrow " : d.toLocaleDateString([], { weekday: "short" }) + " ") + t;
     }
-    function openProgressList() {
-      const all = learningCards.concat(learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; }));
-      const list = document.getElementById("lmList");
-      list.textContent = "";
-      all.forEach(function(c) {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "lm-item alt lm-row";
-        const l = document.createElement("span"); l.className = "lm-l";
-        const r1 = document.createElement("span"); r1.className = "lm-ref"; r1.textContent = c.reference;
-        const r2 = document.createElement("small"); r2.textContent = progressWhen(c);
-        l.appendChild(r1); l.appendChild(r2);
-        const rt = document.createElement("span"); rt.className = "lm-r"; rt.textContent = repPart(c);
-        b.appendChild(l); b.appendChild(rt);
-        b.onclick = function() {
-          closeLearnMenu();
-          openVersePopup({ f: c.reference, g: 0, v: c.version || "", t: c.text || "", note: repPart(c) + " \u00b7 " + progressWhen(c).toLowerCase() }, null);
-          if (vpState) vpState.fromProgress = true;
-        };
-        list.appendChild(b);
-      });
-      list.classList.add("lm-scroll");
-      document.getElementById("lmTitle").textContent = "In progress";
-      const note = document.getElementById("lmNote"); note.className = "lm-note"; note.textContent = all.length + (all.length === 1 ? " card" : " cards");
-      document.getElementById("lmCancel").textContent = "Close";
-      document.getElementById("learnMenu").classList.add("open");
-    }
-
     // Gives the verse card its rank's color theme (no theme for New verses).
     function setCardRank(cardEl, g) {
       for (let i = 1; i <= 8; i++) cardEl.classList.remove("rank-" + i);
@@ -5153,7 +5076,7 @@
       pressLearning("press");
     }
 
-    // kind: 'press' (the button), 'now' (hold menu, ignores the lock), 'skip' (Next Verse / Skip to Lock) or 'again' (Keep in Lock another day).
+    // kind: 'press' (the button). 'now', 'skip' and 'again' (press early, skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
     function pressLearning(kind) {
       if (isScoring || learnPending) return;
       const card = learningCards[learningIndex];
@@ -5265,6 +5188,14 @@
       const pips = document.getElementById("cardPips");
       pips.classList.toggle("late-1", lv === 1);
       pips.classList.toggle("late-2", lv >= 2);
+      // a small note beside the Learn / Lock pill, only while a rep is behind
+      const meta = document.getElementById("cardMeta");
+      let ln = meta.querySelector(".late-note");
+      const behind = card ? lateNow(card).late : 0;
+      if (behind > 0 && meta.querySelector(".rank-badge.is-new")) {
+        if (!ln) { ln = document.createElement("span"); ln.className = "late-note"; meta.appendChild(ln); }
+        ln.textContent = behind + (behind === 1 ? " rep behind" : " reps behind");
+      } else if (ln) ln.remove();
     }
     function scheduleLate(card) {
       if (lateTimer) { clearTimeout(lateTimer); lateTimer = null; }
@@ -5276,17 +5207,8 @@
         if (mode === 'learning' && c) { paintLateState(c); scheduleLate(c); }
       }, Math.min(Math.max(next - nowSrv(), 0) + 500, 2147483000));
     }
-    // The line in the hold menu: where this card stands against the day's schedule.
+    // The words for where a card is: "Part 2 \u00b7 Rep 3 of 7", "Promote" ... (shown beside each card in the In progress list).
     function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? stepWord(card) + " " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
-    function repStatus(card) {
-      const part = repPart(card);
-      const late = lateNow(card).late;
-      let text, lv;
-      // A late rep is made up by pressing again (the next rep opens at once when its time has passed), so the line says how many are behind right now.
-      if (!late) { text = "on track"; lv = 0; }
-      else { text = late + (late === 1 ? " rep behind" : " reps behind"); lv = 1; }   // the same count that turns the dots amber
-      return { text: part + " \u00b7 " + text, level: lv };
-    }
     function predictLearn(card, kind) {
       const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n, card.pm);
       let nr, unlock;
@@ -6206,6 +6128,31 @@
       const q = document.getElementById("pickerSearch").value.trim().toLowerCase();
       const box = document.getElementById("pickerList");
       box.textContent = "";
+      const shown = pickerItems.filter(function(it) { return !q || it.f.toLowerCase().indexOf(q) >= 0; });
+      // Cards in progress sit above the list (nothing to show: no section), then a divider, then the verses you can add
+      const prog = learningCards.concat(learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; }))
+        .filter(function(c) { return !q || c.reference.toLowerCase().indexOf(q) >= 0; });
+      const head = function(text, n) {
+        const h = document.createElement("div"); h.className = "ip-head";
+        const a = document.createElement("span"); a.textContent = text; h.appendChild(a);
+        if (n !== null) { const b = document.createElement("span"); b.textContent = n; h.appendChild(b); }
+        box.appendChild(h);
+      };
+      if (prog.length) {
+        head("In progress", prog.length);
+        prog.forEach(function(c) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item";
+          const main = document.createElement("span"); main.className = "ip-main";
+          const r = document.createElement("span"); r.className = "ip-ref"; r.textContent = c.reference; main.appendChild(r);
+          const w = document.createElement("span"); w.className = "ip-when" + (isLocked(c) ? "" : " open"); w.textContent = progressWhen(c); main.appendChild(w);
+          b.appendChild(main);
+          const p = document.createElement("span"); p.className = "ip-part"; p.textContent = repPart(c); b.appendChild(p);
+          b.onclick = function() { openVersePopup({ f: c.reference, g: 0, v: c.version || "", t: c.text || "", note: repPart(c) + " \u00b7 " + progressWhen(c).toLowerCase() }, null); };
+          box.appendChild(b);
+        });
+        const dv = document.createElement("div"); dv.className = "ip-divider"; box.appendChild(dv);
+        head("Add new", pickerLoading || !shown.length ? null : shown.length);
+      }
       if (pickerLoading) {
         const e = document.createElement("div");
         e.className = "picker-empty";
@@ -6213,7 +6160,6 @@
         box.appendChild(e);
         return;
       }
-      const shown = pickerItems.filter(function(it) { return !q || it.f.toLowerCase().indexOf(q) >= 0; });
       if (shown.length === 0) {
         const e = document.createElement("div");
         e.className = "picker-empty";
