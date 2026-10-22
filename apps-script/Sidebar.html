@@ -1243,6 +1243,8 @@
       padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
     }
     .picker.open { display: flex; }
+    #picker.inline { bottom: var(--tab-h); padding-bottom: 8px; z-index: 39; }   /* the New tab with no card: the tab bar stays, the other tabs' pages sit above it */
+    #picker.inline .pk-cancel { display: none; }
     .picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
     .picker-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
     .picker-close { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
@@ -1530,7 +1532,7 @@
       <span class="picker-title">Choose a verse</span>
       <span class="picker-actions">
         <button type="button" class="picker-close" onclick="startPaste()">Paste verse</button>
-        <button type="button" class="picker-close" onclick="closePicker()">Cancel</button>
+        <button type="button" class="picker-close pk-cancel" onclick="closePicker()">Cancel</button>
       </span>
     </div>
     <div class="picker-note" id="pickerNote"></div>
@@ -1904,7 +1906,10 @@
     function isLocked(c) { return !!(c && c.unlockAt && c.unlockAt > nowSrv()); }
     // A Lock / Promote card that is not open yet stays out of the New tab until its time comes (it waits in learningHeld).
     let learningHeld = [];
-    function hiddenLock(c) { return !!(c && c.stage === 'lock' && isLocked(c)); }
+    // viewRef: a card picked from the In progress list to look at. A Lock / Promote card that is not open yet stays in the tab while it is being viewed (its button is greyed).
+    let viewRef = null;
+    function hiddenLock(c) { return !!(c && c.stage === 'lock' && isLocked(c) && c.reference !== viewRef); }
+    function clearView() { if (viewRef === null) return; viewRef = null; sortLearning(); }
     function sortLearning() {
       const all = learningCards.concat(learningHeld);
       learningCards = all.filter(function(c) { return !hiddenLock(c); });
@@ -3153,7 +3158,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-329';
+    const CLIENT_BUILD = 'sync-330';
 
     let queue = [];
     let currentIndex = 0;
@@ -3388,6 +3393,7 @@
       learningHeld = [];
       learningSeen = {};
       learnPending = false;
+      viewRef = null;
       sortLearning();
       learningIndex = 0;
       mode = (session.mode === 'learning') ? 'learning' : 'review';
@@ -4347,6 +4353,7 @@
     function render() {
       closeContext();
       clearLevelUp();
+      if (document.getElementById("picker").classList.contains("inline") && !(mode === 'learning' && !learningCards[learningIndex])) closePicker();   // the New page is only the tab while there is no card
       if (mode === 'learning') renderLearning();
       else renderCard();
       updateFailLock();
@@ -4357,6 +4364,7 @@
 
     function setMode(m) {
       mode = m;
+      if (m !== 'learning') clearView();
       // Changing tabs doesn't change the deck, so a review from the last couple of minutes can still be undone afterwards
       const keep = { id: undoId, label: undoLabel, exp: undoExp };
       enqueueSubmit(null, snapshot(currentIndex)); // saves the screen you're on so any device reopens here
@@ -4393,6 +4401,7 @@
       updateStatLists(); // an open Repeats / Leveled Up list from the Review screen must not follow you here
       setSummaryButtons(!held, false);
       renderTomorrowNote();
+      openNewPage();   // with no card to show, the New tab is the In progress / Add new page
     }
 
     function renderLearning() {
@@ -4504,14 +4513,15 @@
       paintLearningButton(card);
     }
 
-    // The one button: blue Review, or green Next Part / Learned / Promote. Dimmed while it waits for its unlock time (still tappable).
+    // The one button: blue Review, or green Next Part / Learned / Promote. While the card waits for its time it is greyed and says when it opens ("Opens 8:00 PM"); a press does nothing.
+    function opensWords(ms) { return "Opens " + clockWords(ms).replace(/^at /, ""); }
     function paintLearningButton(card) {
       if (learnHintTimer) { clearTimeout(learnHintTimer); learnHintTimer = null; }
-      const label = card.label || "Review";
+      const label = card.label || "Review", waiting = isLocked(card);
       const b = document.getElementById("btnPass");
-      document.getElementById("btnPassText").textContent = label;
+      document.getElementById("btnPassText").textContent = waiting ? opensWords(card.unlockAt) : label;
       b.classList.toggle("clear", label === "Review");
-      b.classList.toggle("locked", isLocked(card) || learnPending);
+      b.classList.toggle("locked", waiting || learnPending);
     }
 
     function clockWords(ms) {
@@ -4531,6 +4541,7 @@
 
     // Puts the server's version of a card on screen. Stays on the same card (keeping what you have revealed) unless another card is now due.
     function applyLearnCard(c) {
+      viewRef = null;
       const shown = learningCards[learningIndex] ? learningCards[learningIndex].reference : null;
       const prev = learningCards.concat(learningHeld).find(function(x) { return x.reference === c.reference; });
       const oldVerse = prev ? prev.verseIndex : 0;
@@ -4568,6 +4579,18 @@
       const today = new Date(); const sameDay = d.toDateString() === today.toDateString();
       const tm = new Date(today.getTime() + 86400000);
       return "Opens " + (sameDay ? "" : d.toDateString() === tm.toDateString() ? "tomorrow " : d.toLocaleDateString([], { weekday: "short" }) + " ") + t;
+    }
+    // Tapping a card in the In progress list shows that card in the New tab, even when it is not open yet (its button then says when it opens and does nothing).
+    function viewLearnCard(ref) {
+      if (isScoring || learnPending) return;
+      closePicker();
+      if (mode !== 'learning') goTab('new');
+      viewRef = ref;
+      sortLearning();
+      const i = learningCards.findIndex(function(x) { return x.reference === ref; });
+      if (i < 0) { viewRef = null; sortLearning(); render(); return; }
+      learningIndex = i;
+      render();
     }
     // Gives the verse card its rank's color theme (no theme for New verses).
     function setCardRank(cardEl, g) {
@@ -5943,9 +5966,18 @@
 
     let pickerLoading = false;
     let pickerToken = 0;
-    function addNewVerse() {
+    function addNewVerse() { openPicker(false); }
+    // The New tab with no card showing: the same page, as the tab itself (the tab bar stays; no Cancel).
+    function openNewPage() {
+      const pk = document.getElementById("picker");
+      if (pk.classList.contains("open") && pk.classList.contains("inline")) { renderPicker(); return; }   // already up: just refresh it
+      if (pk.classList.contains("open")) return;                                                         // the hold version is up over it
+      openPicker(true);
+    }
+    function openPicker(inline) {
       const btn = document.getElementById("btnAddVerse");
-      if (!btn || btn.disabled || pickerLoading) return;
+      if (!inline && (!btn || btn.disabled)) return;
+      if (pickerLoading) return;
       showSummaryNotice("");
       // open right away; the list fills in when the sheet answers
       const token = ++pickerToken;
@@ -5953,7 +5985,9 @@
       pickerItems = [];
       document.getElementById("pickerNote").textContent = "";
       document.getElementById("pickerSearch").value = "";
-      document.getElementById("picker").classList.add("open");
+      const pk = document.getElementById("picker");
+      pk.classList.toggle("inline", !!inline);
+      pk.classList.add("open");
       renderPicker();
       google.script.run
         .withSuccessHandler(function(list) {
@@ -5965,7 +5999,7 @@
         .withFailureHandler(function(err) {
           pickerLoading = false;
           if (token !== pickerToken) return;
-          closePicker();
+          if (!document.getElementById("picker").classList.contains("inline")) closePicker();
           showSummaryNotice("Couldn't load verses: " + ((err && err.message) || err), true);
         })
         .listUnassigned();
@@ -6193,7 +6227,8 @@
 
     function closePicker() {
       pickerToken++; pickerLoading = false;
-      document.getElementById("picker").classList.remove("open");
+      const pk = document.getElementById("picker");
+      pk.classList.remove("open"); pk.classList.remove("inline");
     }
 
     function renderPicker() {
@@ -6219,7 +6254,7 @@
           const w = document.createElement("span"); w.className = "ip-when" + (isLocked(c) ? "" : " open"); w.textContent = progressWhen(c); main.appendChild(w);
           b.appendChild(main);
           const p = document.createElement("span"); p.className = "ip-part"; p.textContent = repPart(c); b.appendChild(p);
-          b.onclick = function() { openVersePopup({ f: c.reference, g: 0, v: c.version || "", t: c.text || "", note: repPart(c) + " \u00b7 " + progressWhen(c).toLowerCase() }, null); };
+          b.onclick = function() { viewLearnCard(c.reference); };
           box.appendChild(b);
         });
         const dv = document.createElement("div"); dv.className = "ip-divider"; box.appendChild(dv);
