@@ -3182,7 +3182,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-337';
+    const CLIENT_BUILD = 'sync-338';
 
     let queue = [];
     let currentIndex = 0;
@@ -4377,11 +4377,11 @@
       const c = queue[currentIndex];
       return !!c && (c.group === 0 || isFlipped);
     }
-    // Pass / Level Up / Recover follow the same rule as Miss: some of the verse must be showing. A repeat card's Clear (you keep looking at it until you know it) is exempt.
+    // Pass / Level Up / Recover / Clear follow the same rule as Miss: the whole reference must be unblurred first.
     function canPass() {
       if (mode === 'learning') { const lc = learningCards[learningIndex]; return !!lc && (lc.stage !== 'lock' || isFlipped); }
       const c = queue[currentIndex];
-      return !!c && (c.group === 0 || c.isRepeat || isFlipped);
+      return !!c && (c.group === 0 || isFlipped);   // a repeat card's Clear needs the whole reference revealed too
     }
 
     function render() {
