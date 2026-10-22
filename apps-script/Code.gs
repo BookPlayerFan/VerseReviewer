@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-123'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-124'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -292,8 +292,15 @@ function stampLearningDates_(preRead) {
 const LEARN_SLOTS = [6 * 60, 8 * 60, 10 * 60, 12 * 60, 14 * 60, 16 * 60, 20 * 60]; // minutes after midnight
 const REPS_PER_VERSE = 7;
 const DAY_START_MIN = 0;            // a Learn/Lock day runs midnight to midnight (which day a time belongs to); the first rep of the day opens at 6 AM (LEARN_SLOTS[0])
-const LOCK_PM_MIN = 20 * 60;        // Lock PM unlocks at 8 PM
-const START_LIVE_BEFORE_MIN = 18 * 60; // a verse added before 6 PM starts today (the reps whose time has already passed open at once, to catch up); later it waits for 6 AM tomorrow
+const LOCK_PM_MIN = 20 * 60;        // the evening Lock slot opens at 8 PM
+// Lock: a verse that has finished Learn comes up at 6 AM and 8 PM, one attempt per slot (Pass or Miss), until it has been passed twice in a row.
+// A Lock card's rep (column D) is LOCK_BASE + passes in a row + attempts / 100: 1000.00 = nothing yet, 1001.03 = one pass in a row after 3 attempts. It no longer
+// depends on how many steps the learn plan gives the reference, so a change to the plan cannot move a Lock card. (Older Lock rows count the reps after the last
+// Learn rep instead; they are still read, as streak 0 unless they are exactly one past the first Lock rep.)
+const LOCK_BASE = 1000;
+const LOCK_SLOTS = [6 * 60, 20 * 60];
+const PASSES_TO_CLEAR = 2;
+const START_LIVE_BEFORE_MIN = 12 * 60; // a verse added before noon starts today (the reps whose time has already passed open at once, to catch up); later it can be read at once but its reps start at 6 AM tomorrow
 // A rep is "late" an hour after it opens (the 6 AM rep: after 7 AM; the 8 PM rep and Lock PM: after 9 PM; Lock AM: after 7 AM). The dots turn amber (one late rep
 // today) or red (two or more). A late rep is made up by pressing: the next rep of the day opens at once when its time has already passed.
 const LATE_GRACE_MIN = 60;
@@ -318,7 +325,7 @@ function minsOfDay_(ms) {
 function lateDeadline_(slotMs, stage, lockPart) {
   const m = minsOfDay_(slotMs);
   if (stage === 'lock') {
-    const lim = lockPart === 'pm' ? LATE_LOCK_PM_MIN : LATE_LOCK_AM_MIN;
+    const lim = m >= 12 * 60 ? LATE_LOCK_PM_MIN : LATE_LOCK_AM_MIN;   // by the slot it opened at (6 AM or 8 PM), whatever the streak
     return m < lim ? atClock_(slotMs, 0, lim) : slotMs + LATE_GRACE_MIN * 60000;
   }
   if (m === LEARN_SLOTS[0]) return atClock_(slotMs, 0, LATE_FIRST_SLOT_MIN);
@@ -359,7 +366,7 @@ function nextDayStart_(ms) {
   return atClock_(learnDayBase_(ms), 1, LEARN_SLOTS[0]);
 }
 
-// When a verse added at `ms` first opens: the 6 AM slot of today when it is added before 6 PM (that time may already be past, so the reps missed so far
+// When a verse added at `ms` first opens: the 6 AM slot of today when it is added before noon (that time may already be past, so the reps missed so far
 // are ready at once and can be caught up with presses in a row), otherwise the next 6 AM. Before 6 AM it opens at 6 AM.
 function startUnlock_(ms) {
   const m = minsOfDay_(ms);
@@ -397,17 +404,42 @@ function verseCountMap_() {
   return map;
 }
 
+// Where a Lock card is, read from its rep (column D): { streak: passes in a row (0 or 1), tries: attempts so far }, or null when the rep is a Learn rep.
+function lockPos_(raw, total) {
+  const v = Number(raw);
+  if (!(v >= 1)) return null;
+  if (v >= LOCK_BASE) {
+    const f = Math.floor(v + 1e-9);
+    return { streak: Math.max(0, Math.min(PASSES_TO_CLEAR - 1, f - LOCK_BASE)), tries: Math.max(0, Math.min(99, Math.round((v - f) * 100))) };
+  }
+  const r = Math.floor(v);
+  if (r > total) return { streak: r === total + 2 ? 1 : 0, tries: 0 };   // an older Lock row
+  return null;
+}
+function lockRep_(streak, tries) { return Math.round((LOCK_BASE + streak + Math.min(99, tries) / 100) * 100) / 100; }
+// The next Lock slot (6 AM or 8 PM) after `now`.
+function nextLockSlot_(now) {
+  for (let d = 0; d < 3; d++) {
+    for (let i = 0; i < LOCK_SLOTS.length; i++) {
+      const t = atClock_(now, d, LOCK_SLOTS[i]);
+      if (t > now) return t;
+    }
+  }
+  return now + 12 * 3600000;
+}
+
 // Everything the screen needs to know about a New card's position.
 function stageInfo_(rep, n, bRaw, now, pm) {
-  const r = Math.max(1, Math.floor(Number(rep) || 1));
   const total = REPS_PER_VERSE * n;
+  const lp = lockPos_(rep, total);
+  const r = Math.max(1, Math.floor(Number(rep) || 1));
   let unlockAt = 0, readyAt = 0;
   if (bRaw instanceof Date) {
     const t = bRaw.getTime();
     if (!isNaN(t)) { readyAt = t; if (t > now) unlockAt = t; }
   }
   const out = { stage: 'learn', verseIndex: 1, verseCount: n, dot: 1, lockPart: '', label: 'Review', unlockAt: unlockAt, readyAt: readyAt };
-  if (r <= total) {
+  if (!lp) {
     out.verseIndex = Math.ceil(r / REPS_PER_VERSE);
     out.dot = ((r - 1) % REPS_PER_VERSE) + 1;
     if (out.dot === REPS_PER_VERSE) out.label = out.verseIndex < n ? (pm ? 'Next Part' : 'Next Verse') : 'Learned';
@@ -415,29 +447,34 @@ function stageInfo_(rep, n, bRaw, now, pm) {
     out.stage = 'lock';
     out.verseIndex = n;
     out.dot = 0;
-    if (r === total + 1) { out.lockPart = 'am'; out.label = 'Review'; }
+    out.tries = lp.tries;
+    if (lp.streak === 0) { out.lockPart = 'am'; out.label = 'Pass'; }     // lockPart is the streak: 'am' = no pass yet, 'pm' = one pass in a row
     else { out.lockPart = 'pm'; out.label = 'Promote'; }
   }
   return out;
 }
 
 // What a press does. Returns { rep, unlock } (unlock 0 = live now) or { promote: true }.
-function nextStep_(info, rep, now) {
+// Learn: the next rep (the last rep of the last step starts Lock, which first opens at 6 AM tomorrow). Lock: action 'miss' puts the streak back to 0, a pass adds 1
+// and the second one in a row clears it; either way the card is back at the next 6 AM / 8 PM slot.
+function nextStep_(info, rep, now, action) {
   if (info.stage === 'learn') {
     if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, unlock: catchUpSlot_(info.dot, now) };   // may be in the past: ready at once
-    return { rep: rep + 1, unlock: nextDayStart_(now) }; // Next Verse or Learned: starts again at 6 AM tomorrow
+    if (info.verseIndex >= info.verseCount) return { rep: LOCK_BASE, unlock: nextDayStart_(now), learned: true };   // Learned: Lock starts at 6 AM tomorrow
+    return { rep: rep + 1, unlock: nextDayStart_(now) };   // Next Verse / Next Part: starts again at 6 AM tomorrow
   }
-  if (info.lockPart === 'am') {
-    const pm = atClock_(now, 0, LOCK_PM_MIN);
-    return { rep: rep + 1, unlock: pm > now ? pm : 0 };
-  }
-  return { promote: true };
+  const streak = info.lockPart === 'pm' ? 1 : 0;
+  const tries = (info.tries || 0) + 1;
+  if (action === 'miss') return { rep: lockRep_(0, tries), unlock: nextLockSlot_(now) };
+  if (streak + 1 >= PASSES_TO_CLEAR) return { promote: true };
+  return { rep: lockRep_(streak + 1, tries), unlock: nextLockSlot_(now) };
 }
+
 
 // Skip Verse (before the last verse) or Skip to Lock (last verse). Learn cards only.
 function skipStep_(info, n, now) {
   if (info.verseIndex < n) return { rep: REPS_PER_VERSE * info.verseIndex + 1, unlock: 0 };
-  return { rep: REPS_PER_VERSE * n + 1, unlock: nextDayStart_(now) };
+  return { rep: LOCK_BASE, unlock: nextDayStart_(now), learned: true };
 }
 
 // A Level 0 row as a card for the screen.
@@ -462,6 +499,7 @@ function learningCard_(row, i, now) {
   const info = stageInfo_(rep, n, row[1], now, pm);
   Object.keys(info).forEach(function(k) { card[k] = info[k]; });
   if (ps && ps.length) { card.plan = ps.map(function(x) { return [x.f, x.l, x.k, x.pa, x.pb]; }); if (pm) card.pm = 1; }
+  if (info.stage === 'lock') card.ago = agoDays_(row[2]);   // days since Learn finished (column C is stamped when the last rep is pressed)
   const li = lateInfo_(info.stage, info.lockPart, info.readyAt, now, info.dot);
   card.late = li.late;            // reps already late right now (the open rep and any slots that went by)
   card.lateAt = li.next;          // when the next one will count as late (the screen repaints then)
@@ -497,9 +535,11 @@ function newCardCounts_(data, now) {
  *   action 'press'  - the button (refused with 'locked' until its unlock time)
  *   action 'now'    - the same step, ignoring the lock (hold menu)
  *   action 'skip'   - Skip Verse / Skip to Lock (Learn cards only)
- *   action 'again'  - Keep in Lock another day (Lock cards that are open): back to Lock AM, opening at 6 AM tomorrow
- * expectedRep is the rep the screen showed, so a second phone that is behind gets 'stale' and the current card.
- * Lock PM is Promote: the verse becomes Bronze rep 1, due tomorrow.
+ *   action 'miss'   - a missed Lock attempt: the passes in a row go back to 0 and the card returns at the next 6 AM / 8 PM slot ('again', the old
+ *                     Keep in Lock another day, is read as a miss)
+ * On Lock the button is Pass: the first pass in a row brings the card back at the next slot, the second one is Promote (the verse becomes Bronze rep 1, due tomorrow).
+ * expectedRep is the rep the screen showed (Lock reps carry the attempts as a decimal), so a second phone that is behind, or a press sent twice, gets 'stale'
+ * and the current card.
  */
 function learnAction(reference, action, expectedRep) {
   const lock = LockService.getScriptLock();
@@ -512,12 +552,13 @@ function learnAction(reference, action, expectedRep) {
     if (!row) return { ok: false, reason: 'moved', message: 'That verse is no longer in the sheet.' };
     const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
     if (!isLevelZero_(vals[4])) return { ok: false, reason: 'notnew', message: 'That verse is not in Learn or Lock.' };
-    if (action !== 'press' && action !== 'now' && action !== 'skip' && action !== 'again') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
+    if (action !== 'press' && action !== 'now' && action !== 'skip' && action !== 'again' && action !== 'miss') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
+    if (action === 'again') action = 'miss';
 
     const now = nowMs_();
     const n = stepCount_(vals);
     const rep = Number(vals[3]) || 1;
-    if (expectedRep !== undefined && expectedRep !== null && Number(expectedRep) !== rep) {
+    if (expectedRep !== undefined && expectedRep !== null && Math.abs(Number(expectedRep) - rep) > 0.001) {
       return { ok: false, reason: 'stale', card: learningCard_(vals, row - 1, now) };
     }
     const info = stageInfo_(rep, n, vals[1], now, planIsParts_(planSteps_(vals[7])));
@@ -526,17 +567,12 @@ function learnAction(reference, action, expectedRep) {
     if (action === 'skip') {
       if (info.stage !== 'learn') return { ok: false, reason: 'noskip', card: learningCard_(vals, row - 1, now) };
       step = skipStep_(info, n, now);
-    } else if (action === 'again') {
-      // The rep number stays the same when this is pressed on Lock AM, so a press that arrives twice is caught by the lock instead: once kept,
-      // the card is not open until 6 AM and a second 'again' is refused.
-      if (info.stage !== 'lock') return { ok: false, reason: 'nolock', card: learningCard_(vals, row - 1, now) };
-      if (info.unlockAt) return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
-      step = { rep: REPS_PER_VERSE * n + 1, unlock: nextDayStart_(now) };
     } else {
-      if (action === 'press' && info.unlockAt) {
+      if (action === 'miss' && info.stage !== 'lock') return { ok: false, reason: 'nolock', card: learningCard_(vals, row - 1, now) };
+      if ((action === 'press' || action === 'miss') && info.unlockAt) {
         return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
       }
-      step = nextStep_(info, rep, now);
+      step = nextStep_(info, rep, now, action === 'miss' ? 'miss' : 'pass');
     }
 
     let promoted = false;
@@ -551,7 +587,8 @@ function learnAction(reference, action, expectedRep) {
       sheet.getRange(row, 4).setValue(step.rep);
       vals[1] = step.unlock ? new Date(step.unlock) : '';
       vals[3] = step.rep;
-      logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : (action === 'again' ? 'Keep' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
+      if (step.learned) { const td = today_(); sheet.getRange(row, 3).setValue(td); vals[2] = td; }   // column C becomes the day Learn finished ("Learned N days ago" on the Lock card)
+      logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : (action === 'miss' ? 'Keep' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
       card = learningCard_(vals, row - 1, now);
     }
 
@@ -1325,7 +1362,7 @@ function listUnassigned() {
   return out;
 }
 
-// Starts learning the verse you picked (Level 0). Its first rep is live now if it is before 6 PM, otherwise it unlocks at 6 AM tomorrow.
+// Starts learning the verse you picked (Level 0). Its first rep is live now if it is before 12 PM, otherwise it unlocks at 6 AM tomorrow.
 function addChosenVerse(rowIndex, reference) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -1354,7 +1391,7 @@ function addChosenVerse(rowIndex, reference) {
         }
       }
     }
-    // Starts today if added before 6 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
+    // Starts today if added before 12 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
     const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
     sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
     return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0 };

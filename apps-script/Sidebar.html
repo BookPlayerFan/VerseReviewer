@@ -846,6 +846,7 @@
 
     .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time); a Review card before anything is revealed: inert */
     .pt-right { display: inline-flex; align-items: center; gap: 10px; }
+    .pt-att { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 15px; }   /* Lock bar, right: Attempt #N, the same look as the left text */
     .pt-note { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; }   /* Review bar: Card N of M */
     .pt-note b { font-weight: 800; }
     .v-num.dim { opacity: 0.45; }                           /* verses other than the one you are learning today */
@@ -1457,14 +1458,13 @@
       <div class="help-scroll" id="helpPaneInfo">
         <div class="help-sub">A new day starts at midnight</div>
         <div class="help-row"><span>Learn opens</span><kbd class="nw">6 · 8 · 10 AM · 12 · 2 · 4 · 8 PM</kbd></div>
-        <div class="help-row"><span>Lock AM opens</span><kbd>6 AM</kbd></div>
-        <div class="help-row"><span>Lock PM opens</span><kbd>8 PM</kbd></div>
-        <div class="help-note">A verse added before 6 PM starts today and all 7 reps are done in one day; after 6 PM it waits for 6 AM tomorrow. A rep left an hour past opening shows amber. Press Review again to catch up: each rep whose time has passed opens at once.</div>
+        <div class="help-row"><span>Lock opens</span><kbd class="nw">6 AM · 8 PM</kbd></div>
+        <div class="help-note">A verse added before 12 PM starts today and all 7 reps are done in one day; after 12 PM it waits for 6 AM tomorrow. A rep left an hour past opening shows amber. Press Review again to catch up: each rep whose time has passed opens at once.</div>
         <div class="help-sub">Notifications</div>
         <div class="help-row"><span>Reviews, plus the 6 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
         <div class="help-row"><span>Learn at open</span><kbd class="nw">8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
-        <div class="help-row"><span>The 8 PM Learn and Lock PM</span><kbd>8:00 PM</kbd></div>
-        <div class="help-note">The 6 AM Learn and Lock AM do not send their own notification: they ride the 6 AM one. Every other rep notifies when it opens. Only sent when something is waiting; finishing early cancels what is left.</div>
+        <div class="help-row"><span>The 8 PM Learn and Lock</span><kbd>8:00 PM</kbd></div>
+        <div class="help-note">The 6 AM Learn and Lock do not send their own notification: they ride the 6 AM one. Every other rep notifies when it opens. Only sent when something is waiting; finishing early cancels what is left.</div>
       </div>
       <div class="help-scroll" id="helpPaneCtl">
         <div class="help-sub">Verse box</div>
@@ -3167,7 +3167,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-333';
+    const CLIENT_BUILD = 'sync-334';
 
     let queue = [];
     let currentIndex = 0;
@@ -3291,7 +3291,7 @@
             f: c.reference, v: c.version || "", day: c.day || 0,
             stage: c.stage === 'lock' ? 'lock' : 'learn', vi: c.verseIndex || 1, vc: c.verseCount || 1, dot: c.dot || 1,
             part: c.lockPart || "", label: c.label || "Review", unlockAt: c.unlockAt || 0,
-            hdr: c.stage === 'lock' ? '' : learnStatus(c), blk: c.stage !== 'lock' && c.pm && c.verseCount > 1 ? 1 : 0,
+            hdr: c.stage === 'lock' ? (typeof c.ago === 'number' ? 'Learned ' + agoWords(c.ago) : '') : learnStatus(c), att: c.stage === 'lock' ? (c.tries || 0) + 1 : 0, blk: c.stage !== 'lock' && c.pm && c.verseCount > 1 ? 1 : 0,
             segs: learnUnits(c).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
           };
         });
@@ -3554,7 +3554,7 @@
       let added = 0;
       items.slice(0, 20).forEach(function(it) {
         if (!it || typeof it.ref !== 'string' || !it.ref || !it.id || have[it.id]) return;
-        if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip' && it.action !== 'again') return;
+        if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip' && it.action !== 'again' && it.action !== 'miss') return;
         if (!(Number(it.rep) >= 1) || !(Date.now() - Number(it.at) < 6 * 3600 * 1000)) return;
         outbox.push({ learn: { ref: it.ref, action: it.action, rep: Number(it.rep), promote: !!it.promote, id: String(it.id), at: Number(it.at) } });
         have[it.id] = 1; added++;
@@ -4348,13 +4348,13 @@
     }
 
     function canFail() {
-      if (mode === 'learning') return true; // "Next" / "Done" never need the verse revealed
+      if (mode === 'learning') { const lc = learningCards[learningIndex]; return !!lc && lc.stage === 'lock' && !isLocked(lc) && isFlipped; }   // a Lock card has Miss, and (like Review) only once something is revealed
       const c = queue[currentIndex];
       return !!c && (c.group === 0 || isFlipped);
     }
     // Pass / Level Up / Recover follow the same rule as Miss: some of the verse must be showing. A repeat card's Clear (you keep looking at it until you know it) is exempt.
     function canPass() {
-      if (mode === 'learning') return true;
+      if (mode === 'learning') { const lc = learningCards[learningIndex]; return !!lc && (lc.stage !== 'lock' || isFlipped); }
       const c = queue[currentIndex];
       return !!c && (c.group === 0 || c.isRepeat || isFlipped);
     }
@@ -4513,7 +4513,7 @@
       for (let i = 1; i <= total; i++) {
         const pip = document.createElement("div");
         pip.className = "pip" + (i < now ? " filled" : i === now ? " cur" : "") + (before > 0 && i >= before && i < now ? " pop" : "");
-        if (isLock) pip.title = i === 1 ? "Lock AM" : "Lock PM";
+        if (isLock) pip.title = "Pass " + i + " of 2";
         pips.appendChild(pip);
       }
       if (grow) pipsEmerge(150);   // after the old dots went into the pill, the new ones come out of it
@@ -4526,11 +4526,15 @@
     function opensWords(ms) { return "Opens " + clockWords(ms).replace(/^at /, ""); }
     function paintLearningButton(card) {
       if (learnHintTimer) { clearTimeout(learnHintTimer); learnHintTimer = null; }
-      const label = card.label || "Review", waiting = isLocked(card);
-      const b = document.getElementById("btnPass");
+      const label = card.label || "Review", waiting = isLocked(card), lock = card.stage === 'lock';
+      const b = document.getElementById("btnPass"), f = document.getElementById("btnFail");
       document.getElementById("btnPassText").textContent = waiting ? opensWords(card.unlockAt) : label;
       b.classList.toggle("clear", label === "Review");
-      b.classList.toggle("locked", waiting || learnPending);
+      const idle = lock && !waiting && !isFlipped;   // a Lock card: Miss and Pass stay grey until something is revealed
+      b.classList.toggle("locked", waiting || learnPending || idle);
+      f.style.display = lock && !waiting ? "flex" : "none";
+      f.classList.toggle("locked", idle || learnPending);
+      document.getElementById("btnFailText").textContent = "Miss";
     }
 
     function clockWords(ms) {
@@ -4761,16 +4765,19 @@
         ? '<span class="hint-flag' + (hintLevel === 5 ? ' off' : '') + '" role="button" aria-label="Hint level" onclick="hintFlagTap(event)">' + bulbSvg(hintLevel) + '</span>'
         : '';
       const rc = isNew ? null : queue[currentIndex];
+      const lockCard = !!(lc && lc.stage === 'lock');
       const status = learn
         ? learnStatus(lc)
+        : (lockCard && typeof lc.ago === 'number' ? 'Learned ' + agoWords(lc.ago)
         : (rc && rc.isRepeat ? 'Second try'
           : (rc && typeof rc.ago === 'number' ? 'Last seen ' + agoWords(rc.ago)
           : (parsedSegments.length > 1
             ? `${revealedCount} of ${parsedSegments.length} revealed`
-            : (allRevealed ? 'Revealed' : 'Tap to reveal'))));
+            : (allRevealed ? 'Revealed' : 'Tap to reveal')))));
       // right side: the level number on a Learn card; on Review a ring that fills as the deck is done, with the number of cards left in the middle (not on a repeat card); nothing on a Lock card
       let right = flag;
       if (!isNew && baseCount > 0 && currentIndex < baseCount) right = dayRing(baseCount - currentIndex, baseCount);
+      else if (lockCard) right = '<span class="pt-att">Attempt #' + ((lc.tries || 0) + 1) + '</span>';
       let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
@@ -5087,7 +5094,7 @@
     function syncFlipState() {
       const anyRevealed = segmentStates.some(s => s === 'revealed');
       isFlipped = anyRevealed;
-      if (mode === 'learning') return;
+      if (mode === 'learning') { const lc = learningCards[learningIndex]; if (lc && lc.stage === 'lock') paintLearningButton(lc); return; }
 
       const card = queue[currentIndex];
       updateFailLock();
@@ -5096,8 +5103,9 @@
     // Miss and Pass (Level Up, Recover) are always on screen in Review, but dimmed and inert until some of the verse text is showing.
     function updateFailLock() {
       const b = document.getElementById("btnFail");
-      b.classList.toggle("locked", mode !== 'learning' && hasActiveCard() && !canFail());
-      document.getElementById("btnPass").classList.toggle("locked", mode !== 'learning' && hasActiveCard() && !canPass());
+      if (mode === 'learning') { const lc = learningCards[learningIndex]; if (lc) paintLearningButton(lc); return; }
+      b.classList.toggle("locked", hasActiveCard() && !canFail());
+      document.getElementById("btnPass").classList.toggle("locked", hasActiveCard() && !canPass());
     }
 
     // ───────────── Scoring ─────────────
@@ -5165,6 +5173,8 @@
     // Learning screen: "Level Up" promotes the verse to Level 1; "Review" marks it as looked at for a while.
     // A press on the New card's button (Pass is the only action here; the old second button is gone).
     function scoreLearning(action) {
+      const c = learningCards[learningIndex];
+      if (action === "Fail") { if (c && c.stage === 'lock') pressLearning("miss"); return; }
       if (action !== "Pass") return;
       pressLearning("press");
     }
@@ -5201,10 +5211,12 @@
 
     // kind: 'press' (the button). 'now', 'skip' and 'again' (press early, skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
     function pressLearning(kind) {
-      if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); return; }   // a tap that is ignored says so
+      if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); else if (kind === "miss") tapBusy("btnFailText"); return; }   // a tap that is ignored says so
       const card = learningCards[learningIndex];
       if (!card) return;
-      if (kind === "press" && isLocked(card)) return; // the unlock time is only in the hold menu
+      if ((kind === "press" || kind === "miss") && isLocked(card)) return; // the unlock time is only in the hold menu
+      if (kind === "miss" && card.stage !== 'lock') return;
+      if (card.stage === 'lock' && (kind === "press" || kind === "miss") && !isFlipped) return;   // like Review: reveal something first (a peek does not count)
       learnPending = true;
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
@@ -5229,7 +5241,7 @@
         };
         // the PM ring fills in, both dots turn green, then they lift into the badge and the rank-up plays
         if (fillCurrentPip()) { setTimeout(pipFinale, PIP_FILL_MS); setTimeout(function() { pipsIntoBadge(go); }, PIP_FILL_MS + 900); } else go();
-      } else if (kind !== 'skip' && kind !== 'again' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
+      } else if (kind !== 'skip' && kind !== 'again' && kind !== 'miss' && card.stage === 'learn' && (card.dot || 1) === 7 && document.querySelector("#cardPips .pip.cur")) {
         // The seventh rep: its dot fills, every dot turns green in a wave, then the card moves on (to the next verse, or to Lock).
         const startedIn = epoch;
         isScoring = true;
@@ -5263,14 +5275,26 @@
     function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
     function lDayBase(ms) { return ms; }   // days run midnight to midnight (same as the server's learnDayBase_)
     function lDayStart(ms) { return lAt(lDayBase(ms), 1, L_SLOTS[0]); }   // when the next day's first rep opens (6 AM)
+    function lockRepOf(streak, tries) { return Math.round((1000 + streak + Math.min(99, tries) / 100) * 100) / 100; }
+    function nextLockSlot(now) {
+      for (let d = 0; d < 3; d++) for (const m of [360, 1200]) { const t = lAt(now, d, m); if (t > now) return t; }
+      return now + 12 * 3600000;
+    }
     function lInfo(rep, n, pm) {
       const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
+      if (rep >= 1000) {   // a Lock rep: 1000 + passes in a row + attempts / 100 (the same on every plan)
+        const f = Math.floor(rep + 1e-9), st = Math.max(0, Math.min(1, f - 1000));
+        o.stage = 'lock'; o.verseIndex = n; o.dot = 0; o.tries = Math.max(0, Math.min(99, Math.round((rep - f) * 100)));
+        if (st === 0) o.lockPart = 'am'; else { o.lockPart = 'pm'; o.label = 'Promote'; }
+        if (st === 0) o.label = 'Pass';
+        return o;
+      }
       if (rep <= total) {
         o.verseIndex = Math.ceil(rep / 7); o.dot = ((rep - 1) % 7) + 1;
         if (o.dot === 7) o.label = o.verseIndex < n ? (pm ? 'Next Part' : 'Next Verse') : 'Learned';
       } else {
-        o.stage = 'lock'; o.verseIndex = n; o.dot = 0;
-        if (rep === total + 1) { o.lockPart = 'am'; } else { o.lockPart = 'pm'; o.label = 'Promote'; }
+        o.stage = 'lock'; o.verseIndex = n; o.dot = 0; o.tries = 0;   // an older Lock row (rep after the last Learn rep)
+        if (rep === total + 1) { o.lockPart = 'am'; o.label = 'Pass'; } else { o.lockPart = 'pm'; o.label = 'Promote'; }
       }
       return o;
     }
@@ -5278,7 +5302,7 @@
     // Lock AM: 7 AM). A late rep is made up by pressing again; the dots warn while a rep is late right now.
     function lLateDeadline(slotMs, stage, lockPart) {
       const d = new Date(slotMs), m = d.getHours() * 60 + d.getMinutes();
-      if (stage === 'lock') { const lim = lockPart === 'pm' ? 1260 : 420; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
+      if (stage === 'lock') { const lim = m >= 720 ? 1260 : 420; return m < lim ? lAt(slotMs, 0, lim) : slotMs + 3600000; }
       if (m === L_SLOTS[0]) return lAt(slotMs, 0, 420);
       if (m === L_SLOTS[L_SLOTS.length - 1]) return lAt(slotMs, 0, 1260);
       return slotMs + 3600000;
@@ -5330,16 +5354,20 @@
     function predictLearn(card, kind) {
       const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n, card.pm);
       let nr, unlock;
-      if (kind === 'again') {
+      if (info.stage === 'lock') {
+        // a pass adds one to the passes in a row, a Miss puts it back to none; either way the card waits for the next 6 AM / 8 PM and counts one more attempt
+        const tries = (info.tries || 0) + 1, streak = kind === 'miss' ? 0 : (info.lockPart === 'pm' ? 1 : 0) + 1;
+        nr = lockRepOf(Math.min(streak, 1), tries); unlock = nextLockSlot(now);
+      } else if (kind === 'again' || kind === 'miss') {
         nr = 7 * n + 1; unlock = lDayStart(now);
       } else if (kind === 'skip') {
-        if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nr = 7 * n + 1; unlock = lDayStart(now); }
-      } else if (info.stage === 'learn') {
-        nr = rep + 1; unlock = info.dot < 7 ? lAt(lDayBase(now), 0, L_SLOTS[Math.min(info.dot, 6)]) : lDayStart(now);   // a rep whose time has passed is ready at once
+        if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nr = 1000; unlock = lDayStart(now); }
       } else {
-        const pm = lAt(now, 0, 1200); nr = rep + 1; unlock = pm > now ? pm : 0;
+        if (info.dot < 7) { nr = rep + 1; unlock = lAt(lDayBase(now), 0, L_SLOTS[Math.min(info.dot, 6)]); }   // a rep whose time has passed is ready at once
+        else if (info.verseIndex >= n) { nr = 1000; unlock = lDayStart(now); }                            // Learned: Lock starts at 6 AM tomorrow
+        else { nr = rep + 1; unlock = lDayStart(now); }
       }
-      return Object.assign({}, card, lInfo(nr, n, card.pm), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 });
+      return Object.assign({}, card, lInfo(nr, n, card.pm), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 }, info.stage === 'learn' && nr >= 1000 ? { ago: 0 } : {});
     }
 
     function scoreCard(action) {
