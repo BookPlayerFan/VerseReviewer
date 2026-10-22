@@ -1257,7 +1257,7 @@
     #treasuryView, #searchView, #upcomingView { touch-action: pan-y; }
     .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
       box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
-      color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
+      color: var(--text-primary); border-bottom: 1px solid var(--border-card); border-radius: 0; }   /* square ends: a button's rounded corners made the line curl up at both sides */
     .picker-item .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .picker-item .pk-added { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
     .picker-item .pk-parts { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); }
@@ -1265,7 +1265,8 @@
     .ip-head:first-child { margin-top: 2px; }
     .ip-divider { height: 1px; margin: 14px 0 0; background: var(--text-meta); opacity: .45; }
     .ip-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
-      box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500; color: var(--text-primary); border-bottom: 1px solid var(--border-card); }
+      box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500; color: var(--text-primary); border-bottom: 1px solid var(--border-card); border-radius: 0; }
+    .ip-item.last { border-bottom: 0; }   /* the divider under the In progress list is the one line there */
     .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .ip-item .ip-when { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
     .ip-item .ip-when.open { color: var(--text-accent); font-weight: 600; }
@@ -3158,7 +3159,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-330';
+    const CLIENT_BUILD = 'sync-331';
 
     let queue = [];
     let currentIndex = 0;
@@ -6247,8 +6248,8 @@
       };
       if (prog.length) {
         head("In progress", prog.length);
-        prog.forEach(function(c) {
-          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item";
+        prog.forEach(function(c, k) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item" + (k === prog.length - 1 ? " last" : "");
           const main = document.createElement("span"); main.className = "ip-main";
           const r = document.createElement("span"); r.className = "ip-ref"; r.textContent = c.reference; main.appendChild(r);
           const w = document.createElement("span"); w.className = "ip-when" + (isLocked(c) ? "" : " open"); w.textContent = progressWhen(c); main.appendChild(w);
