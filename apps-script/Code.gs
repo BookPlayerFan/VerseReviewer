@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-126'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-127'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -541,7 +541,16 @@ function newCardCounts_(data, now) {
  * expectedRep is the rep the screen showed (Lock reps carry the attempts as a decimal), so a second phone that is behind, or a press sent twice, gets 'stale'
  * and the current card.
  */
-function learnAction(reference, action, expectedRep) {
+// The extra Log columns for a Learn / Lock press: which step of how many and its words (Learn), the reference's size, what the screen sent, and a Lock card's streak and attempt.
+function logExtras_(text, info, x, lock) {
+  const cx = cleanX_(x), o = { rw: refWords_(text), nv: verseCount_(text), secs: cx.s, peeks: cx.p };
+  if (info.stage === 'learn') {
+    const sizes = stepSizes_(text);
+    o.hint = cx.h; o.step = info.verseIndex + '/' + info.verseCount; o.sw = sizes[info.verseIndex - 1] || '';
+  } else if (lock) { o.lstreak = lock.streak; o.lattempt = lock.attempt; }
+  return o;
+}
+function learnAction(reference, action, expectedRep, x) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -582,14 +591,16 @@ function learnAction(reference, action, expectedRep) {
       const w = writeReview_({ rowIndex: row, reference: ref, rep: 1, group: 1 });
       if (!w.ok) return w;
       promoted = true;
-      logEvent_({ ref: ref, result: 'Level Up', lb: 0, la: 1, rb: rep, ra: 1, tries: '', repeat: false });
+      logEvent_(Object.assign({ ref: ref, result: 'Level Up', lb: 0, la: 1, rb: rep, ra: 1, tries: '', repeat: false }, logExtras_(vals[7], info, x, { streak: PASSES_TO_CLEAR, attempt: (info.tries || 0) + 1 })));
     } else {
       sheet.getRange(row, 2).setValue(step.unlock ? new Date(step.unlock) : '');
       sheet.getRange(row, 4).setValue(step.rep);
       vals[1] = step.unlock ? new Date(step.unlock) : '';
       vals[3] = step.rep;
       if (step.learned) { const td = today_(); sheet.getRange(row, 3).setValue(td); vals[2] = td; }   // column C becomes the day Learn finished ("Learned N days ago" on the Lock card)
-      logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : (action === 'miss' ? 'Keep' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
+      const lk = info.stage === 'lock' ? lockPos_(step.rep, 0) : null;
+      logEvent_(Object.assign({ ref: ref, result: info.stage === 'lock' ? (action === 'miss' ? 'Lock Miss' : 'Lock Pass') : (action === 'skip' ? 'Skip' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false },
+        logExtras_(vals[7], info, x, lk ? { streak: lk.streak, attempt: lk.tries } : null)));
       card = learningCard_(vals, row - 1, now);
       // This verse just went to Lock: the next queued verse takes the Learn slot (visible at once, its first rep opens at 6 AM tomorrow).
       if (step.learned) nextCard = startNextQueued_(sheet, now, nextDayStart_);
@@ -1059,7 +1070,7 @@ function writeReview_(review) {
     if (!row) return { ok: false, reason: 'moved', message: 'That verse is no longer in the sheet.' };
   }
 
-  const old = sheet.getRange(row, 2, 1, 4).getValues()[0];
+  const old = sheet.getRange(row, 2, 1, 7).getValues()[0];   // columns B to H: due, last, rep, level, reference, version, text
   const before = [dateToMs_(old[0]), dateToMs_(old[1]), old[2], old[3]];
 
   let nextDateVal = "";
@@ -1071,7 +1082,10 @@ function writeReview_(review) {
   }
 
   sheet.getRange(row, 2, 1, 4).setValues([[nextDateVal, lastDateVal, newRep, newGroup]]);
-  return { ok: true, row: { r: row, f: ref, before: before } };
+  const todayMs = today_().getTime(), nextMs = nextDateVal ? dateToMs_(nextDateVal) : 0;
+  const since = (newGroup > 0 && before[1] && Number(before[3]) > 0) ? Math.max(0, Math.round((todayMs - before[1]) / 86400000)) : '';
+  const interval = nextMs ? Math.max(0, Math.round((nextMs - todayMs) / 86400000)) : '';
+  return { ok: true, row: { r: row, f: ref, before: before, since: since, interval: interval, words: refWords_(old[6]), nv: verseCount_(old[6]) } };
 }
 
 function sanitizeQueue_(q) {
@@ -1149,7 +1163,11 @@ function sanitizeStats_(st) {
 // ───────────── Review log ─────────────
 // Every scored card is added as a row on a "Log" tab (created automatically on first use).
 // Nothing in the app reads it yet; it is for looking back on later. A logging problem never blocks a review.
-const LOG_HEADERS = ['Time', 'Reference', 'Result', 'Level Before', 'Level After', 'Rep Before', 'Rep After', 'Try Today', 'Same-Day Repeat'];
+// Columns J to T were added later and are only filled where they apply (blank otherwise): the hint level of a Learn rep, which step of how many, the words in that step,
+// the words and verses of the whole reference, the seconds the card was on screen (time away from the app is not counted), how many times it was peeked at (held),
+// days since the verse was last reviewed, the number of days the next review was set for, and a Lock card's passes in a row and attempt number.
+const LOG_HEADERS = ['Time', 'Reference', 'Result', 'Level Before', 'Level After', 'Rep Before', 'Rep After', 'Try Today', 'Same-Day Repeat',
+  'Hint Level', 'Step', 'Step Words', 'Ref Words', 'Verses', 'Seconds', 'Peeks', 'Days Since Last', 'Interval Days', 'Lock Streak', 'Lock Attempt'];
 const LOG_SHEET = 'Log';
 
 function getLogSheet_() {
@@ -1160,19 +1178,38 @@ function getLogSheet_() {
     sheet.appendRow(LOG_HEADERS);
     try { sheet.setFrozenRows(1); } catch (e) {}
     try { sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd hh:mm:ss'); } catch (e) {}
+  } else {
+    const have = sheet.getLastColumn();   // an older Log tab gets the newer column titles once
+    if (have < LOG_HEADERS.length) { try { sheet.getRange(1, have + 1, 1, LOG_HEADERS.length - have).setValues([LOG_HEADERS.slice(have)]); } catch (e) {} }
   }
   return sheet;
 }
+// What the screen sends along with a press (hint level, seconds on the card, peeks): only small whole numbers are kept.
+function cleanX_(x) {
+  const n = function(v, max) { v = Math.round(Number(v)); return isFinite(v) && v >= 0 ? Math.min(v, max) : ''; };
+  x = (x && typeof x === 'object') ? x : {};
+  return { h: n(x.h, 5), s: n(x.s, 900), p: n(x.p, 99) };
+}
+// Words in each learn step of a reference (the same steps as planSteps_), in order.
+function stepSizes_(text) {
+  const out = [], v = splitVerses_(text);
+  if (!v.length) return out;
+  planReference_(v).forEach(function(s) { s.sizes.forEach(function(z) { out.push(z); }); });
+  return out;
+}
+function refWords_(text) { return splitWords_(String(text || '').replace(/\[\d+\]/g, ' ')); }
 
 // info: { ref, result, lb, la, rb, ra, tries, repeat }. Returns { t, f } so Undo can remove the row.
 function logEvent_(info) {
   try {
     const sheet = getLogSheet_();
     const now = new Date();
+    const o = function(v) { return v === undefined || v === null ? '' : v; };
     sheet.appendRow([
       now, info.ref, info.result,
       info.lb, info.la, info.rb, info.ra,
-      info.tries, info.repeat ? 'Yes' : ''
+      info.tries, info.repeat ? 'Yes' : '',
+      o(info.hint), o(info.step), o(info.sw), o(info.rw), o(info.nv), o(info.secs), (info.peeks ? info.peeks : ''), o(info.since), o(info.interval), o(info.lstreak), o(info.lattempt)
     ]);
     return { t: now.getTime(), f: info.ref };
   } catch (e) {
@@ -1255,7 +1292,9 @@ function submitReview(expectedVersion, review, next) {
             ref: ref,
             result: lb === 0 ? 'Level Up' : (pushed > 0 ? 'Fail' : 'Pass'),
             lb: lb, la: Number(review.group), rb: Number(written.before[2]) || 0, ra: Number(review.rep),
-            tries: s.tries[ref], repeat: false
+            tries: s.tries[ref], repeat: false,
+            since: lb > 0 ? written.since : '', interval: written.interval, rw: written.words, nv: written.nv,
+            secs: cleanX_(review.x).s, peeks: cleanX_(review.x).p
           };
         } else if (prevCard) {
           info = {

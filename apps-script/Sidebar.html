@@ -3182,7 +3182,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-336';
+    const CLIENT_BUILD = 'sync-337';
 
     let queue = [];
     let currentIndex = 0;
@@ -3228,6 +3228,11 @@
     // Both are saved with the session, so any device reopens where you left off.
     let mode = 'review';
     let learningCards = [];
+    // How long the card has been on screen (time with the app in the background is not counted) and how many times it was peeked at: sent with each press for the Log.
+    let clock = { key: "", at: Date.now(), acc: 0 }, peekCount = 0;
+    function startCardClock(key) { if (clock.key === key) return; clock = { key: key, at: Date.now(), acc: 0 }; peekCount = 0; }
+    function cardSeconds() { return Math.min(900, Math.round((clock.acc + (document.hidden ? 0 : Date.now() - clock.at)) / 1000)); }
+    document.addEventListener("visibilitychange", function() { if (document.hidden) clock.acc += Date.now() - clock.at; else clock.at = Date.now(); });
     let learnQueue = [];   // references waiting for the Learn slot, in the order they were added
     let learningIndex = 0;
     let enterLearningAfterLoad = null; // reference of a just-added verse to jump straight to
@@ -3574,7 +3579,7 @@
         if (!it || typeof it.ref !== 'string' || !it.ref || !it.id || have[it.id]) return;
         if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip' && it.action !== 'again' && it.action !== 'miss') return;
         if (!(Number(it.rep) >= 1) || !(Date.now() - Number(it.at) < 6 * 3600 * 1000)) return;
-        outbox.push({ learn: { ref: it.ref, action: it.action, rep: Number(it.rep), promote: !!it.promote, id: String(it.id), at: Number(it.at) } });
+        outbox.push({ learn: { ref: it.ref, action: it.action, rep: Number(it.rep), promote: !!it.promote, id: String(it.id), at: Number(it.at), x: it.x && typeof it.x === 'object' ? { h: Number(it.x.h) || 0, s: Number(it.x.s) || 0, p: Number(it.x.p) || 0 } : null } });
         have[it.id] = 1; added++;
       });
       if (!added) return;
@@ -3626,7 +3631,7 @@
           updateSyncWarning();
           checkSettled();
         })
-        .learnAction(l.ref, l.action, l.rep);
+        .learnAction(l.ref, l.action, l.rep, l.x || null);
     }
 
     // After a press or review is saved, the server brings the push reminders in line. That takes a few seconds, so it is a separate call
@@ -4385,6 +4390,8 @@
       if (document.getElementById("picker").classList.contains("inline") && !(mode === 'learning' && !learningCards[learningIndex])) closePicker();   // the New page is only the tab while there is no card
       if (mode === 'learning') renderLearning();
       else renderCard();
+      const kc = mode === 'learning' ? learningCards[learningIndex] : queue[currentIndex];
+      if (kc && kc.reference) startCardClock(kc.reference + "|" + kc.rep + (kc.isRepeat ? "|r" : ""));
       updateFailLock();
       updateTabs();
       placeNotice();
@@ -4513,6 +4520,7 @@
     let growPips = false;   // set for one paint: the new dots grow in (after the old ones shrank away)
     let lastPips = { ref: "", stage: "", now: 0 };   // what the dots last showed, to pop the one that just filled
     function paintLearningHeader(card) {
+      startCardClock(card.reference + "|" + card.rep);
       const metaTag = document.getElementById("cardMeta");
       metaTag.className = "meta-tag";
       metaTag.textContent = "";
@@ -5002,7 +5010,7 @@
     function startPeek(e) {
       if (!hasActiveCard()) return;
       const learn = mode === 'learning' && isLearnCard(learningCard());
-      peeking = true;
+      peeking = true; peekCount++;
       if (learn) document.body.classList.add("peek"); else peekFirstWords();
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
       if (el) { clearTimeout(lvlFlashTimer); swapLabel(el, learn ? "Holding \u00b7 full words" : "Peeking: first 3 words"); }
@@ -5224,7 +5232,7 @@
       if (card.stage === 'lock' && (kind === "press" || kind === "miss") && !isFlipped) return;   // like Review: reveal something first (a peek does not count)
       learnPending = true;
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
-      enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote });
+      enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote, x: { h: card.stage === 'learn' ? hintLevel : 0, s: cardSeconds(), p: peekCount } });
       // Every Review press on reps 2 to 6 of a step makes the next rep one hint level harder (never past 5). It adds one to whatever level you are on, so a level
       // you changed yourself carries on from there. Rep 1 does not add, so reps 1 and 2 are both at the starting level; rep 7 ends the step (the next one starts at Full).
       if (kind === 'press' && card.stage === 'learn' && (card.dot || 1) >= 2 && (card.dot || 1) <= 6 && hintLevel < 5) setHintLevel(hintLevel + 1, true);
@@ -5501,7 +5509,7 @@
 
       // The server computes the due date and stores the session; we send the new level and rep.
       enqueueSubmit(
-        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup },
+        { rowIndex: card.rowIndex, reference: card.reference, rep: newRep, group: newGroup, x: { s: cardSeconds(), p: peekCount } },
         snapshot(currentIndex + 1), (action === "Fail" ? "Miss" : action) + " \u00B7 " + card.reference
       );
 
