@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-121'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-122'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2596,8 +2596,8 @@ function planSteps_(text) {
   });
   return out;
 }
-// True when the plan differs from one whole verse per step (some step is a part or a join): the screen then says "Part N of M".
-function planIsParts_(steps) { return steps.some(function(x) { return x.k > 1 || x.l > x.f; }); }
+// True when a reference has more than one step, or its one step is a join of verses: the screen then says "Part N of M" (or "Full reference" for a single step).
+function planIsParts_(steps) { return steps.length > 1 || steps.some(function(x) { return x.k > 1 || x.l > x.f; }); }
 function stepCount_(row) {
   const ps = planSteps_(row[7]); if (ps.length) return ps.length;
   return verseCount_(row[7]);

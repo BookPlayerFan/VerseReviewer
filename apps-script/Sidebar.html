@@ -711,10 +711,10 @@
       display: inline;
     }
     /* A reference learned in parts: one block per part */
-    .step-blk { position: relative; margin: 0 0 10px 8px; padding: 2px 0 2px 20px; border-left: 3px solid rgba(150, 150, 150, 0.35); border-radius: 2px; }
+    .step-blk { position: relative; margin: 0 0 8px 6px; padding: 1px 0 1px 13px; border-left: 3px solid rgba(150, 150, 150, 0.35); border-radius: 2px; }   /* 22px in all: the number hangs out over the card's own padding */
     .step-blk.on { border-left-color: var(--text-accent); }
-    .step-n { position: absolute; left: -13px; top: 2px; width: 21px; height: 21px; box-sizing: border-box; border-radius: 50%; text-align: center;
-      font: 700 11px/19px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0; text-align: center;
+    .step-n { position: absolute; left: -11px; top: 1px; width: 19px; height: 19px; box-sizing: border-box; border-radius: 50%; text-align: center;
+      font: 700 10px/17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0; text-align: center;
       background: var(--bg-body, var(--bg-card)); border: 1px solid rgba(150, 150, 150, 0.5); color: var(--text-muted); }
     .step-blk.on .step-n { border: 1.5px solid var(--text-accent); color: var(--text-accent); }
 
@@ -773,9 +773,8 @@
       color: var(--text-accent);
       user-select: none;
     }
-    .v-text.peek3 { filter: none; opacity: 1; background-color: transparent; transition: none; }   /* no fade in either direction: a fade would show the whole verse clear for a moment */
-    .v-text.nt { transition: none !important; }   /* Review / Lock hold: the first three words are clear, the rest stays blurred */
-    .v-text.peek3 .pk3r { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); border-radius: 4px; }
+    .pk3-layer { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 50; pointer-events: none; }   /* Review / Lock hold: the first three words, drawn clear over the untouched blurred text */
+    .pk3-layer span { position: absolute; white-space: nowrap; border-radius: 3px; overflow: hidden; }
     .v-text.hinted .hz { color: transparent; }
     .v-text.hinted .hu { color: transparent; position: relative; transition: color .22s ease; }
     .v-text.hinted .hu::after { content: ""; position: absolute; left: 50%; top: 55%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--text-accent); transition: opacity .22s ease; pointer-events: none; }   /* a hidden word: a dot where its first letter would be (drawn over the letter, so nothing changes size or moves) */
@@ -3154,7 +3153,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-327';
+    const CLIENT_BUILD = 'sync-329';
 
     let queue = [];
     let currentIndex = 0;
@@ -4283,15 +4282,12 @@
       if (!many) return "";
       return p[0] === p[1] ? "v" + numOf(p[0]) : "v" + numOf(p[0]) + "\u2013" + numOf(p[1]);
     }
-    // The line at the left of the bar above a Learn card.
+    // The line at the left of the bar above a Learn card: always "Part N of M" and what the part holds (v13 c-d, v14, v25-26), or "Full reference" when the whole
+    // reference is one step (with the verses it holds when it has several).
     function learnStatus(card) {
-      const vc = card.verseCount || 1;
-      if (card.pm) {
-        const cov = stepCover(card);
-        if (vc === 1) return cov ? "Verses " + cov.replace(/^v/, "") : "Single verse";   // the whole reference joined into one step
-        return "Part " + (card.verseIndex || 1) + " of " + vc + (cov ? " \u00b7 " + cov : "");
-      }
-      return vc > 1 ? "Verse " + (card.verseIndex || 1) + " of " + vc : "Single verse";
+      const vc = card.verseCount || 1, cov = card.pm ? stepCover(card) : "";
+      if (vc === 1) return "Full reference" + (cov ? " \u00b7 " + cov : "");
+      return "Part " + (card.verseIndex || 1) + " of " + vc + (cov ? " \u00b7 " + cov : "");
     }
 
     // Flatten verses into the pieces that are shown and revealed. New tab: long verses split into phrases (a, b, c...).
@@ -4508,7 +4504,7 @@
       paintLearningButton(card);
     }
 
-    // The one button: blue Review, or green Next Verse / Learned / Promote. Dimmed while it waits for its unlock time (still tappable).
+    // The one button: blue Review, or green Next Part / Learned / Promote. Dimmed while it waits for its unlock time (still tappable).
     function paintLearningButton(card) {
       if (learnHintTimer) { clearTimeout(learnHintTimer); learnHintTimer = null; }
       const label = card.label || "Review";
@@ -4925,7 +4921,7 @@
 
     // Press and hold in the verse box is a peek; it never reveals anything and it ends when you let go.
     // Learn cards: the full words of every verse that is showing (and the verse you are learning, even blurred at Off) show for as long as you hold.
-    // Review and Lock cards: the first three words of the passage come out of the blur in place, to confirm you have the start of it right.
+    // Review and Lock cards: the first three words of the passage show clear over the blur, to confirm you have the start of it right.
     // The tap on the end of a hold must not also reveal a piece.
     let heldBody = null, peeking = false, peek3 = null;
     function startPeek(e) {
@@ -4939,21 +4935,38 @@
     function peekFirstWords() {
       const el = document.querySelector("#cardBody .v-text");
       if (!el || !el.classList.contains("blurred")) return;   // already showing: nothing to peek at
-      const m = el.textContent.match(/^(\s*\S+(?:\s+\S+){0,2})([\s\S]*)$/);
-      if (!m) return;
-      peek3 = { el: el, html: el.innerHTML };
-      el.classList.remove("blurred"); el.classList.add("peek3");
-      el.innerHTML = '<span class="pk3">' + escapeHtml(m[1]) + '</span><span class="pk3r">' + escapeHtml(m[2]) + '</span>';
+      // The blurred text is never touched (changing it is what made the outline jump on hold and release). The first three words are drawn clear on a layer above it.
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), words = [];
+      let node;
+      while (words.length < 3 && (node = walker.nextNode())) {
+        const re = /\S+/g; let m;
+        while (words.length < 3 && (m = re.exec(node.nodeValue))) {
+          const r = document.createRange(); r.setStart(node, m.index); r.setEnd(node, m.index + m[0].length);
+          const rects = r.getClientRects ? r.getClientRects() : [];   // (no layout: no peek, and no error)
+          if (rects.length) words.push({ t: m[0], x: rects[0].left, y: rects[0].top, w: rects[0].width, h: rects[0].height });
+        }
+      }
+      if (!words.length) return;
+      const cs = getComputedStyle(el);
+      let bg = "", up = el.parentElement;   // the solid colour behind the verse box (not the box's own spoiler tint)
+      while (up && (!bg || bg === "transparent" || bg === "rgba(0, 0, 0, 0)")) { bg = getComputedStyle(up).backgroundColor; up = up.parentElement; }
+      const layer = document.createElement("div"); layer.className = "pk3-layer";
+      words.forEach(function(w, i) {
+        const sp = document.createElement("span"), nx = words[i + 1];
+        const wide = nx && Math.abs(nx.y - w.y) < 2 && nx.x > w.x ? nx.x - w.x + 1 : w.w + 2;   // a word on the same line reaches the next one, so no tinted gaps show between them
+        sp.textContent = w.t;
+        sp.style.cssText = "left:" + (w.x - 1) + "px;top:" + (w.y - 1) + "px;width:" + wide + "px;height:" + (w.h + 2) + "px;line-height:" + (w.h + 2) + "px;padding:0 1px;box-sizing:border-box;" +
+          "font:" + cs.font + ";letter-spacing:" + cs.letterSpacing + ";color:" + cs.color + ";background:" + bg + ";";
+        layer.appendChild(sp);
+      });
+      document.body.appendChild(layer);
+      peek3 = layer;
     }
     function endPeek() {
       if (!peeking) return;
       peeking = false;
       document.body.classList.remove("peek");
-      if (peek3) {
-        const pe = peek3.el; pe.classList.add("nt");   // snap back to blurred: the blur's own fade would show the whole verse for a moment
-        pe.innerHTML = peek3.html; pe.classList.remove("peek3"); pe.classList.add("blurred"); peek3 = null;
-        void pe.offsetWidth; requestAnimationFrame(function() { pe.classList.remove("nt"); });
-      }
+      if (peek3) { peek3.remove(); peek3 = null; }
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
       if (el) swapLabel(el, el.getAttribute("data-base") || "");
     }
@@ -5264,8 +5277,8 @@
         if (mode === 'learning' && c) { paintLateState(c); scheduleLate(c); }
       }, Math.min(Math.max(next - nowSrv(), 0) + 500, 2147483000));
     }
-    // The words for where a card is: "Part 2 \u00b7 Rep 3 of 7", "Promote" ... (shown beside each card in the In progress list).
-    function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Promote" : "Lock AM") : (card.verseCount > 1 ? stepWord(card) + " " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
+    // The words for where a card is: "Part 2 \u00b7 Rep 3 of 7", or "Rep 1 of 2" on a Lock card ... (shown beside each card in the In progress list).
+    function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Rep 2 of 2" : "Rep 1 of 2") : (card.verseCount > 1 ? stepWord(card) + " " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
     function predictLearn(card, kind) {
       const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n, card.pm);
       let nr, unlock;
