@@ -901,7 +901,7 @@
     .stat-box.cleared::after { content: "\2713"; position: absolute; top: 7px; right: 7px; width: 16px; height: 16px; border-radius: 50%;
       background: var(--badge-pass); color: #fff; font-size: 11px; font-weight: 900; line-height: 16px; text-align: center; }
     @media (prefers-color-scheme: dark) { .stat-box.cleared::after { color: #0b2a17; } }
-    .stat-box.open { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
+    .stat-box.open, .stat-box.held { border-color: var(--text-accent); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18); }
     /* Leveled Up with 5 or more: soft gold fill and a bold gold number (the blue "open" border still wins when tapped). */
     :root { --gold-bg-a: rgba(255, 208, 70, 0.22); --gold-bg-b: rgba(214, 158, 20, 0.13); --gold-num: #a87400; }
     @media (prefers-color-scheme: dark) { :root { --gold-bg-a: rgba(242, 201, 76, 0.18); --gold-bg-b: rgba(200, 150, 20, 0.10); --gold-num: #ffd54a; } }
@@ -939,6 +939,17 @@
       .card.ranked .pip.filled { box-shadow: 0 0 5px color-mix(in srgb, var(--rc) 55%, transparent); }
       .dia-mark { text-shadow: 0 0 7px color-mix(in srgb, var(--rc) 70%, transparent); }
     }
+    /* Hold the Treasury box on Review Complete: the box below with the rank icons and, at the bottom, the same three counts as the Verses legend. */
+    .tr-box { text-align: left; margin: -6px 0 14px; padding: 12px 12px 12px; background: var(--bg-body); border: 1px solid var(--border-body); border-radius: 12px; color: var(--text-primary); animation: noteFadeIn .25s ease-out both; }
+    .tr-box .rgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .tr-box .rcell { --rc: var(--rl); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 2px 7px; border: 1px solid var(--border-card); border-radius: 12px; line-height: 1.15; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tr-box .rcell { --rc: var(--rd); } }
+    :root[data-theme="dark"] .tr-box .rcell { --rc: var(--rd); }
+    .tr-box .rcell svg { width: 26px; height: 26px; color: var(--rc); }
+    .tr-box .rcell b { font-size: 16px; font-weight: 800; margin-top: 2px; }
+    .tr-box .rcell span { font-size: 10.5px; color: var(--text-muted); }
+    .tr-box .rcell.zero { opacity: 0.4; }
+    .tr-box .tr-mini { margin-top: 10px; }
     .fail-list { text-align: left; margin: -6px 0 14px; padding: 0 12px 6px; background: var(--bg-body); border: 1px solid var(--border-body);
       border-radius: 12px; color: var(--text-primary); overflow: hidden; }
     /* Header stays put while the verses scroll beneath it; both lists are always five rows tall. */
@@ -1383,6 +1394,7 @@
         </div>
       </div>
       <div class="fail-list" id="failList" style="display: none;"></div>
+      <div class="tr-box" id="trBox" role="button" aria-label="Treasury details. Tap to close." onclick="closeTrBox()" style="display: none;"></div>
 
 
       <div class="tomorrow-note" id="tomorrowNote" role="button" onclick="openUpcoming()" style="display: none;"></div>
@@ -3193,7 +3205,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-352';
+    const CLIENT_BUILD = 'sync-353';
 
     let queue = [];
     let currentIndex = 0;
@@ -4134,29 +4146,48 @@
       });
     }
     let ptsHeld = null;
-    // Hold the Treasury box: for 3 seconds its number becomes the net points of the 7 days before today and its label says "Last 7".
-    let weekTimer = null, weekToken = 0;
-    function restoreTreasuryBox() {
-      clearTimeout(weekTimer); weekTimer = null; weekToken++;
-      const lbl = document.querySelector("#statGradBox .stat-lbl");
-      if (lbl) lbl.textContent = "Treasury";
-      paintPts(sessionStats.pts || 0);
+    // Hold the Treasury box: a box opens below it with a rank icon for each level (how many references are at it) and, at the bottom, the
+    // same three counts as the Verses legend (verses, references, books). Hold again, or tap the box, to close it.
+    function closeTrBox() {
+      const el = document.getElementById("trBox");
+      if (el) { el.style.display = "none"; el.textContent = ""; }
+      const gb = document.getElementById("statGradBox"); if (gb) gb.classList.remove("held");
+    }
+    function paintTrBox() {
+      const el = document.getElementById("trBox");
+      if (!el || el.style.display === "none") return;
+      el.textContent = "";
+      const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0], books = {};
+      let verses = 0;
+      vlVerses.forEach(function(v) { cnt[Math.max(0, Math.min(8, v.g | 0))]++; verses += (v.pn || 1); books[vlBookKey(v)] = true; });
+      const grid = document.createElement("div"); grid.className = "rgrid";
+      for (let g = 1; g <= 8; g++) {
+        const c = document.createElement("div"); c.className = "rcell rank-" + g + (cnt[g] ? "" : " zero");
+        c.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (RANK_ICON[g] || "") + "</svg>";
+        const n = document.createElement("b"); n.textContent = vlVerses.length ? cnt[g] : "\u2013";
+        const l = document.createElement("span"); l.textContent = rankName(g);
+        c.appendChild(n); c.appendChild(l); grid.appendChild(c);
+      }
+      el.appendChild(grid);
+      const stats = document.createElement("div"); stats.className = "tr-mini";
+      const total = vlVerses.length, nb = Object.keys(books).length;
+      [[verses, verses === 1 ? "verse" : "verses"], [total, total === 1 ? "reference" : "references"], [nb, "of 66 books"]].forEach(function(q) {
+        const c = document.createElement("div"), n = document.createElement("b"), l = document.createElement("span");
+        n.textContent = vlVerses.length ? q[0] : "\u2013"; l.textContent = q[1]; c.appendChild(n); c.appendChild(l); stats.appendChild(c);
+      });
+      el.appendChild(stats);
     }
     function openPtsPeek() {
       hideVerseTip(); closePeek();
-      clearTimeout(weekTimer);
-      const tok = ++weekToken;
-      const el = document.getElementById("statGraduated");
-      document.querySelector("#statGradBox .stat-lbl").textContent = "Last 7";
-      el.textContent = "\u2026"; el.classList.remove("neg");
-      weekTimer = setTimeout(restoreTreasuryBox, 8000);   // if the numbers never arrive, it still goes back
-      netPointsOver(7, function(n) {
-        if (tok !== weekToken) return;
-        el.textContent = n === null ? "\u2014" : fmtPts(n);
-        el.classList.toggle("neg", n !== null && n < 0);
-        clearTimeout(weekTimer);
-        weekTimer = setTimeout(restoreTreasuryBox, 3000);   // 3 seconds on screen once the number is in
-      });
+      const el = document.getElementById("trBox");
+      if (!el) return;
+      if (el.style.display !== "none") { closeTrBox(); return; }
+      // it takes the place of any list that is open
+      if (openStatList) { Object.keys(STAT_LISTS).forEach(function(k) { document.getElementById(STAT_LISTS[k].box).classList.remove("open"); }); openStatList = null; document.getElementById("failList").style.display = "none"; }
+      el.style.display = "block";
+      document.getElementById("statGradBox").classList.add("held");
+      paintTrBox();
+      if (!vlVerses.length) loadVlVerses(function() { paintTrBox(); }, function() {});   // the verse list is not in yet
     }
 
     function renderTomorrowNote() {
@@ -5664,6 +5695,7 @@
 
       cardEl.style.display = "none";
       summaryEl.style.display = "flex";
+      closeTrBox();
       document.getElementById("summaryIcon").style.display = "";
       setSummaryButtons(false, false);
       renderTomorrowNote();
@@ -5962,6 +5994,7 @@
       const list = document.getElementById("failList");
       const missing = (kind === "fail" || kind === "done") ? Math.max(0, (sessionStats[cfg.count] || 0) - items.length) : 0;
       if (!items.length && !missing) return;
+      closeTrBox();
       Object.keys(STAT_LISTS).forEach(function(k) { document.getElementById(STAT_LISTS[k].box).classList.remove("open"); });
       if (openStatList === kind) {
         openStatList = null;
