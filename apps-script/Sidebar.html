@@ -3182,7 +3182,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-339';
+    const CLIENT_BUILD = 'sync-340';
 
     let queue = [];
     let currentIndex = 0;
@@ -6296,7 +6296,7 @@
     // Saves the verse to the sheet (it joins the waiting list in the picker).
     function addParsedVerse(p, cb, learn) {
       if (learn && adding) { cb(false, "One moment, a verse is still being added."); return; }
-      if (learn) { adding = true; addNote((haveVerseInLearn() ? "Adding " : "Starting ") + p.ref + "\u2026"); }
+      if (learn) { adding = true; addT0 = Date.now(); addNote((haveVerseInLearn() ? "Adding " : "Starting ") + p.ref + "\u2026"); }
       google.script.run
         .withSuccessHandler(function(res) {
           if (res && res.success && learn) {
@@ -6515,6 +6515,8 @@
     // One call answers both the save and the start, and carries the started card, so the page shows it at once (no reload of the whole session).
     function finishAdd(res, failPrefix) {
       adding = false;
+      if (res && res.success && addT0) { const t = new Date(); diag.add = (Date.now() - addT0) + " ms \u00b7 " + t.getHours() + ":" + ("0" + t.getMinutes()).slice(-2) + (res.card ? "" : " (queued)"); }
+      addT0 = 0;
       if (res && res.success && res.queued && !res.started) {
         learnQueue = Array.isArray(res.queue) ? res.queue.slice() : learnQueue.concat([res.reference]);
         pickerItems = pickerItems.filter(function(x) { return x.f !== res.reference; });
@@ -6547,11 +6549,11 @@
         addNote(failPrefix ? failPrefix + "it didn't start: " + m : m, true);
       }
     }
-    let adding = false;
+    let adding = false, addT0 = 0;
     function chooseVerse(it, failPrefix) {
       if (adding) return;
       const queueing = haveVerseInLearn();   // Learn is busy: the verse joins the queue and the list stays open
-      adding = true;
+      adding = true; addT0 = Date.now();
       // The Choose a verse page stays up until the answer is back, so nothing else shows in between.
       addNote(queueing ? "Adding to the queue\u2026" : "Starting " + it.f + "\u2026");
       google.script.run
@@ -6662,6 +6664,7 @@
       row("Page", CLIENT_BUILD + (updateReady ? " \u00b7 update waiting" : ""), updateReady ? "bad" : "");
       if (diag.expects && "sync-" + diag.expects !== CLIENT_BUILD) row("Server expects", "sync-" + diag.expects, "bad");
       row("Server", serverBuild || "?");
+      row("Last verse add", diag.add || "none yet");
       row("Button got stuck", diag.stuck || "never", diag.stuck ? "bad" : "ok");
       row("Session", "v" + sessionVersion + " \u00b7 " + (sessionDate || "no date"));
       row("Last check", (diag.checkedAt || "never") + (diag.result ? " \u00b7 " + diag.result : ""));
