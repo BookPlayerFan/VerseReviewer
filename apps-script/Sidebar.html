@@ -1264,7 +1264,7 @@
     .picker-search { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px;
       border: 1px solid var(--border-card); border-radius: 10px; background: transparent;
       color: var(--text-primary); margin-bottom: 8px; }
-    .picker-list { --fade: var(--bg-card); flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: 12px; }
+    .picker-list { --fade: var(--bg-card); flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 3px 3px 12px; margin: 0 -3px; }   /* room for the outline and shadow, which the list's own clipping would otherwise cut at the edges */
     .np-bar { flex: none; padding: 8px 0 14px; }   /* the Add Verse button stays put; the list scrolls above it */
     .np-add { width: 100%; min-height: 0; padding: 14px; border: 0; border-radius: 14px; background: var(--text-accent); color: var(--bg-card); font-size: 16px; font-weight: 600; box-shadow: none; }
     .np-add:active { filter: brightness(.92); }
