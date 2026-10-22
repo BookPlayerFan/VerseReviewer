@@ -1907,6 +1907,7 @@
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       const which = listOpen ? "verses" : (mode === "learning" ? "new" : "review");
       wakeSet(which === "new");
+      if (which !== "review") closeTrBox();   // leaving the Review tab closes the Treasury details
       document.getElementById("tabReview").classList.toggle("on", which === "review");
       document.getElementById("tabNew").classList.toggle("on", which === "new");
       document.getElementById("tabVerses").classList.toggle("on", which === "verses");
@@ -3205,7 +3206,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-353';
+    const CLIENT_BUILD = 'sync-354';
 
     let queue = [];
     let currentIndex = 0;
