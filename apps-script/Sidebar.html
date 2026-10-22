@@ -1114,9 +1114,30 @@
     .pp-note { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
     .pp-note.bad { color: var(--badge-fail); }
     .pv-edit { background: transparent; color: var(--text-accent); border: 0; font-size: 15px; font-weight: 600; padding: 10px 14px; cursor: pointer; }
-    .paste-hint { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; min-height: 16px; }
+    .pc-title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+    .pc-sub { font-size: 14px; color: var(--text-muted); margin: 4px 0 14px; line-height: 1.35; }
+    .paste-card { padding: 22px 20px 16px; border-radius: 22px; }
+    .paste-wrap { position: relative; }
+    .paste-wrap .paste-area { min-height: 160px; border: 1.5px solid var(--border-card); border-radius: 14px; padding: 12px 14px 44px; font-size: 15.5px; box-sizing: border-box; }
+    .paste-btn { position: absolute; right: 10px; bottom: 10px; min-height: 0; width: auto; padding: 6px 14px; border: 0; border-radius: 999px; background: var(--btn-restart-bg); color: var(--text-accent); font-size: 13px; font-weight: 600; box-shadow: none; }
+    .paste-hint { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); margin: 12px 2px 0; min-height: 22px; }
     .paste-hint.bad { color: var(--badge-fail); }
-    .paste-hint.ok { color: var(--text-muted); }
+    .paste-hint .ck { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--btn-pass-bg); color: var(--badge-pass); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+    .paste-hint b { color: var(--text-primary); font-weight: 600; }
+    .paste-card .pv-btns { margin-top: 16px; }
+    .paste-card .pv-close { background: transparent; border: 0; color: var(--text-muted); }
+    .paste-card .pv-add { background: var(--text-accent); color: var(--bg-card); }
+    .paste-card .pv-add:disabled { background: var(--border-card); color: var(--text-muted); opacity: 1; }
+    .pp-meta { text-align: center; font-size: 13.5px; color: var(--text-muted); margin: -2px 0 8px; }
+    #pastePreview .pv-text { background: var(--bg-page); border-radius: 14px; padding: 12px 14px; max-height: 38vh; }
+    .pp-start { display: flex; align-items: center; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--btn-restart-bg); color: var(--text-accent); font-size: 14px; font-weight: 500; line-height: 1.35; }
+    .pp-start.wait { background: #fef7e0; color: #7a4f01; }
+    .pp-start:empty { display: none; }
+    .pv-learn { background: var(--text-accent); color: var(--bg-card); border: 0; }
+    .pv-learn:disabled { opacity: .4; pointer-events: none; }
+    #pastePreview .pp-col { margin-top: 14px; }
+    #pastePreview .pp-row { margin-top: 4px; justify-content: space-between; }
+    #pastePreview .pp-row .pv-edit { flex: none; border: 0; background: transparent; color: var(--text-muted); font-size: 15px; font-weight: 600; padding: 8px 14px; }
     .pv { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
       background: rgba(0,0,0,0.45); padding: 24px 20px; }
     .pv.open { display: flex; }
@@ -1147,7 +1168,6 @@
     .pv-btns.pp-col button { flex: none; width: 100%; }
     .pv-save { background: transparent; color: var(--text-accent); border: 1.5px solid var(--text-accent); }
     .pv-save:disabled { opacity: .4; pointer-events: none; }
-    #pastePreview .pv-edit { border: 1px solid var(--border-card); border-radius: 12px; background: var(--bg-body); color: var(--text-muted); font-size: 16px; font-weight: 700; padding: 13px; }
     .pv-undo { background: var(--btn-restart-bg); color: var(--btn-restart-text); }
     .uc-body { text-align: center; font-size: 16px; line-height: 1.45; margin: 2px 0 8px; color: var(--text-primary); }
     .uc-body .uc-sub { margin-top: 4px; font-size: 14px; color: var(--text-muted); }
@@ -1499,13 +1519,17 @@
 
   <div class="pv" id="pasteModal" onclick="if (event.target === this) closePaste()">
     <div class="pv-card paste-card">
-      <div class="pv-head" style="color: var(--text-primary); font-size: 16px;">Paste new verse</div>
-      <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
-        placeholder="Paste a verse here (reference + text), or type it:&#10;Romans 8:35-37 ESV&#10;Verse text… (use [36] for verse numbers)" oninput="onPasteInput(event)" onpaste="pasteLanded()"></textarea>
+      <div class="pc-title">Add Verse</div>
+      <div class="pc-sub">Paste a verse with its reference, or type one in.</div>
+      <div class="paste-wrap">
+        <textarea class="paste-area" id="pasteText" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Romans 8:35-37 ESV&#10;[35] Who shall separate us from the love of Christ? [36] As it is written…&#10;&#10;(use [36] for verse numbers)" oninput="onPasteInput(event)" onpaste="pasteLanded()"></textarea>
+        <button type="button" class="paste-btn" onclick="pasteButton()">Paste</button>
+      </div>
       <div class="paste-hint" id="pasteHint"></div>
       <div class="pv-btns">
         <button type="button" class="pv-close" onclick="closePaste()">Cancel</button>
-        <button type="button" class="pv-add" id="pasteAdd" onclick="submitPaste()">Add</button>
+        <button type="button" class="pv-add" id="pasteAdd" onclick="submitPaste()" disabled>Continue</button>
       </div>
     </div>
   </div>
@@ -1513,15 +1537,17 @@
   <div class="pv" id="pastePreview" onclick="if (event.target === this) cancelPastePreview()">
     <div class="pv-card">
       <div class="pv-head"><span id="ppRef"></span><span class="version-badge" id="ppVer"></span></div>
+      <div class="pp-meta" id="ppMeta"></div>
       <div class="pv-text" id="ppText"></div>
+      <div class="pp-start" id="ppStart"></div>
       <div class="pp-note" id="ppNote"></div>
       <div class="pv-btns pp-col">
-        <button type="button" class="pv-add" id="ppLearn" onclick="addFromPreview(true)">Save &amp; Learn now</button>
-        <button type="button" class="pv-save" id="ppAdd" onclick="addFromPreview(false)">Save to my list</button>
+        <button type="button" class="pv-learn" id="ppLearn" onclick="addFromPreview(true)">Learn now</button>
+        <button type="button" class="pv-save" id="ppAdd" onclick="addFromPreview(false)">Save for later</button>
       </div>
       <div class="pv-btns pp-row">
-        <button type="button" class="pv-close" onclick="cancelPastePreview()">Cancel</button>
         <button type="button" class="pv-edit" onclick="editPastePreview()">Edit</button>
+        <button type="button" class="pv-edit" onclick="cancelPastePreview()">Cancel</button>
       </div>
     </div>
   </div>
@@ -3150,7 +3176,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-343';
+    const CLIENT_BUILD = 'sync-344';
 
     let queue = [];
     let currentIndex = 0;
@@ -6106,14 +6132,14 @@
     let pasteParsed = null;
     let pasteReading = false;
 
+    const PASTE_TIP = "The reference can be on the first or last line.";
     function openPaste(prefill, note) {
       document.getElementById("pasteText").value = prefill || "";
       pasteLastLen = (prefill || "").length;
       const hint = document.getElementById("pasteHint");
-      hint.textContent = note || "";
+      hint.textContent = note || PASTE_TIP;
       hint.className = note ? "paste-hint bad" : "paste-hint";
-      document.getElementById("pasteAdd").disabled = false;
-      document.getElementById("pasteAdd").style.display = prefill ? "" : "none";   // before anything is pasted there is only Cancel
+      document.getElementById("pasteAdd").disabled = true;   // Continue wakes up once a reference is recognised
       document.getElementById("pasteModal").classList.add("open");
       if (prefill) updatePasteHint();
       // Focus right here, while the tap that opened the box is still in progress: iPhone only raises the keyboard
@@ -6134,6 +6160,29 @@
     // and the popup shows the verse it understood.
     // Automatic clipboard reading is off for now: iPhone blocks it inside the app frame.
     let AUTO_CLIP_READ = false;
+    // The Paste button in the box: reads the clipboard (the tap counts as the permission) and goes on to the confirm step. If the phone will not let the page read it,
+    // the box is still there: press and hold in it and choose Paste.
+    function pasteButton() {
+      if (pasteReading) return;
+      let direct = null;
+      try { direct = navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : null; } catch (e) { direct = null; }
+      const cb = direct ? direct.catch(function() { return readClipViaShell(); }) : readClipViaShell();
+      pasteReading = true;
+      const guard = setTimeout(function() { pasteReading = false; }, 20000);
+      cb.then(function(text) {
+        clearTimeout(guard); pasteReading = false;
+        text = String(text || "").trim();
+        if (!text) { toastBanner("The clipboard is empty", true, 4000); return; }
+        const box = document.getElementById("pasteText");
+        box.value = text; pasteLastLen = text.length;
+        const p = parsePasted(text);
+        if (!p.error && !p.empty) showPastePreview(p); else updatePasteHint();
+      }, function() {
+        clearTimeout(guard); pasteReading = false;
+        toastBanner("Couldn\u2019t read the clipboard. Press and hold in the box, then choose Paste.", true, 5000);
+      });
+    }
+
     function startPaste() {
       openPaste();
       if (!AUTO_CLIP_READ || pasteReading) return;
@@ -6168,6 +6217,19 @@
       }, 30);
     }
 
+    // When the first rep of a newly added verse opens (the server's rule: added before 6 AM opens at 6 AM, before noon it is open right away, after noon it waits for 6 AM tomorrow).
+    function startLineFor(queueing) {
+      if (queueing) {
+        const cur = learningCards.concat(learningHeld).find(function(c) { return c.stage !== 'lock'; });
+        const ahead = learnQueue.length;
+        return { wait: true, text: (cur ? cur.reference : "Another verse") + " is in Learn. This one waits in the queue" + (ahead ? " (#" + (ahead + 1) + ")" : "") + " and starts when it moves to Lock." };
+      }
+      const d = new Date(nowSrv()), m = d.getHours() * 60 + d.getMinutes();
+      if (m < 6 * 60) return { wait: false, text: "First rep opens today at 6:00 AM" };
+      if (m < 12 * 60) return { wait: false, text: "First rep is open right away" };
+      return { wait: false, text: "First rep opens tomorrow at 6:00 AM" };
+    }
+    let planToken = 0;
     function showPastePreview(p) {
       pasteParsed = p;
       fillVersePopup("ppRef", "ppVer", "ppText", { f: p.ref, v: p.ver, t: p.text }, true);
@@ -6175,8 +6237,24 @@
       note.textContent = p.defaultVer ? "No version found, so I used ESV. Tap Edit to change it." : "";
       note.className = "pp-note";
       document.getElementById("ppAdd").disabled = false;
-      // one new verse at a time: Save & Learn is off while one is on the New tab (Save to my list still works)
-      document.getElementById("ppLearn").textContent = haveVerseInLearn() ? "Save & add to queue" : "Save & Learn now";   // while one is in Learn the new verse waits in the queue
+      // one new verse at a time: while one is in Learn the new verse waits in the queue (Save for later still works)
+      const queueing = haveVerseInLearn();
+      document.getElementById("ppLearn").textContent = queueing ? "Add to queue" : "Learn now";
+      const st = startLineFor(queueing), se = document.getElementById("ppStart");
+      se.textContent = st.text; se.className = "pp-start" + (st.wait ? " wait" : "");
+      // verses and words are counted here; the number of Learn parts comes from the server's plan
+      const meta = document.getElementById("ppMeta"), facts = textFacts(p.text), token = ++planToken;
+      meta.textContent = facts + " \u00b7 \u2026";
+      try {
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (token !== planToken) return;
+            const n = r && Number(r.parts) > 0 ? Number(r.parts) : 0;
+            meta.textContent = facts + (n ? " \u00b7 " + n + (n === 1 ? " part" : " parts") : "");
+          })
+          .withFailureHandler(function() { if (token === planToken) meta.textContent = facts; })
+          .planPreview(p.text);
+      } catch (e) { meta.textContent = facts; }
       try { document.getElementById("pasteText").blur(); } catch (e) {}
       document.getElementById("pastePreview").classList.add("open");
     }
@@ -6226,13 +6304,25 @@
       updatePasteHint();
     }
 
+    // How many words / verses a pasted text has (the [n] markers are verse numbers).
+    function textFacts(t) {
+      const words = String(t || "").replace(/\[\d+\]/g, " ").split(/\s+/).filter(Boolean).length;
+      const verses = Math.max(1, (String(t || "").match(/\[\d+\]/g) || []).length);
+      return verses + (verses === 1 ? " verse" : " verses") + " \u00b7 " + words + (words === 1 ? " word" : " words");
+    }
     function updatePasteHint() {
       const el = document.getElementById("pasteHint");
       const p = parsePasted(document.getElementById("pasteText").value);
-      document.getElementById("pasteAdd").style.display = p.empty ? "none" : "";
-      if (p.empty) { el.textContent = ""; el.className = "paste-hint"; return; }
+      const add = document.getElementById("pasteAdd");
+      el.textContent = "";
+      add.disabled = !!(p.empty || p.error);
+      if (p.empty) { el.textContent = PASTE_TIP; el.className = "paste-hint"; return; }
       if (p.error) { el.textContent = p.error; el.className = "paste-hint bad"; return; }
-      el.textContent = p.ref + " · " + p.ver + (p.defaultVer ? " (no version given)" : "");
+      const ck = document.createElement("span"); ck.className = "ck"; ck.textContent = "\u2713"; el.appendChild(ck);
+      const t = document.createElement("span");
+      const b = document.createElement("b"); b.textContent = p.ref; t.appendChild(b);
+      t.appendChild(document.createTextNode(" \u00b7 " + p.ver + (p.defaultVer ? " (no version given)" : "") + " \u00b7 " + textFacts(p.text)));
+      el.appendChild(t);
       el.className = "paste-hint ok";
     }
 

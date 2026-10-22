@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-129'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-130'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1912,6 +1912,15 @@ function addPastedVerse(reference, version, text, learn) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// How many Learn parts a verse would take (the learn plan), for the Add Verse confirm dialog. Reads nothing from the sheet.
+function planPreview(text) {
+  const body = String(text === null || text === undefined ? '' : text).replace(/\s+/g, ' ').trim();   // the same cleaning addPastedVerse does
+  if (!body || body.length > 20000) return { parts: 0 };
+  let n = 0;
+  try { n = planSteps_(body).length; } catch (e) {}
+  return { parts: Math.max(1, n) };
 }
 
 // For the Verse List screen: every verse you've started (Level 0 and up). Unassigned verses are left out.
