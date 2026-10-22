@@ -328,43 +328,6 @@
     .tr-mini > div { flex: 1; text-align: center; padding: 6px 4px 7px; border: 1px solid var(--border-card); border-radius: 10px; line-height: 1.15; }
     .tr-mini b { display: block; font-size: 16px; font-weight: 800; color: var(--text-primary); }
     .tr-mini span { font-size: 10.5px; color: var(--text-meta); }
-    /* Treasury screen */
-    .tr-head { margin: 4px 0 10px; padding: 14px 16px 16px; border-radius: 16px; border: 1px solid var(--border-card); background: var(--bg-body, transparent); }
-    .tr-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-    .tr-pts { font-size: 40px; font-weight: 800; line-height: 1; color: var(--text-primary); letter-spacing: -0.5px; }
-    .tr-pts small { font-size: 16px; font-weight: 600; color: var(--text-muted); letter-spacing: 0; margin-left: 4px; }
-    .tr-bar { display: flex; height: 9px; margin-top: 14px; border-radius: 5px; overflow: hidden; background: var(--border-card); }
-    .tr-bar i { display: block; background: var(--rl); }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tr-bar i { background: var(--rd); } }
-    :root[data-theme="dark"] .tr-bar i { background: var(--rd); }
-    .tr-row { --rc: var(--rl); display: flex; align-items: center; gap: 12px; width: 100%; min-height: 0; padding: 12px 4px; margin: 0; background: none; border: 0; border-bottom: 1px solid var(--border-card);
-      box-shadow: none; border-radius: 0; flex-direction: row; text-align: left; font-family: inherit; color: var(--text-primary); }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tr-row, :root:not([data-theme="light"]) .tr-grp { --rc: var(--rd); } }
-    :root[data-theme="dark"] .tr-row, :root[data-theme="dark"] .tr-grp { --rc: var(--rd); }
-    .tr-row:active { transform: none; filter: none; }
-    .tr-row .tr-ic { flex: none; display: block; width: 26px; height: 26px; color: var(--rc); }
-    .tr-row .tr-ic svg { display: block; width: 100%; height: 100%; }
-    .tr-row .tr-n { flex: 1; min-width: 0; font-size: 14px; color: var(--text-muted); }
-    .tr-row .tr-p { font-size: 15px; font-weight: 800; white-space: nowrap; }
-    .tr-row .chev { color: var(--text-meta); font-size: 18px; line-height: 1; transition: transform 0.15s ease; }
-    .tr-row.open .chev { transform: rotate(90deg); }
-    /* Every rank is a card in its own color from the start; opening one only unfolds the list inside it. */
-    .tr-grp { --rc: var(--rl); margin: 8px 0; border-radius: 14px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--rc) 30%, var(--border-card));
-      background: color-mix(in srgb, var(--rc) 6%, transparent); transition: background 0.25s ease, border-color 0.25s ease; }
-    .tr-grp.open { border-color: color-mix(in srgb, var(--rc) 50%, var(--border-card)); background: color-mix(in srgb, var(--rc) 10%, transparent); }
-    .tr-grp.zero { opacity: 0.45; }
-    .tr-grp > .tr-row { padding: 12px 14px; border-bottom: 0; }
-    .tr-row.zero { cursor: default; }
-    .tr-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s ease; }
-    .tr-body.open { grid-template-rows: 1fr; }
-    .tr-in { overflow: hidden; min-height: 0; border-top: 1px solid transparent; transition: border-color 0.28s ease; }
-    .tr-body.open > .tr-in { border-top-color: color-mix(in srgb, var(--rc) 25%, var(--border-card)); }
-    .tr-grp .vl-verse { padding-left: 16px; padding-right: 14px; }
-    .tr-grp .vl-verse + .vl-verse { border-top-color: color-mix(in srgb, var(--rc) 18%, var(--border-card)); }
-    .tr-grp .vl-verse.lp-down { background: color-mix(in srgb, var(--rc) 20%, transparent); }
-    /* The Treasury fades in over the screen and fades back out. */
-    #treasuryView.open { animation: trIn 0.25s ease-out; }
-    #treasuryView.closing { animation: trOut 0.2s ease-in forwards; }
     /* a book opens as a nearly full-screen card that fades in right over the map, and fades back out to it */
     #upcomingView.open { animation: bkIn 0.2s ease-out; }
     #upcomingView.closing { animation: bkOut 0.16s ease-in forwards; }
@@ -375,8 +338,6 @@
     @keyframes bkOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.97); } }
     .bk-dim { position: fixed; left: 0; right: 0; top: 0; bottom: var(--tab-h); z-index: 41; background: rgba(0, 0, 0, 0.34); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
     .bk-dim.on { opacity: 1; pointer-events: auto; }
-    @keyframes trIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes trOut { from { opacity: 1; } to { opacity: 0; } }
     .vl-due { font-size: 12px; color: var(--text-meta); white-space: nowrap; margin-left: 10px; }
     .vl-due.now { color: var(--text-accent); font-weight: 700; }
     .vl-row { display: flex; align-items: center; justify-content: space-between; width: 100%;
@@ -456,7 +417,7 @@
       font-size: 15px; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .vl-verse .vl-ref { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .vl-verse, .verse-body { -webkit-touch-callout: none; }
-    #verseListView, #upcomingView, #treasuryView, .vl-verse, .vl-row, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #verseListView, #upcomingView, .vl-verse, .vl-row, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
     .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -1104,7 +1065,7 @@
     #verseListView .picker-title { flex: none; }
     #verseListView .vl-total { display: block; font-size: 12px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #verseListView .vl-total:empty { display: none; }
-    #upcomingView, #treasuryView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
+    #upcomingView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 41; }
     #upcomingView { inset: max(env(safe-area-inset-top, 0px), 8px) max(env(safe-area-inset-right, 0px), 12px) calc(var(--tab-h) + 6px) max(env(safe-area-inset-left, 0px), 12px); }   /* exactly the card behind it */
     #upcomingView { padding: 14px 16px 6px; border-radius: 20px; border: 1px solid var(--border-card); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.38); z-index: 42; }
     #searchView { bottom: var(--tab-h); padding-bottom: 8px; z-index: 42; overflow-x: hidden; }
@@ -1311,7 +1272,7 @@
     .picker-item .pk-added { font-size: 13px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
     .picker-item .pk-parts { flex: none; font-size: 15px; font-weight: 600; color: var(--text-accent); }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
-    #treasuryView, #searchView, #upcomingView { touch-action: pan-y; }
+    #searchView, #upcomingView { touch-action: pan-y; }
     .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
 
     /* One notification style for the whole app: a rounded banner in the same spot on every screen (just above the buttons).
@@ -1427,14 +1388,6 @@
       <button type="button" class="picker-close" onclick="backUpcoming()">Close</button>
     </div>
     <div class="picker-list" id="upList"></div>
-  </div>
-
-  <div class="picker" id="treasuryView">
-    <div class="picker-head">
-      <span class="picker-title">Treasury</span>
-      <button type="button" class="picker-close" onclick="backTreasury()">Back</button>
-    </div>
-    <div class="picker-list" id="trList"></div>
   </div>
 
   <div class="bk-dim" id="bookDim" onclick="tapCardDim()"></div>
@@ -1867,7 +1820,6 @@
     function goTab(t) {
       if (t === "new" && document.getElementById("picker").classList.contains("held")) { closePicker(); updateTabs(); return; }   // tapping New again leaves the held page
       closeUpcoming();
-      closeTreasury();
       closeSearch(); closePeek();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
       if (t === "verses") {
@@ -2046,7 +1998,7 @@
 
     function closeVerseList() {
       hideVerseTip();
-      closeTreasury(); closePeek();
+      closePeek();
       document.getElementById("verseListView").classList.remove("open");
       updateTabs();
     }
@@ -2255,97 +2207,6 @@
       if (document.getElementById("upcomingView").classList.contains("open")) backUpcoming();
     }
 
-    // ── Treasury: every rank with its references; a rank opens in place on this screen ──
-    let trOpen = null;
-    // What a reference is worth: the points for its level (1, 2, 3, 4, 5, 6, 8, 10), once for each of its verses.
-    function trPts(v) { return ptsOf(v.g) * (v.pn || 1); }
-    function trBody(g, vs, body) {
-      vs.slice().sort(compareVerses).forEach(function(v) {
-        const p = trPts(v), nv = v.pn || 1;
-        body.appendChild(vlItem(v, false, { text: (nv > 1 ? nv + " verses \u00b7 " : "") + p + (p === 1 ? " pt" : " pts"), now: false }));
-      });
-    }
-    function renderTreasury() {
-      hideVerseTip();
-      const box = document.getElementById("trList");
-      box.textContent = "";
-      const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-      let pts = 0, verses = 0;
-      const gp = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-      vlVerses.forEach(function(v) { const g = Math.max(0, Math.min(8, v.g | 0)); cnt[g]++; gp[g] += ptsOf(g) * (v.pn || 1); pts += ptsOf(g) * (v.pn || 1); verses += (v.pn || 1); });
-      const total = vlVerses.length;
-      const head = document.createElement("div");
-      head.className = "tr-head";
-      let bar = "";
-      for (let g = 1; g <= 8; g++) if (cnt[g]) bar += '<i class="rank-' + g + '" style="flex:' + cnt[g] + '"></i>';
-      head.innerHTML = '<div class="tr-top"><div class="tr-pts">' + pts + '<small>pts</small></div></div><div class="tr-bar">' + bar + '</div>';
-      const books = {};
-      vlVerses.forEach(function(v) { books[vlBookKey(v)] = true; });
-      const stats = document.createElement("div");
-      stats.className = "tr-mini";
-      [[verses, verses === 1 ? "verse" : "verses"], [total, total === 1 ? "reference" : "references"], [Object.keys(books).length, "of 66 books"]].forEach(function(p) {
-        const c = document.createElement("div");
-        const n = document.createElement("b"); n.textContent = p[0];
-        const l = document.createElement("span"); l.textContent = p[1];
-        c.appendChild(n); c.appendChild(l);
-        stats.appendChild(c);
-      });
-      head.appendChild(stats);
-      box.appendChild(head);
-      const bodies = [], rows = [], grps = [];
-      for (let g = 8; g >= 1; g--) {
-        const vs = vlVerses.filter(function(v) { return v.g === g; });
-        const grp = document.createElement("div");
-        grp.className = "tr-grp rank-" + g + (vs.length ? "" : " zero");
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "tr-row rank-" + g + (vs.length ? "" : " zero");
-        const ic = document.createElement("span"); ic.className = "tr-ic";
-        ic.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (RANK_ICON[g] || "") + "</svg>";
-        const n = document.createElement("span"); n.className = "tr-n";
-        n.textContent = vs.length + (vs.length === 1 ? " reference" : " references");
-        const p = document.createElement("span"); p.className = "tr-p";
-        p.textContent = gp[g] + (gp[g] === 1 ? " pt" : " pts");
-        const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "\u203A";
-        row.appendChild(ic); row.appendChild(makePill(g)); row.appendChild(n); row.appendChild(p); row.appendChild(chev);
-        grp.appendChild(row);
-        const body = document.createElement("div");
-        body.className = "tr-body";
-        const inner = document.createElement("div");
-        inner.className = "tr-in";
-        body.appendChild(inner);
-        if (vs.length) grp.appendChild(body);
-        box.appendChild(grp);
-        rows.push(row); bodies.push(body); grps.push(grp);
-        let built = false;
-        row.onclick = function() {
-          if (!vs.length) return;
-          hideVerseTip();
-          const open = !body.classList.contains("open");
-          rows.forEach(function(r, i) { r.classList.remove("open"); bodies[i].classList.remove("open"); grps[i].classList.remove("open"); });
-          if (open) {
-            if (!built) { trBody(g, vs, inner); built = true; }
-            row.classList.add("open"); body.classList.add("open"); grp.classList.add("open");
-            trOpen = g;
-            setTimeout(function() { try { grp.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }, 300);
-          } else trOpen = null;
-        };
-        if (trOpen === g && vs.length) row.onclick();
-      }
-    }
-    function openTreasury() {
-      hideVerseTip();
-      const tv = document.getElementById("treasuryView");
-      if (tv.classList.contains("open") && !tv.classList.contains("closing")) return;
-      if (!vlVerses.length) { loadVlVerses(function() { if (vlVerses.length) openTreasury(); }, function() {}); return; }   // opened from Review Complete before the list is loaded
-      trOpen = null;
-      renderTreasury();
-      const view = document.getElementById("treasuryView");
-      clearTimeout(trCloseTimer);
-      view.classList.remove("closing");
-      view.classList.add("open");
-      document.getElementById("trList").scrollTop = 0;
-    }
     // Swipe anywhere on a screen to close it (right or left, per screen; same mechanic as the swipe in the New tab): it fires as soon as the finger has clearly
     // gone sideways. Mostly-vertical drags are left to scrolling, and the very edge of the screen is left to iOS.
     function attachSwipeBack(id, back, dir) {
@@ -2374,22 +2235,6 @@
         if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
       }, true);
     }
-    let trCloseTimer = null;
-    // Back button: slide out, then close. Anything else (changing tab, closing the Verses tab) closes at once.
-    function backTreasury() {
-      const view = document.getElementById("treasuryView");
-      if (!view.classList.contains("open") || view.classList.contains("closing")) return;
-      view.classList.add("closing");
-      trCloseTimer = setTimeout(closeTreasury, 210);
-    }
-    function closeTreasury() {
-      hideVerseTip();
-      clearTimeout(trCloseTimer);
-      const view = document.getElementById("treasuryView");
-      view.classList.remove("closing");
-      view.classList.remove("open");
-    }
-
     // One verse row (reference, version badge if not ESV, rank pill): tap for its first words, hold for the whole verse.
     function vlItem(v, showPills, due) {
       const item = document.createElement("div");
@@ -3114,7 +2959,7 @@
       });
       obs.observe(el, { childList: true });
     }
-    ["svList", "upList", "trList"].forEach(watchEndCue);   // (the New page has no end marker)
+    ["svList", "upList"].forEach(watchEndCue);   // (the New page has no end marker)
 
     // Pull past the top of a list card (a swipe down that starts with the list already at its top), or push past its end (a swipe up that starts at the
     // end), and the card closes, like pulling down an open verse. A swipe that starts mid-list just scrolls.
@@ -3206,7 +3051,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-355';
+    const CLIENT_BUILD = 'sync-356';
 
     let queue = [];
     let currentIndex = 0;
@@ -3300,8 +3145,6 @@
     });
 
     window.onload = function() {
-      attachSwipeBack("treasuryView", backTreasury, "left");
-      attachSwipeBack("verseListView", openTreasury, "right");      // swipe right on the Verses tab opens the Treasury (the Review Complete screen has no link to it)
       ptsHeld = attachLongPress(document.getElementById("statGradBox"), openPtsPeek);
       attachSwipeBack("upcomingView", backUpcoming, "left");
       attachSwipeBack("searchView", backSearch, "left");
