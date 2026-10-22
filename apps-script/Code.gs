@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-119'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-120'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2476,46 +2476,52 @@ function checkVerseSplits() {
 }
 
 // ───────────── Learn plan simulation (read only) ─────────────
-// Run checkLearnPlan() from the editor. It changes nothing. It shows what a "volume unit" plan would do to your learn days: a learn step is worth about
-// LEARN_UNIT words, a step costs a day, and a step that runs past the unit costs more and more. So a long verse splits into parts (at its best break) and short
-// neighbouring verses of one reference join into one step. Whole verses are only ever joined with other whole verses; a split verse stands on its own.
-// Everything below is a share of one volume unit (25 words = 100%), so changing LEARN_UNIT rescales the whole plan.
-//   up to 120%    an ideal step (30 words). Whole verses join when together they are about 120% (30 words) or less; the closer to 120%, the less the join is worth.
-//   50% and up    a part (12.5 words, the same as a phrase) of a split verse should be at least this big (smaller costs extra), and a verse alone under it is a good reason to join.
-//   160%          where a verse is split into parts (40 words). Leaving a verse whole costs steadily more above 100% and steeply more just under 160%, so at 40 words a split wins whatever the break.
-//                 A joined step likewise costs a little more as it nears 120% and very much more above it.
-// None of these is a hard rule. Each is the point where one choice starts to cost more than another, and the breaks, the evenness and the tiny verses nudge it.
-const LEARN_UNIT = LOAD_WORDS;  // words in one volume unit (100%): the same unit the review load uses
+// Run checkLearnPlan() from the editor. It changes nothing. It shows what the learn plan does to your learn days: every learn step costs a day, and a step that is
+// bigger than about one volume unit (LEARN_UNIT, 25 words) costs more and more. So a long verse splits into parts (at its best break) and short neighbouring verses of
+// one reference join into one step. Whole verses are only ever joined with other whole verses; a split verse stands on its own.
+// There are no hard limits on size. Every choice is a cost and the cheapest plan wins. The size cost is a curve (a "size-cost curve", not a measured failure rate):
+//   step cost = 1 (the day) + LEARN_REDO x (words / unit) x (how far past the middle the step is, 0 to 1, an S curve)
+// The middle of the curve (LEARN_MID, 37.5 words, the top of 25 +50%) is where the extra cost has reached half of its full size. Under about 25 words the extra cost
+// is small, and above the middle it climbs fast. The same curve prices a whole verse, a part of a split verse and a joined step. A very small step is not punished for
+// being small: it just costs a whole day, so joining it to a neighbour saves that day. In practice verses join up to about 30 words and split from about 39.
+// Words are "effective words": a phrase that repeats inside a verse (whatsoever things are ... whatsoever things are ...) is easier to learn, so it counts at
+// 30% of its length, and the credit is capped at 30% of the verse.
+const LEARN_UNIT = LOAD_WORDS;  // words in one volume unit: the same unit the review load uses
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
-const LEARN_SPLIT_AT = 1.60;    // a verse about this share of the unit is where a split starts to be worth it
-const LEARN_JOIN_AT = 1.20;     // verses join up to about this share of the unit
-const LEARN_MIN_PART = 0.50;    // a part of a split verse smaller than this share costs extra
-const LEARN_SPLIT_COST = 0.37;  // each extra part of a split verse costs this much more, so a split has to be worth it
-const LEARN_JOIN_SLACK = 0.04;     // a joined step over LEARN_JOIN_AT by this much (one word) costs one more step, so it stops there
-const LEARN_SHORT_COEF = 225;       // a part under the minimum costs (share short)^2 x this
-const LEARN_ALONE_COEF = 56;        // a verse that stays a step on its own under the minimum costs (share short)^2 x this: a tiny step is a good reason to join
-const LEARN_EVEN_COEF = 6;          // uneven parts cost (share from the even size)^2 x this
-const LEARN_BREAK_COST = { sentence: 0.3, semicolon: 0.4, comma: 0.6, other: 1.5 };   // a verse boundary costs 0
-// A step over the unit gets steadily more costly, then steeply so as it nears LEARN_SPLIT_AT: t = how far it is from the unit to the split point (0 at 100%, 1 at 160%).
-// cost = a gentle rise (t squared) + a steep wall (t to the sixth), so just under the split point it is cheaper to cut, and past it leaving a verse whole is very costly.
-const LEARN_RISE = 1.3;         // the gentle rise: this much extra cost by the split point
-const LEARN_WALL = 3.0;         // the steep part: this much more at the split point, almost nothing before about 130%
-const LEARN_JOIN_RISE = 0.8;    // a joined step costs a little more the closer it gets to LEARN_JOIN_AT
-function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words / LEARN_UNIT); return LEARN_SHORT_COEF * d * d; }
-function learnAloneCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words / LEARN_UNIT); return LEARN_ALONE_COEF * d * d; }
-// A joined step is judged more strictly than a single verse: verses only join when together they are about one unit or less.
-function learnJoinCost_(words) { const sh = words / LEARN_UNIT, over = Math.max(0, sh - LEARN_JOIN_AT) / LEARN_JOIN_SLACK, t = Math.min(sh, LEARN_JOIN_AT) / LEARN_JOIN_AT; return LEARN_EXTRA_DAY + LEARN_JOIN_RISE * t * t + over * over; }
-function learnStepCost_(words) { const t = Math.max(0, words / LEARN_UNIT - 1) / (LEARN_SPLIT_AT - 1); return LEARN_EXTRA_DAY + LEARN_RISE * t * t + LEARN_WALL * Math.pow(t, 6); }
+const LEARN_MID = 37.5;         // effective words where the size cost has reached half of its full size
+const LEARN_SPREAD = 6.5;       // how quickly the curve climbs around the middle (smaller = steeper)
+const LEARN_REDO = 3.0;         // the full size of the extra cost, in days, for a 25-word step (it grows with the step's words)
+const LEARN_SPLIT_COST = 0.4;   // each extra part of a split verse costs this much more (the parts have to be put back together later)
+const LEARN_BREAK_COST = { sentence: 0, semicolon: 0.1, comma: 0.2, other: 0.6 };   // a small tie-break between cuts; a verse boundary costs 0
+const LEARN_REPEAT_CREDIT = 0.7;    // a word inside a repeated phrase counts for this much less
+const LEARN_REPEAT_CAP = 0.3;       // the credit never takes more than this share off a verse
+function learnStepCost_(words) { return LEARN_EXTRA_DAY + LEARN_REDO * (words / LEARN_UNIT) / (1 + Math.exp(-(words - LEARN_MID) / LEARN_SPREAD)); }
+
+// Effective words of a verse: its words, less a credit for phrases (2 to 8 words) that repeat an earlier phrase of the same verse. { words, rep, eff }
+function effInfo_(text) {
+  const t = String(text).toLowerCase().replace(/\[\d+\]/g, ' ').replace(/[^a-z0-9'\s-]/g, ' ').split(/\s+/).filter(Boolean);
+  const n = t.length, seen = {};
+  let rep = 0, i = 0;
+  while (i < n) {
+    for (let a = 0; a + 1 < i; a++) for (let L = 2; L <= 8 && a + L <= i; L++) seen[t.slice(a, a + L).join(' ')] = 1;   // every phrase that ends before here
+    let best = 0;
+    for (let L = Math.min(8, n - i); L >= 2; L--) if (seen[t.slice(i, i + L).join(' ')]) { best = L; break; }
+    if (best) { rep += best; i += best; } else i++;
+  }
+  const words = splitWords_(text);
+  return { words: words, rep: rep, eff: Math.max(1, words - Math.min(LEARN_REPEAT_CREDIT * rep, LEARN_REPEAT_CAP * words)) };
+}
 
 // The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after, bounds }
-// A cut costs by how natural the break is (sentence end best, plain comma worse), a part under LEARN_MIN_PART of the unit costs a little extra, and parts that are
-// uneven cost a little extra too, so with two equally good breaks the more even one wins. None of these is a hard rule: a cost only decides between choices.
+// A cut costs a little for the stitching and a little by how natural the break is (sentence end best, plain comma worse). The steps cost by size (learnStepCost_),
+// so parts come out about even. None of these is a hard rule: a cost only decides between choices. The only structural limit is 4 parts, cut at phrase breaks.
 function planVerse_(text) {
   const phrases = splitPhrases_(text);
   const lens = phrases.map(splitWords_);
   const n = lens.length;
   const pre = [0]; lens.forEach(function(l) { pre.push(pre[pre.length - 1] + l); });
   const total = pre[n];
+  const fx = effInfo_(text).eff / Math.max(1, total);   // effective words per word: repeated phrases make a verse easier
   function breakAfter(i) {
     const w = phrases[i].replace(/[\u201d"\u2019')\]]+$/, '');
     if (/[.!?]$/.test(w)) return LEARN_BREAK_COST.sentence;
@@ -2527,13 +2533,8 @@ function planVerse_(text) {
   function tryCuts(cuts) {   // cuts: increasing phrase indexes where a new part starts
     const bounds = [0].concat(cuts, [n]);
     const k = bounds.length - 1;
-    const mean = total / k;
     let cost = 0;
-    for (let p = 0; p < k; p++) {
-      const w = pre[bounds[p + 1]] - pre[bounds[p]];
-      cost += learnStepCost_(w);
-      if (k > 1) cost += learnShortCost_(w) + LEARN_EVEN_COEF * ((w - mean) / LEARN_UNIT) * ((w - mean) / LEARN_UNIT);
-    }
+    for (let p = 0; p < k; p++) cost += learnStepCost_((pre[bounds[p + 1]] - pre[bounds[p]]) * fx);
     cuts.forEach(function(c) { cost += breakAfter(c - 1) + LEARN_SPLIT_COST; });
     if (!best || cost < best.cost - 1e-9) best = { cost: cost, bounds: bounds };
   }
@@ -2556,16 +2557,17 @@ function planVerse_(text) {
 // The learn steps of a whole reference: [{ verses: [first, last] (0-based), sizes: [words per part], text }]
 function planReference_(verses) {
   const m = verses.length;
-  const words = verses.map(function(v) { return splitWords_(v.text); });
+  const rawWords = verses.map(function(v) { return splitWords_(v.text); });
+  const words = verses.map(function(v) { return effInfo_(v.text).eff; });   // joins are judged on effective words, shown on raw words
   const own = verses.map(function(v) { return planVerse_(v.text); });
   const best = new Array(m + 1).fill(Infinity), from = new Array(m + 1).fill(0);
   best[0] = 0;
   for (let j = 1; j <= m; j++) {
-    best[j] = best[j - 1] + own[j - 1].cost + (own[j - 1].sizes.length === 1 ? learnAloneCost_(words[j - 1]) : 0); from[j] = j - 1;            // the verse alone (split or not): tried first, so a tie keeps the verses apart
+    best[j] = best[j - 1] + own[j - 1].cost; from[j] = j - 1;            // the verse alone (split or not): tried first, so a tie keeps the verses apart
     let sum = words[j - 1];
     for (let i = j - 2; i >= 0; i--) {                                    // verses i..j-1 as one joined step
       sum += words[i];
-      const c = best[i] + learnJoinCost_(sum);
+      const c = best[i] + learnStepCost_(sum);
       if (c < best[j] - 1e-9) { best[j] = c; from[j] = i; }
     }
   }
@@ -2573,7 +2575,7 @@ function planReference_(verses) {
   for (let j = m; j > 0; j = from[j]) {
     const i = from[j];
     if (j - i === 1) steps.unshift({ first: i, last: i, sizes: own[i].sizes, after: own[i].after, bounds: own[i].bounds });
-    else { let w = 0; for (let k = i; k < j; k++) w += words[k]; steps.unshift({ first: i, last: j - 1, sizes: [w], after: [] }); }
+    else { let w = 0; for (let k = i; k < j; k++) w += rawWords[k]; steps.unshift({ first: i, last: j - 1, sizes: [w], after: [] }); }
   }
   return steps;
 }
@@ -2609,12 +2611,13 @@ function stepCount_(row) {
 function checkLearnPlan() {
   const data = readSheetData_();
   let refs = 0, stepsNow = 0, stepsNew = 0, joinedVerses = 0, joinedSteps = 0, splitVerses = 0, splitExtra = 0, changed = 0;
-  const lines = [];
+  const lines = [], repLines = [];
   for (let i = 1; i < data.length; i++) {
     const ref = cleanRef_(data[i][5]);
     if (!ref) continue;
     const verses = splitVerses_(data[i][7]);
     if (!verses.length) continue;
+    verses.forEach(function(v, k) { const e = effInfo_(v.text); if (e.words - e.eff >= 3) repLines.push('  ' + (ref + (verses.length > 1 ? ' (verse ' + (v.num || (k + 1)) + ')' : '') + '                              ').slice(0, 34) + e.words + 'w counts as ' + Math.round(e.eff) + ' (repeated phrases)'); });
     const steps = planReference_(verses);
     refs++; stepsNow += verses.length; stepsNew += steps.reduce(function(a, s) { return a + s.sizes.length; }, 0);
     let changes = false;
@@ -2637,13 +2640,13 @@ function checkLearnPlan() {
     }
   }
   const out = [
-    'LEARN PLAN SIMULATION (volume unit ' + LEARN_UNIT + ' words = 100%: verses join up to about ' + Math.round(LEARN_JOIN_AT * 100) + '% (' + Math.round(LEARN_JOIN_AT * LEARN_UNIT) + ' words); a verse starts to split from about ' + Math.round(LEARN_SPLIT_AT * 100) + '% (' + Math.round(LEARN_SPLIT_AT * LEARN_UNIT) + ' words); parts are at least ' + Math.round(LEARN_MIN_PART * 100) + '% (' + (Math.round(LEARN_MIN_PART * LEARN_UNIT * 10) / 10) + ' words); all soft costs, no hard limits)',
+    'LEARN PLAN SIMULATION (a step costs a day plus a size cost that climbs around ' + LEARN_MID + ' words; verses join up to about 30 words together and split from about 39 effective words; repeated phrases count for less; all costs, no hard limits)',
     'references: ' + refs + '   learn steps today (one per verse): ' + stepsNow + '   with this plan: ' + stepsNew + '   (' + (stepsNew - stepsNow >= 0 ? '+' : '') + (stepsNew - stepsNow) + ')',
     'JOINED: ' + joinedVerses + ' verses would join into ' + joinedSteps + ' steps (saves ' + (joinedVerses - joinedSteps) + ' steps)',
     'SPLIT:  ' + splitVerses + ' verses would split (adds ' + splitExtra + ' steps)',
     'references that would change: ' + changed + ' of ' + refs + '   ([learning] = still in the learn phase now; a plan only applies to references started after the change)',
     '',
     'CHANGED REFERENCES (verses today -> steps with the plan)'
-  ].concat(lines);
+  ].concat(lines, ['', 'VERSES MADE EASIER BY REPEATED PHRASES (' + repLines.length + ')'], repLines);
   console.log(out.join('\n'));
 }
