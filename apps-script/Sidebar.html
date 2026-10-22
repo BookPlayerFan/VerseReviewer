@@ -774,15 +774,17 @@
       color: var(--text-accent);
       user-select: none;
     }
-    .day-ring { position: relative; display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; flex: none; }
+    .day-ring { position: relative; display: inline-flex; width: 26px; height: 26px; margin: -6px 0; align-items: center; justify-content: center; flex: none; }   /* the margin keeps the ring from making the bar taller than the text */
     .day-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
     .day-ring circle { fill: none; stroke-width: 3.5; }
     .day-ring .dr-track { stroke: rgba(150, 150, 150, 0.28); }
     .day-ring .dr-arc { stroke: var(--text-accent); stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
-    .day-ring b { position: relative; font: 700 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-primary); }
-    .day-ring.wide b { font-size: 11px; }
-    .pk3-layer { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 50; pointer-events: none; }   /* Review / Lock hold: the first three words, drawn clear over the untouched blurred text */
-    .pk3-layer span { position: absolute; white-space: nowrap; border-radius: 3px; overflow: hidden; }
+    .day-ring b { position: relative; font: 500 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-primary); }
+    .day-ring.wide b { font-size: 9px; }
+    .v-text.blurred.pk3 { filter: none; opacity: 1; background-color: transparent; }   /* Review / Lock hold: the first three words unblur in place; the rest stays blurred */
+    .pk3-on { animation: pk3in .18s ease; }
+    .pk3-rest { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); user-select: none; }
+    @keyframes pk3in { from { filter: blur(var(--spoiler-blur)); opacity: 0.2; } to { filter: none; opacity: 1; } }
     .v-text.hinted .hz { color: transparent; }
     .v-text.hinted .hu { color: transparent; position: relative; transition: color .22s ease; }
     .v-text.hinted .hu::after { content: ""; position: absolute; left: 50%; top: 55%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--text-accent); transition: opacity .22s ease; pointer-events: none; }   /* a hidden word: a dot where its first letter would be (drawn over the letter, so nothing changes size or moves) */
@@ -964,6 +966,7 @@
     .fail-list .fail-head .fail-title { line-height: 1; }
     .fail-list .fail-head .pts-sum .up { color: var(--text-accent); }
     .fail-list .fail-head .pts-sum .down { color: var(--btn-fail-text); }
+    .fail-due { margin-left: auto; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
     .pts-badge { min-width: 34px; text-align: right; font-weight: 800; font-size: 14px; }
     .pts-badge.up { color: var(--text-accent); }
     .pts-badge.down { color: var(--btn-fail-text); }
@@ -1349,7 +1352,7 @@
       </div>
 
       <div class="stats-grid" id="summaryStats">
-        <div class="stat-box">
+        <div class="stat-box" id="statRevBox" onclick="toggleStatList('done')">
           <div class="stat-val" id="statReviewed">0</div>
           <div class="stat-lbl">Reviewed</div>
         </div>
@@ -3167,7 +3170,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-334';
+    const CLIENT_BUILD = 'sync-335';
 
     let queue = [];
     let currentIndex = 0;
@@ -3206,7 +3209,7 @@
     let revealCursor = -1;  // the piece revealed most recently; a tap reveals the next hidden piece after it
 
     // Today's session. The server is the source of truth so every device shows the same session.
-    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [] };
+    let sessionStats = { reviewed: 0, passed: 0, failed: 0, graduated: 0, pts: 0, ptsRefs: [], failedRefs: [], gradRefs: [], clearedRefs: [], doneRefs: [] };
     let sessionVersion = 0;
     let sessionDate = "";
     // Which screen you are on: 'review' (the daily deck) or 'learning' (Level 0 verses).
@@ -3414,6 +3417,7 @@
       if (!Array.isArray(sessionStats.failedRefs)) sessionStats.failedRefs = [];
       if (!Array.isArray(sessionStats.gradRefs)) sessionStats.gradRefs = [];
       if (!Array.isArray(sessionStats.clearedRefs)) sessionStats.clearedRefs = [];
+      if (!Array.isArray(sessionStats.doneRefs)) sessionStats.doneRefs = [];
       totalCardsProcessed = session.processed || 0;
       sessionVersion = session.version;
       sessionDate = session.date;
@@ -3509,7 +3513,7 @@
         baseCount: baseCount,
         processed: totalCardsProcessed,
         mode: mode,
-        stats: Object.assign({}, sessionStats, { failedRefs: (sessionStats.failedRefs || []).slice(), gradRefs: (sessionStats.gradRefs || []).slice(), clearedRefs: (sessionStats.clearedRefs || []).slice() }),
+        stats: Object.assign({}, sessionStats, { failedRefs: (sessionStats.failedRefs || []).slice(), gradRefs: (sessionStats.gradRefs || []).slice(), clearedRefs: (sessionStats.clearedRefs || []).slice(), doneRefs: (sessionStats.doneRefs || []).slice() }),
         seen: learningSeen
       };
     }
@@ -4747,7 +4751,7 @@
     // The Review bar's ring: the share of today's deck already done, and how many cards are left (this one included) in the middle.
     function dayRing(left, total) {
       const r = 13, c = 2 * Math.PI * r, off = c * (1 - (total - left) / total);
-      return '<span class="day-ring' + (left >= 100 ? ' wide' : '') + '" role="img" aria-label="' + left + ' left"><svg width="34" height="34" viewBox="0 0 34 34">' +
+      return '<span class="day-ring' + (left >= 100 ? ' wide' : '') + '" role="img" aria-label="' + left + ' left"><svg width="26" height="26" viewBox="0 0 34 34">' +
         '<circle class="dr-track" cx="17" cy="17" r="' + r + '"/><circle class="dr-arc" cx="17" cy="17" r="' + r + '" stroke-dasharray="' + c.toFixed(2) + '" stroke-dashoffset="' + off.toFixed(2) + '"/></svg><b>' + left + '</b></span>';
     }
     function renderCardBody() {
@@ -4990,38 +4994,24 @@
     function peekFirstWords() {
       const el = document.querySelector("#cardBody .v-text");
       if (!el || !el.classList.contains("blurred")) return;   // already showing: nothing to peek at
-      // The blurred text is never touched (changing it is what made the outline jump on hold and release). The first three words are drawn clear on a layer above it.
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), words = [];
-      let node;
-      while (words.length < 3 && (node = walker.nextNode())) {
-        const re = /\S+/g; let m;
-        while (words.length < 3 && (m = re.exec(node.nodeValue))) {
-          const r = document.createRange(); r.setStart(node, m.index); r.setEnd(node, m.index + m[0].length);
-          const rects = r.getClientRects ? r.getClientRects() : [];   // (no layout: no peek, and no error)
-          if (rects.length) words.push({ t: m[0], x: rects[0].left, y: rects[0].top, w: rects[0].width, h: rects[0].height });
-        }
-      }
-      if (!words.length) return;
-      const cs = getComputedStyle(el);
-      let bg = "", up = el.parentElement;   // the solid colour behind the verse box (not the box's own spoiler tint)
-      while (up && (!bg || bg === "transparent" || bg === "rgba(0, 0, 0, 0)")) { bg = getComputedStyle(up).backgroundColor; up = up.parentElement; }
-      const layer = document.createElement("div"); layer.className = "pk3-layer";
-      words.forEach(function(w, i) {
-        const sp = document.createElement("span"), nx = words[i + 1];
-        const wide = nx && Math.abs(nx.y - w.y) < 2 && nx.x > w.x ? nx.x - w.x + 1 : w.w + 2;   // a word on the same line reaches the next one, so no tinted gaps show between them
-        sp.textContent = w.t;
-        sp.style.cssText = "left:" + (w.x - 1) + "px;top:" + (w.y - 1) + "px;width:" + wide + "px;height:" + (w.h + 2) + "px;line-height:" + (w.h + 2) + "px;padding:0 1px;box-sizing:border-box;" +
-          "font:" + cs.font + ";letter-spacing:" + cs.letterSpacing + ";color:" + cs.color + ";background:" + bg + ";";
-        layer.appendChild(sp);
-      });
-      document.body.appendChild(layer);
-      peek3 = layer;
+      // The first three words unblur right where they are (the text is split in two spans for as long as you hold); the rest stays blurred.
+      const txt = el.textContent, m = /^\s*\S+(?:\s+\S+){0,2}/.exec(txt);
+      if (!m) return;
+      peek3 = { el: el, html: el.innerHTML };
+      el.classList.add("pk3");
+      el.innerHTML = '<span class="pk3-on">' + escapeHtml(m[0]) + '</span><span class="pk3-rest">' + escapeHtml(txt.slice(m[0].length)) + '</span>';
+    }
+    function undoPeek3() {
+      if (!peek3) return;
+      peek3.el.classList.remove("pk3");
+      peek3.el.innerHTML = peek3.html;
+      peek3 = null;
     }
     function endPeek() {
       if (!peeking) return;
       peeking = false;
       document.body.classList.remove("peek");
-      if (peek3) { peek3.remove(); peek3 = null; }
+      undoPeek3();
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
       if (el) swapLabel(el, el.getAttribute("data-base") || "");
     }
@@ -5092,8 +5082,7 @@
     }
 
     function syncFlipState() {
-      const anyRevealed = segmentStates.some(s => s === 'revealed');
-      isFlipped = anyRevealed;
+      isFlipped = segmentStates.length > 0 && segmentStates.every(s => s === 'revealed');   // Review and Lock buttons wake up only when the whole reference is unblurred
       if (mode === 'learning') { const lc = learningCards[learningIndex]; if (lc && lc.stage === 'lock') paintLearningButton(lc); return; }
 
       const card = queue[currentIndex];
@@ -5488,6 +5477,7 @@
       }
 
       if (card.group > 0 && newGroup !== card.group) notePts(card.reference, (ptsOf(newGroup) - ptsOf(card.group)) * textVerses(card.text, card.reference), newGroup);   // Treasury points: the net change in level, per verse
+      if (card.group > 0) recordStatRef('doneRefs', card.reference, newGroup);   // the Reviewed list on the Review complete screen
       if (graduated && card.group > 0) {
         sessionStats.graduated++;
         recordStatRef('gradRefs', card.reference, newGroup);
@@ -5770,6 +5760,7 @@
     // A repeat verse passed (Clear) at least once today.
     function noteCleared(ref) {
       if (!Array.isArray(sessionStats.clearedRefs)) sessionStats.clearedRefs = [];
+      if (!Array.isArray(sessionStats.doneRefs)) sessionStats.doneRefs = [];
       const has = sessionStats.clearedRefs.some(function(r) { return (typeof r === "string" ? r : r.f) === ref; });
       if (!has) sessionStats.clearedRefs.push(ref);
     }
@@ -5809,7 +5800,8 @@
 
     const STAT_LISTS = {
       fail: { key: "failedRefs", box: "statFailBox", title: "Missed", count: "failed" },
-      grad: { key: "ptsRefs", box: "statGradBox", title: "Treasury", count: "pts" }
+      grad: { key: "ptsRefs", box: "statGradBox", title: "Treasury", count: "pts" },
+      done: { key: "doneRefs", box: "statRevBox", title: "Reviewed", count: "reviewed" }
     };
     let openStatList = null;
 
@@ -5830,6 +5822,22 @@
       return { v: v, t: txt, w: w };
     }
 
+    // Days from today until a verse's next review, from the Verses list (null when that list has not arrived or the verse is not in it).
+    function dueDaysOf(ref) {
+      for (let i = 0; i < vlVerses.length; i++) if (vlVerses[i].f === ref) return typeof vlVerses[i].d === "number" ? vlVerses[i].d : null;
+      return null;
+    }
+    // "Tomorrow", "Fri Oct 23": the day a reviewed verse moved to.
+    function dueDayWords(n) {
+      if (n === null || n === undefined) return "";
+      if (n <= 0) return "Today";
+      if (n === 1) return "Tomorrow";
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n);
+      return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    }
+    function paintDueDates() {
+      document.querySelectorAll("#failList .fail-due").forEach(function(el) { el.textContent = dueDayWords(dueDaysOf(el.getAttribute("data-ref"))); });
+    }
     function statItems(kind) {
       const raw = Array.isArray(sessionStats[STAT_LISTS[kind].key]) ? sessionStats[STAT_LISTS[kind].key] : [];
       const items = raw.map(function(r) {
@@ -5837,7 +5845,9 @@
         const g = (r && typeof r === "object" && Number.isInteger(r.g)) ? Math.max(0, Math.min(8, r.g)) : null;
         return { f: f, g: g, p: parseRef(f), d: (r && typeof r === "object" && Number.isInteger(r.d)) ? r.d : 0 };
       }).filter(function(it) { return it.f; });
+      if (kind === "done") items.forEach(function(it) { it.n = dueDaysOf(it.f); });
       items.sort(function(a, b) {
+        if (kind === "done" && a.n !== b.n) return (a.n === null ? 999999 : a.n) - (b.n === null ? 999999 : b.n);   // soonest next review first
         if (kind === "grad" && (a.d < 0) !== (b.d < 0)) return a.d < 0 ? -1 : 1;   // lost points first so they are not hidden below the scroll, then the biggest gains
         if (kind === "grad" && a.d !== b.d) return Math.abs(b.d) - Math.abs(a.d);
         const ga = a.g === null ? -1 : a.g, gb = b.g === null ? -1 : b.g;
@@ -5850,7 +5860,7 @@
     function updateStatLists() {
       Object.keys(STAT_LISTS).forEach(function(k) {
         const box = document.getElementById(STAT_LISTS[k].box);
-        box.classList.toggle("tappable", (k === "fail" && (sessionStats[STAT_LISTS[k].count] || 0) > 0) || statItems(k).length > 0);
+        box.classList.toggle("tappable", ((k === "fail" || k === "done") && (sessionStats[STAT_LISTS[k].count] || 0) > 0) || statItems(k).length > 0);
         box.classList.remove("open");
       });
       document.getElementById("statFailBox").classList.toggle("cleared", allRepeatsCleared());
@@ -5897,12 +5907,13 @@
       return queue.some(function(c) { return c.isRepeat; });
     }
 
-    function toggleStatList(kind) {
+    function resortDone() { openStatList = null; toggleStatList('done', true); }   // the dates just arrived: draw the list again in the new order
+    function toggleStatList(kind, noLoad) {
       if (kind === "grad" && ptsHeld && ptsHeld()) return;   // the hold just opened the points peek
       const cfg = STAT_LISTS[kind];
       const items = statItems(kind);
       const list = document.getElementById("failList");
-      const missing = kind === "fail" ? Math.max(0, (sessionStats[cfg.count] || 0) - items.length) : 0;
+      const missing = (kind === "fail" || kind === "done") ? Math.max(0, (sessionStats[cfg.count] || 0) - items.length) : 0;
       if (!items.length && !missing) return;
       Object.keys(STAT_LISTS).forEach(function(k) { document.getElementById(STAT_LISTS[k].box).classList.remove("open"); });
       if (openStatList === kind) {
@@ -5952,6 +5963,11 @@
         name.textContent = it.f;
         row.appendChild(name);
         if (it.g !== null) row.appendChild(makePill(it.g));
+        if (kind === "done") {
+          const du = document.createElement("span");
+          du.className = "fail-due"; du.setAttribute("data-ref", it.f); du.textContent = dueDayWords(it.n);
+          row.appendChild(du);
+        }
         if (kind === "grad" && it.d) {
           const bd = document.createElement("span");
           bd.className = "pts-badge " + (it.d > 0 ? "up" : "down");
@@ -5983,6 +5999,7 @@
       list.appendChild(head);
       list.appendChild(inner);
       list.style.display = "block";
+      if (kind === "done" && !noLoad) loadVlVerses(function(changed) { if (openStatList === "done") { if (changed) resortDone(); else paintDueDates(); } }, function() {});   // fresh dates
       endCue(inner, "End \u00b7 " + items.length + (items.length === 1 ? " verse" : " verses"));
     }
 
