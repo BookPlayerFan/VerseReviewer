@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-118'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-119'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2480,9 +2480,10 @@ function checkVerseSplits() {
 // LEARN_UNIT words, a step costs a day, and a step that runs past the unit costs more and more. So a long verse splits into parts (at its best break) and short
 // neighbouring verses of one reference join into one step. Whole verses are only ever joined with other whole verses; a split verse stands on its own.
 // Everything below is a share of one volume unit (25 words = 100%), so changing LEARN_UNIT rescales the whole plan.
-//   up to 120%    an ideal step (30 words). Whole verses join when together they are about 120% (30 words) or less.
+//   up to 120%    an ideal step (30 words). Whole verses join when together they are about 120% (30 words) or less; the closer to 120%, the less the join is worth.
 //   50% and up    a part (12.5 words, the same as a phrase) of a split verse should be at least this big (smaller costs extra), and a verse alone under it is a good reason to join.
-//   about 160%    where one verse starts to be worth splitting into parts (40 words; a clean sentence break tips it a little earlier, no natural pause a little later).
+//   160%          where a verse is split into parts (40 words). Leaving a verse whole costs steadily more above 100% and steeply more just under 160%, so at 40 words a split wins whatever the break.
+//                 A joined step likewise costs a little more as it nears 120% and very much more above it.
 // None of these is a hard rule. Each is the point where one choice starts to cost more than another, and the breaks, the evenness and the tiny verses nudge it.
 const LEARN_UNIT = LOAD_WORDS;  // words in one volume unit (100%): the same unit the review load uses
 const LEARN_EXTRA_DAY = 1.0;    // the price of one more step (one more day)
@@ -2490,20 +2491,21 @@ const LEARN_SPLIT_AT = 1.60;    // a verse about this share of the unit is where
 const LEARN_JOIN_AT = 1.20;     // verses join up to about this share of the unit
 const LEARN_MIN_PART = 0.50;    // a part of a split verse smaller than this share costs extra
 const LEARN_SPLIT_COST = 0.37;  // each extra part of a split verse costs this much more, so a split has to be worth it
-const LEARN_TYPICAL_BREAK = 0.45;   // the usual cost of the break itself: used only to place LEARN_SPLIT_AT
 const LEARN_JOIN_SLACK = 0.04;     // a joined step over LEARN_JOIN_AT by this much (one word) costs one more step, so it stops there
 const LEARN_SHORT_COEF = 225;       // a part under the minimum costs (share short)^2 x this
 const LEARN_ALONE_COEF = 56;        // a verse that stays a step on its own under the minimum costs (share short)^2 x this: a tiny step is a good reason to join
 const LEARN_EVEN_COEF = 6;          // uneven parts cost (share from the even size)^2 x this
 const LEARN_BREAK_COST = { sentence: 0.3, semicolon: 0.4, comma: 0.6, other: 1.5 };   // a verse boundary costs 0
-// a verse over the unit costs (share over)^2 x this; set so that at LEARN_SPLIT_AT it costs the same as splitting
-const LEARN_OVER_COEF = (LEARN_EXTRA_DAY + LEARN_SPLIT_COST + LEARN_TYPICAL_BREAK) / Math.pow(LEARN_SPLIT_AT - 1, 2);
-
+// A step over the unit gets steadily more costly, then steeply so as it nears LEARN_SPLIT_AT: t = how far it is from the unit to the split point (0 at 100%, 1 at 160%).
+// cost = a gentle rise (t squared) + a steep wall (t to the sixth), so just under the split point it is cheaper to cut, and past it leaving a verse whole is very costly.
+const LEARN_RISE = 1.3;         // the gentle rise: this much extra cost by the split point
+const LEARN_WALL = 3.0;         // the steep part: this much more at the split point, almost nothing before about 130%
+const LEARN_JOIN_RISE = 0.8;    // a joined step costs a little more the closer it gets to LEARN_JOIN_AT
 function learnShortCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words / LEARN_UNIT); return LEARN_SHORT_COEF * d * d; }
 function learnAloneCost_(words) { const d = Math.max(0, LEARN_MIN_PART - words / LEARN_UNIT); return LEARN_ALONE_COEF * d * d; }
 // A joined step is judged more strictly than a single verse: verses only join when together they are about one unit or less.
-function learnJoinCost_(words) { const over = Math.max(0, words / LEARN_UNIT - LEARN_JOIN_AT) / LEARN_JOIN_SLACK; return LEARN_EXTRA_DAY + over * over; }
-function learnStepCost_(words) { const over = Math.max(0, words / LEARN_UNIT - 1); return LEARN_EXTRA_DAY + LEARN_OVER_COEF * over * over; }
+function learnJoinCost_(words) { const sh = words / LEARN_UNIT, over = Math.max(0, sh - LEARN_JOIN_AT) / LEARN_JOIN_SLACK, t = Math.min(sh, LEARN_JOIN_AT) / LEARN_JOIN_AT; return LEARN_EXTRA_DAY + LEARN_JOIN_RISE * t * t + over * over; }
+function learnStepCost_(words) { const t = Math.max(0, words / LEARN_UNIT - 1) / (LEARN_SPLIT_AT - 1); return LEARN_EXTRA_DAY + LEARN_RISE * t * t + LEARN_WALL * Math.pow(t, 6); }
 
 // The cheapest way to learn ONE verse: as 1, 2, 3 or 4 parts cut at its phrase boundaries. { cost, sizes, after, bounds }
 // A cut costs by how natural the break is (sentence end best, plain comma worse), a part under LEARN_MIN_PART of the unit costs a little extra, and parts that are
