@@ -790,15 +790,6 @@
     .v-text.hinted .hu::after { content: ""; position: absolute; left: 50%; top: 55%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--text-accent); transition: opacity .22s ease; pointer-events: none; }   /* a hidden word: a dot where its first letter would be (drawn over the letter, so nothing changes size or moves) */
     .v-text.hinted .hl { -webkit-text-stroke: 0.35px currentColor; } /* a touch heavier without changing the letter's width */
 
-    .notice {
-      font-size: 13px;
-      text-align: center;
-      color: var(--badge-pass);
-      font-weight: 700;
-      min-height: 18px;
-      margin-bottom: 6px;
-      flex-shrink: 0;
-    }
 
     .action-container { 
       display: flex; 
@@ -1192,8 +1183,6 @@
     .ctx-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--border-card); border-top-color: var(--text-accent); border-radius: 50%;
       animation: ctxspin .9s linear infinite; vertical-align: -3px; margin-right: 8px; }
     @keyframes ctxspin { to { transform: rotate(360deg); } }
-    .sync-warning { position: fixed; bottom: calc(var(--tab-h) + 14px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
-      z-index: 60; white-space: normal; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.22); } /* same spot on every screen, centered just above the tab bar */
     .sync-warning.is-saving { pointer-events: none; }
     /* Status readout */
     .pv-card.help-card { height: 78%; max-height: 600px; }
@@ -1223,12 +1212,6 @@
        so they take no room between the verse and the buttons. */
     .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
     .verse-wrap .verse-body { flex: 1; margin-bottom: 0; }
-    #toastNotice { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 5;
-      width: max-content; max-width: 94%; min-height: 0; margin: 0; padding: 6px 14px; border-radius: 14px;
-      background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: 0 4px 14px rgba(0,0,0,0.14);
-      pointer-events: none; text-align: center; animation: noticeIn 0.18s ease-out both; }
-    #toastNotice:empty { display: none; }
-    @keyframes noticeIn { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
     button:disabled { opacity: 0.55; cursor: default; }
     button:disabled:active { transform: none; filter: none; }
@@ -1285,29 +1268,25 @@
     .ip-item .ip-part { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); text-align: right; }
     .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
 
-    .notice.is-error { color: var(--badge-fail); }
-
-    .sync-warning.is-update { padding: 10px 20px; border-radius: 999px; font-size: 16px; background: var(--text-accent); color: var(--bg-card);
-      box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
-    .sync-warning {
-      flex-direction: row;
-      min-height: 0;
-      padding: 10px 20px;
-      border-radius: 999px;
-      font-size: 16px;
-      font-weight: 700;
-      background: var(--badge-repeat-bg);
-      color: var(--text-repeat);
-    }
+    /* One notification style for the whole app: a rounded banner in the same spot on every screen (just above the buttons).
+       Blue is information, amber is something that went wrong. .sync-warning holds the ones that wait for you (unsaved, update ready); .vr-toast is the short ones. */
+    .sync-warning, .vr-toast { position: fixed; bottom: calc(var(--tab-h) + 95px); left: 50%; transform: translateX(-50%); z-index: 95;
+      width: max-content; max-width: calc(100vw - 32px); box-sizing: border-box; flex-direction: row; align-items: center; justify-content: center; min-height: 0;
+      padding: 10px 20px; border-radius: 999px; border: 0; font-size: 16px; font-weight: 600; line-height: 1.25; text-align: center; white-space: normal;
+      background: #8ab4f8; color: #14213d; box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
+    .sync-warning.is-warn, .vr-toast.is-warn { background: #fdd663; color: #2b1d00; }
+    .sync-warning.bn-under { visibility: hidden; }   /* a short message takes the spot while it shows */
+    .vr-toast { animation: toastIn 0.18s ease-out both; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
   </style>
 </head>
 <body>
 
 
   <button type="button" class="sync-warning" id="syncWarning" onclick="onSyncWarningTap()" style="display: none;"></button>
+  <button type="button" class="vr-toast" id="vrToast" onclick="toastBanner('')" style="display: none;"></button>
 
   <div id="deckContainer">
-    <div class="notice" id="toastNotice"></div>
     <div class="card" id="activeCard">
 
       <div class="card-header-group">
@@ -1371,7 +1350,6 @@
       <div class="tomorrow-note" id="tomorrowNote" role="button" onclick="openUpcoming()" style="display: none;"></div>
 
       <div class="summary-btn-stack">
-        <div class="notice" id="summaryNotice"></div>
         <button type="button" class="btn-add-verse" id="btnAddVerse" onclick="addNewVerse()" style="display: none;">
           Add New Verse
         </button>
@@ -1587,20 +1565,6 @@
 
     // The notice lives outside the card (the card fades away when you score it, and a notice inside it
     // would fade too), so each time it changes it is lined up with the bottom of the verse box.
-    function placeNotice() {
-      const n = document.getElementById("toastNotice");
-      const card = document.getElementById("activeCard");
-      const wrap = card && card.querySelector(".verse-wrap");
-      const deck = document.getElementById("deckContainer");
-      if (!n || !wrap || !deck || !n.firstChild) return;
-      const bottomEdge = card.offsetTop + wrap.offsetTop + wrap.offsetHeight;
-      n.style.bottom = Math.max(0, deck.clientHeight - bottomEdge + 10) + "px";
-      n.style.left = (card.offsetLeft + wrap.offsetLeft + wrap.offsetWidth / 2) + "px";
-    }
-    try {
-      new MutationObserver(placeNotice).observe(document.getElementById("toastNotice"), { childList: true, characterData: true, subtree: true });
-    } catch (e) {}
-
     // Level-up moment: the card itself turns into the new rank (badge, dots, outline and tint cross-fade),
     // settles with a small bounce, then fades away. Higher ranks add a ring and sparkles around the new badge.
     let luOverlay = null;
@@ -3182,7 +3146,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-341';
+    const CLIENT_BUILD = 'sync-342';
 
     let queue = [];
     let currentIndex = 0;
@@ -3268,7 +3232,7 @@
         pushTested = true;
         try {
           google.script.run
-            .withSuccessHandler(function(r) { flashNotice(r && r.ok ? "Notifications on \u2713" : "Notifications on"); })
+            .withSuccessHandler(function() {})
             .withFailureHandler(function() {})
             .sendTestPush();
         } catch (err) {}
@@ -3510,15 +3474,20 @@
       if (addBtn) addBtn.disabled = busy;
     }
 
-    function showSummaryNotice(msg, isError) {
-      // On a card screen (not the summary) the message goes in the notice line above the buttons.
-      const summaryVisible = document.getElementById("summaryView").style.display !== "none";
-      const el = document.getElementById(summaryVisible ? "summaryNotice" : "toastNotice");
-      if (!el) return;
-      el.textContent = msg || "";
-      el.classList.toggle("is-error", !!isError);
-      if (!summaryVisible && msg) setTimeout(function() { if (el.textContent === msg) el.textContent = ""; }, 4000);
+    // The short messages: one banner, same spot everywhere (blue = information, amber = something went wrong). An empty message clears it.
+    let toastTimer = null;
+    function toastBanner(msg, warn, ms) {
+      const el = document.getElementById("vrToast"), sw = document.getElementById("syncWarning");
+      clearTimeout(toastTimer); toastTimer = null;
+      if (!msg) { el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); return; }
+      el.textContent = msg;
+      el.classList.toggle("is-warn", !!warn);
+      el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";   // plays the entrance again for a new message
+      el.style.display = "inline-flex";
+      if (sw) sw.classList.add("bn-under");
+      toastTimer = setTimeout(function() { toastTimer = null; el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); }, ms || 3000);
     }
+    function showSummaryNotice(msg, isError) { toastBanner(msg, !!isError, isError ? 5000 : 3000); }
 
     // ───────────── Saving ─────────────
 
@@ -3748,10 +3717,10 @@
         el.textContent = "Saving\u2026";
         el.style.display = "inline-flex";
       } else if (submitFailed) {
-        el.textContent = "⚠ " + pendingCount() + " unsaved · Retry";
+        el.textContent = "Couldn\u2019t save " + pendingCount() + " \u00b7 Tap to retry";
         el.style.display = "inline-flex";
       } else if (problemCount > 0) {
-        el.textContent = "⚠ Save problem · Reload";
+        el.textContent = "Couldn\u2019t save \u00b7 Tap to reload";
         el.style.display = "inline-flex";
       } else if (reloadingNow) {
         el.textContent = "Reloading\u2026";
@@ -3766,6 +3735,7 @@
       }
       if (!((updateReady || reloadingNow) && pendingCount() === 0 && !savingShown && !submitFailed && problemCount === 0)) el.classList.remove("is-update");
       el.classList.toggle("is-saving", el.style.display !== "none" && el.textContent === "Saving\u2026");
+      el.classList.toggle("is-warn", el.style.display !== "none" && (submitFailed || problemCount > 0 || (reloadFailed && updateReady && !reloadingNow)));   // amber = something went wrong
       if (updateReady) autoReloadIfIdle();
     }
 
@@ -3984,7 +3954,7 @@
     }
 
     function undoLast(afterOk) {
-      if (!undoAvailable()) { if (!undoId) return; flashNotice("Nothing to undo"); return; }
+      if (!undoAvailable()) return;
       const id = undoId;
       hideUndo();
       isScoring = true;
@@ -4167,15 +4137,8 @@
       try { window.top.postMessage({ type: 'VR_PILLS', pills: rec }, '*'); } catch (e) {}
     }
 
-    // Short message that works on both the card and summary screens.
-    function flashNotice(msg) {
-      const summaryVisible = document.getElementById("summaryView").style.display !== "none";
-      const el = document.getElementById(summaryVisible ? "summaryNotice" : "toastNotice");
-      if (!el) return;
-      el.textContent = msg;
-      el.classList.remove("is-error");
-      setTimeout(function() { if (el.textContent === msg) el.textContent = ""; }, 2500);
-    }
+    // A short information message (blue banner).
+    function flashNotice(msg) { toastBanner(msg, false, 3000); }
 
     // ───────────── Verse rendering ─────────────
 
@@ -4395,7 +4358,6 @@
       if (kc && kc.reference) startCardClock(kc.reference + "|" + kc.rep + (kc.isRepeat ? "|r" : ""));
       updateFailLock();
       updateTabs();
-      placeNotice();
       postCache();
     }
 
@@ -5154,18 +5116,8 @@
       const startedIn = epoch;
       setTimeout(function() { advanceCard(startedIn); }, ms);
     }
-    // The Cleared / Re-queued notice outlasts the card swap, so it can be read: it stays over the next card for CARD_NOTICE_MS.
-    const CARD_NOTICE_MS = 1500;
-    let cardNoticeOn = false;
-    function cardNotice(msg) {
-      const el = document.getElementById("toastNotice");
-      el.textContent = msg; el.classList.remove("is-error");
-      cardNoticeOn = true;
-      setTimeout(function() { cardNoticeOn = false; if (el.textContent === msg) el.textContent = ""; }, CARD_NOTICE_MS);
-    }
     function advanceCard(startedIn) {
       if (startedIn !== epoch) return; // the session was replaced meanwhile; don't skip a card
-      if (!cardNoticeOn) document.getElementById("toastNotice").textContent = "";
       const doneCard = queue[currentIndex];
       currentIndex++;
       if (currentIndex >= activeEnd()) {
@@ -5242,7 +5194,6 @@
           playLevelUp(1, 1, "Promoted \u2713");
           levelUpThen(PROMOTE_MS, function() {
             if (startedIn !== epoch) return;
-            document.getElementById("toastNotice").textContent = "";
             render();
           });
         };
@@ -5388,7 +5339,6 @@
       isScoring = true;
 
       const card = queue[currentIndex];
-      const notice = document.getElementById("toastNotice");
 
       totalCardsProcessed++;
 
@@ -5396,10 +5346,8 @@
       if (card.isRepeat) {
         if (action === "Pass") {
           noteCleared(card.reference);
-          cardNotice("🎉 Cleared for today!");
         } else {
           queue.push(card);
-          cardNotice("🔄 Re-queued for repeat");
         }
         enqueueSubmit(null, snapshot(currentIndex + 1));
         animateOut();
@@ -6504,13 +6452,16 @@
         .withFailureHandler(function() { renderPicker(); })
         .unqueueVerse(ref);
     }
-    // A message about adding a verse: in the Choose a verse page while it is up, otherwise the usual notice line.
+    // A message about adding a verse. Progress ("Starting ...") shows in the Choose a verse page while it is up (it is a loading state); a problem is an amber banner.
     function addNote(msg, isError) {
-      if (document.getElementById("picker").classList.contains("open")) {
+      if (isError) {
+        const pn = document.getElementById("pickerNote"); pn.textContent = ""; pn.style.color = "";
+        toastBanner(msg, true, 5000);
+      } else if (document.getElementById("picker").classList.contains("open")) {
         const el = document.getElementById("pickerNote");
         el.textContent = msg || "";
-        el.style.color = !msg ? "" : isError ? "var(--badge-fail)" : "var(--text-meta)";
-      } else showSummaryNotice(msg, isError);
+        el.style.color = msg ? "var(--text-meta)" : "";
+      } else if (msg) toastBanner(msg, false, 3000);
     }
     // One call answers both the save and the start, and carries the started card, so the page shows it at once (no reload of the whole session).
     function finishAdd(res, failPrefix) {
@@ -6743,7 +6694,6 @@
               if (!session || !Array.isArray(session.cards)) { noteCheck("bad session reply"); return; }
               if (isScoring || pendingCount() > 0) return;
               adoptSession(session);
-              flashNotice("Synced");
               noteCheck("synced");
             })
             .withFailureHandler(function(err) {
