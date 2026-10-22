@@ -1931,6 +1931,18 @@
           ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
       });
     }
+    // A card that just arrived from the server (the next queued verse): joins the list without touching what is on screen.
+    function addQuietCard(c) {
+      const shownRef = learningCards[learningIndex] ? learningCards[learningIndex].reference : null;
+      learningCards = learningCards.filter(function(x) { return x.reference !== c.reference; });
+      learningHeld = learningHeld.filter(function(x) { return x.reference !== c.reference; });
+      learningCards.push(c);
+      sortLearning();
+      const at = shownRef ? learningCards.findIndex(function(x) { return x.reference === shownRef; }) : -1;
+      learningIndex = at >= 0 ? at : 0;
+      if (mode === 'learning' && !isScoring && !learnPending && (at < 0)) render(); else updateTabs();
+      postCache();
+    }
     // One new verse at a time means one in its Learn reps; a verse that has moved on to Lock does not count (the server applies the same rule).
     function haveVerseInLearn() {
       return learningCards.concat(learningHeld).some(function(c) { return c.stage !== 'lock'; });
@@ -3170,7 +3182,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-335';
+    const CLIENT_BUILD = 'sync-336';
 
     let queue = [];
     let currentIndex = 0;
@@ -3216,6 +3228,7 @@
     // Both are saved with the session, so any device reopens where you left off.
     let mode = 'review';
     let learningCards = [];
+    let learnQueue = [];   // references waiting for the Learn slot, in the order they were added
     let learningIndex = 0;
     let enterLearningAfterLoad = null; // reference of a just-added verse to jump straight to
     let serverBuild = "";
@@ -3402,6 +3415,7 @@
       queue = session.cards || [];
       srvSkew = typeof session.serverNow === 'number' ? session.serverNow - Date.now() : 0;
       learningCards = session.learning || [];
+      learnQueue = Array.isArray(session.queue) ? session.queue.slice() : [];
       learningHeld = [];
       learningSeen = {};
       learnPending = false;
@@ -3579,6 +3593,8 @@
             if (typeof res.version === 'number') sessionVersion = res.version;
             if (typeof res.tomorrow === 'number') { tomorrowCount = res.tomorrow; if (typeof res.tomorrowLoad === 'number') tomorrowLoad = res.tomorrowLoad; setTreasury(res.treasury); }
             outbox.shift();
+            if (Array.isArray(res.queue)) learnQueue = res.queue.slice();
+            if (res.next) addQuietCard(res.next);   // the next queued verse took the Learn slot
             renderTomorrowNote();
             schedulePushSync("learn");
             if (res.promoted) {
@@ -6205,8 +6221,7 @@
       note.className = "pp-note";
       document.getElementById("ppAdd").disabled = false;
       // one new verse at a time: Save & Learn is off while one is on the New tab (Save to my list still works)
-      const haveNew = haveVerseInLearn();
-      document.getElementById("ppLearn").disabled = haveNew;
+      document.getElementById("ppLearn").textContent = haveVerseInLearn() ? "Save & add to queue" : "Save & Learn now";   // while one is in Learn the new verse waits in the queue
       try { document.getElementById("pasteText").blur(); } catch (e) {}
       document.getElementById("pastePreview").classList.add("open");
     }
@@ -6315,16 +6330,28 @@
         if (n !== null) { const b = document.createElement("span"); b.textContent = n; h.appendChild(b); }
         box.appendChild(h);
       };
-      if (prog.length) {
-        head("In progress", prog.length);
+      const qd = learnQueue.filter(function(f) { return !q || f.toLowerCase().indexOf(q) >= 0; });
+      if (prog.length || qd.length) {
+        head("In progress", prog.length + qd.length);
         prog.forEach(function(c, k) {
-          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item" + (k === prog.length - 1 ? " last" : "");
+          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item" + (k === prog.length - 1 && !qd.length ? " last" : "");
           const main = document.createElement("span"); main.className = "ip-main";
           const r = document.createElement("span"); r.className = "ip-ref"; r.textContent = c.reference; main.appendChild(r);
           const w = document.createElement("span"); w.className = "ip-when" + (isLocked(c) ? "" : " open"); w.textContent = progressWhen(c); main.appendChild(w);
           b.appendChild(main);
           const p = document.createElement("span"); p.className = "ip-part"; p.textContent = repPart(c); b.appendChild(p);
           b.onclick = function() { viewLearnCard(c.reference); };
+          box.appendChild(b);
+        });
+        // Verses waiting for the Learn slot, in the order they were added: tapping one takes it back out of the queue
+        qd.forEach(function(f, k) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item queued" + (k === qd.length - 1 ? " last" : "");
+          const main = document.createElement("span"); main.className = "ip-main";
+          const r = document.createElement("span"); r.className = "ip-ref"; r.textContent = f; main.appendChild(r);
+          const w = document.createElement("span"); w.className = "ip-when"; w.textContent = learnQueue.indexOf(f) === 0 ? "Next up" : "Queued #" + (learnQueue.indexOf(f) + 1); main.appendChild(w);
+          b.appendChild(main);
+          const p = document.createElement("span"); p.className = "ip-part"; p.textContent = "Tap to remove"; b.appendChild(p);
+          b.onclick = function() { unqueueVerse(f); };
           box.appendChild(b);
         });
         const dv = document.createElement("div"); dv.className = "ip-divider"; box.appendChild(dv);
@@ -6396,10 +6423,11 @@
       fillVersePopup("pvRef", "pvVer", "pvText", it, false);
       const addBtn = document.getElementById("pvAdd");
       addBtn.style.display = (noAdd || canDelete) ? "none" : "";
-      // one new verse at a time: while one is on the New tab, the final Add button is off (the list itself still opens)
+      // one new verse at a time: while one is on the New tab, the Add button says Add to queue
       const haveNew = haveVerseInLearn();
-      addBtn.disabled = haveNew;
-      addBtn.onclick = function() { if (haveNew) return; closePreview(); chooseVerse(it); };
+      addBtn.disabled = false;
+      addBtn.textContent = haveNew ? "Add to queue" : "Add";   // one verse in Learn at a time: the next ones wait in the queue and start by themselves
+      addBtn.onclick = function() { closePreview(); chooseVerse(it); };
       const del = document.getElementById("pvDel"), note = document.getElementById("pvNote");
       note.textContent = "";
       note.className = "pp-note";
@@ -6448,15 +6476,33 @@
       document.getElementById("pickerPreview").classList.remove("open");
     }
 
+    // Takes a verse back out of the queue: it returns to the Add new list.
+    function unqueueVerse(ref) {
+      learnQueue = learnQueue.filter(function(f) { return f !== ref; });
+      renderPicker();
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && Array.isArray(res.queue)) learnQueue = res.queue.slice();
+          google.script.run.withSuccessHandler(function(list) { if (Array.isArray(list)) { pickerItems = list; renderPicker(); } }).listUnassigned();
+        })
+        .withFailureHandler(function() { renderPicker(); })
+        .unqueueVerse(ref);
+    }
     function chooseVerse(it, failPrefix) {
-      closePicker();
+      const queueing = haveVerseInLearn();   // Learn is busy: the verse joins the queue and the list stays open
+      if (!queueing) closePicker();
       const btn = document.getElementById("btnAddVerse");
-      if (btn) { btn.disabled = true; btn.textContent = "Adding..."; }
+      if (btn && !queueing) { btn.disabled = true; btn.textContent = "Adding..."; }
       google.script.run
         .withSuccessHandler(function(res) {
           if (btn) { btn.disabled = false; btn.textContent = "Add New Verse"; }
-          if (res && res.success) {
-            enterLearningAfterLoad = res.reference;
+          if (res && res.success && res.queued && !res.started) {
+            learnQueue = Array.isArray(res.queue) ? res.queue.slice() : learnQueue.concat([res.reference]);
+            pickerItems = pickerItems.filter(function(x) { return x.f !== res.reference; });
+            if (document.getElementById("picker").classList.contains("open")) renderPicker(); else showSummaryNotice("Added " + res.reference + " to the queue");
+          } else if (res && res.success) {
+            if (document.getElementById("picker").classList.contains("open")) closePicker();
+            enterLearningAfterLoad = res.started || res.reference;
             restartSession();
           } else {
             const m = (res && res.message) ? res.message : "Couldn't add that verse.";

@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-125'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-126'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -577,6 +577,7 @@ function learnAction(reference, action, expectedRep) {
 
     let promoted = false;
     let card = null;
+    let nextCard = null;
     if (step.promote) {
       const w = writeReview_({ rowIndex: row, reference: ref, rep: 1, group: 1 });
       if (!w.ok) return w;
@@ -590,6 +591,8 @@ function learnAction(reference, action, expectedRep) {
       if (step.learned) { const td = today_(); sheet.getRange(row, 3).setValue(td); vals[2] = td; }   // column C becomes the day Learn finished ("Learned N days ago" on the Lock card)
       logEvent_({ ref: ref, result: action === 'skip' ? 'Skip' : (action === 'miss' ? 'Keep' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false });
       card = learningCard_(vals, row - 1, now);
+      // This verse just went to Lock: the next queued verse takes the Learn slot (visible at once, its first rep opens at 6 AM tomorrow).
+      if (step.learned) nextCard = startNextQueued_(sheet, now, nextDayStart_);
     }
 
     // Other phones notice the change through the session version, like any other review.
@@ -607,7 +610,7 @@ function learnAction(reference, action, expectedRep) {
 
     // The push reminders are brought in line afterwards by syncPushes(), called by the page once this answer is back. They make network calls that take
     // seconds, so they do not run here while the lock is held.
-    const result = { ok: true, promoted: promoted, card: card, version: s && s.date === todayKey_() ? s.version : undefined };
+    const result = { ok: true, promoted: promoted, card: card, next: nextCard, queue: readQueue_(), version: s && s.date === todayKey_() ? s.version : undefined };
     const tdata = readSheetData_();
     result.tomorrow = dueTomorrowCount_(tdata);
     result.tomorrowLoad = dueTomorrowLoad_(tdata);
@@ -894,6 +897,7 @@ function hydrate_(s, preRead) {
     stats: s.stats,
     cards: cards,
     learning: learning,
+    queue: liveQueue_(data),
     seen: seenFor_(s, learning),
     tomorrow: dueTomorrowCount_(data),
     tomorrowLoad: dueTomorrowLoad_(data),
@@ -1338,6 +1342,69 @@ function undoLast(undoId) {
 }
 
 // Verses with no level yet, in sheet order, for the "Add New Verse" picker.
+// ── The Learn queue: verses waiting for the Learn slot, in the order they were added (references, kept in one script property) ──
+const QUEUE_KEY = 'LEARN_QUEUE';
+const MAX_LEARN_QUEUE = 100;
+function readQueue_() {
+  try {
+    const arr = JSON.parse(store_().getProperty(QUEUE_KEY) || '[]');
+    return Array.isArray(arr) ? arr.filter(function(x) { return typeof x === 'string' && x; }).slice(0, MAX_LEARN_QUEUE) : [];
+  } catch (e) { return []; }
+}
+function writeQueue_(list) { store_().setProperty(QUEUE_KEY, JSON.stringify(list.slice(0, MAX_LEARN_QUEUE))); }
+// The queue as the screen needs it: only verses that still wait in the sheet (no level yet), so a verse that was deleted or started another way drops out.
+function liveQueue_(data) {
+  const q = readQueue_(), out = [];
+  if (!q.length) return out;
+  const wait = Object.create(null);
+  for (let i = 1; i < data.length; i++) {
+    const g = data[i][4], ref = cleanRef_(data[i][5]);
+    if (ref && (g === '' || g === null || g === undefined)) wait[ref] = true;
+  }
+  q.forEach(function(f) { if (wait[f] && out.indexOf(f) < 0) out.push(f); });
+  return out;
+}
+// A verse is in its Learn reps (not yet in Lock) when its rep is not a Lock rep.
+function inLearnReps_(row) {
+  return isLevelZero_(row[4]) && !lockPos_(row[3], REPS_PER_VERSE * stepCount_(row));
+}
+function learnBusy_(rows) {
+  for (let i = 0; i < rows.length; i++) if (cleanRef_(rows[i][5]) && inLearnReps_(rows[i])) return true;
+  return false;
+}
+// Starts the first queued verse still waiting in the sheet. unlockFn(now) says when its first rep opens. Returns its card (for the screen), or null.
+// The script lock is already held by the caller.
+function startNextQueued_(sheet, now, unlockFn) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const all = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  if (learnBusy_(all)) return null;
+  const q = readQueue_();
+  while (q.length) {
+    const ref = q.shift();
+    const at = all.findIndex(function(r) { return cleanRef_(r[5]) === ref && (r[4] === '' || r[4] === null || r[4] === undefined); });
+    if (at < 0) continue;
+    const unlock = unlockFn(now), row = at + 2;
+    sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : '', today_(), 1, 0]]);
+    writeQueue_(q);
+    const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
+    return learningCard_(vals, row - 1, now);
+  }
+  writeQueue_(q);
+  return null;
+}
+
+// Takes a verse out of the queue (it goes back to the Add new list).
+function unqueueVerse(reference) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ref = cleanRef_(reference);
+    writeQueue_(readQueue_().filter(function(f) { return f !== ref; }));
+    return { success: true, queue: readQueue_() };
+  } finally { lock.releaseLock(); }
+}
+
 function listUnassigned() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
   if (!sheet) return [];
@@ -1346,10 +1413,11 @@ function listUnassigned() {
   const data = sheet.getRange(1, 1, lastRow, 8).getValues();
   const out = [];
   const todayMs = today_().getTime();
+  const queued = readQueue_();
   for (let i = 1; i < data.length; i++) {
     const g = data[i][4];
     const ref = cleanRef_(data[i][5]);
-    if (ref && (g === "" || g === null || g === undefined)) {
+    if (ref && queued.indexOf(ref) < 0 && (g === "" || g === null || g === undefined)) {
       // Days since the date in column C (when it was added), or null if there is none.
       const added = toMidnight_(data[i][2]);
       const waiting = added ? Math.max(0, Math.round((todayMs - added.getTime()) / 86400000)) : null;
@@ -1380,21 +1448,26 @@ function addChosenVerse(rowIndex, reference) {
     if (!(g === "" || g === null || g === undefined)) {
       return { success: false, message: 'That verse was already added.' };
     }
-    // One verse in Learn at a time: refuse if another Level 0 verse is still in its Learn reps (a verse in Lock does not block).
-    // This also stops a phone with an out-of-date screen from adding a second.
-    if (lastRow >= 2) {
-      const all = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
-      for (let i = 0; i < all.length; i++) {
-        if (!cleanRef_(all[i][5]) || !isLevelZero_(all[i][4])) continue;
-        if ((Number(all[i][3]) || 1) <= REPS_PER_VERSE * stepCount_(all[i])) {
-          return { success: false, message: 'You already have a verse in Learn. Finish its reps first, then add the next one.' };
-        }
+    // One verse in Learn at a time: while another Level 0 verse is still in its Learn reps (a verse in Lock does not count) the new one joins the queue,
+    // and starts by itself when that one goes to Lock. This also covers a phone with an out-of-date screen.
+    const all = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 8).getValues() : [];
+    const queue = readQueue_();
+    if (learnBusy_(all)) {
+      if (queue.indexOf(want) < 0) {
+        if (queue.length >= MAX_LEARN_QUEUE) return { success: false, message: 'The queue is full.' };
+        queue.push(want); writeQueue_(queue);
       }
+      return { success: true, queued: true, reference: want, rowIndex: row, queue: queue };
     }
     // Starts today if added before 12 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
     const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
+    if (queue.length) {   // others were waiting first: the one at the front starts, this one waits behind them
+      if (queue.indexOf(want) < 0) { queue.push(want); writeQueue_(queue); }
+      const started = startNextQueued_(sheet, nowAt, startUnlock_);
+      if (started) return { success: true, queued: started.reference !== want, started: started.reference, reference: want, rowIndex: row, unlockAt: started.unlockAt || 0, queue: readQueue_() };
+    }
     sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
-    return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0 };
+    return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0, queue: readQueue_() };
   } finally {
     lock.releaseLock();
   }
