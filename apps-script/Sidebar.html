@@ -3179,7 +3179,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-347';
+    const CLIENT_BUILD = 'sync-348';
 
     let queue = [];
     let currentIndex = 0;
@@ -5219,6 +5219,21 @@
       renderDiag();
     }, 1000);
 
+    // After a press the verse is covered again when the next rep will be done from memory: a Lock card always, a Learn card at hint level 5 (blurred).
+    // Without this the pieces you revealed to check yourself stay showing, and the next rep starts with the answer on screen.
+    function rehideAfterPress(prev) {
+      if (mode !== 'learning' || isScoring || !prev) return;
+      const c = learningCards[learningIndex];
+      if (!c || c.reference !== prev.reference) return;
+      if (!(c.stage === 'lock' || (isLearnCard(c) && hintLevel === 5))) return;
+      if (segmentStates.every(function(x) { return x === 'hidden'; })) return;
+      segmentStates = segmentStates.map(function() { return 'hidden'; });
+      fullPieces = {};
+      revealCursor = tapStart();
+      syncFlipState();
+      renderCardBody();
+    }
+
     // kind: 'press' (the button). 'now', 'skip' and 'again' (press early, skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
     function pressLearning(kind) {
       if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); else if (kind === "miss") tapBusy("btnFailText"); return; }   // a tap that is ignored says so
@@ -5271,11 +5286,13 @@
             else if (mode === 'learning') render();                                        // it has: the card is already updated underneath
             else updateTabs();
             growPips = false;
+            rehideAfterPress(card);
             if (ghost) verseGhostFade(ghost);
           });
         }, PIP_FILL_MS + PIP_FINALE_MS);
       } else {
         applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
+        rehideAfterPress(card);
       }
     }
 
