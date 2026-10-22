@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-122'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-123'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -211,6 +211,13 @@ function readSheetData_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
   const lastRow = sheet ? sheet.getLastRow() : 0;
   return lastRow >= 2 ? sheet.getRange(1, 1, lastRow, 8).getValues() : [];
+}
+
+// Whole days since the verse was last reviewed (column C), or null when it has no date. The Review card says "Last seen N days ago".
+function agoDays_(lastRaw) {
+  const last = toMidnight_(lastRaw);
+  if (!last) return null;
+  return Math.max(0, Math.round((today_().getTime() - last.getTime()) / 86400000));
 }
 
 // "Day 1" is the day a verse was added to Learning; column C holds that date while the verse is Level 0.
@@ -620,7 +627,8 @@ function getDueCards(includeNew, preRead) {
         group: group,
         groupName: groupInfo.name,
         rep: rep,
-        repsNeeded: groupInfo.repsNeeded
+        repsNeeded: groupInfo.repsNeeded,
+        ago: agoDays_(data[i][2])
       });
     }
   }
@@ -831,7 +839,8 @@ function hydrate_(s, preRead) {
       rep: e.p,
       repsNeeded: info.repsNeeded,
       isRepeat: !!e.l,
-      isHeld: !!e.h
+      isHeld: !!e.h,
+      ago: agoDays_(row[2])
     });
   });
 
