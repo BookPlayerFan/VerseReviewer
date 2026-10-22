@@ -1242,16 +1242,15 @@
     button:disabled:active { transform: none; filter: none; }
 
 
-    /* Treasury pill at the top of Review Complete: Treasury | total points \u203A. Tap it (or swipe right) to open the Treasury. */
-    .tr-pill { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; cursor: pointer;
+    /* Treasury pill at the top of Review Complete: Treasury | total points. Only shows the total; the Treasury page opens from the Verses tab (swipe right). */
+    .tr-pill { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; cursor: default;
       display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; border: 1px solid var(--border-card);
       font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
     .tr-pill span { padding: 7px 14px; line-height: 16px; }
     .tr-pill span + span { border-left: 1px solid var(--border-card); }
     .tr-pill b { color: inherit; font-weight: 800; }
     .tr-pill .tp-go { color: var(--text-accent, #1a73e8); }
-    .tr-pill:active { opacity: 0.6; }
-    .tr-pill.fade-in { animation: noteFadeIn .35s ease-out both; }
+        .tr-pill.fade-in { animation: noteFadeIn .35s ease-out both; }
     .tomorrow-note.fade-in { animation: noteFadeIn .35s ease-out both; }
     @keyframes noteFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1359,7 +1358,7 @@
     </div>
 
     <div class="summary-card" id="summaryView" style="display: none;">
-      <div class="tr-pill" id="trPill" role="button" onclick="openTreasury()" style="display: none;"></div>
+      <div class="tr-pill" id="trPill" style="display: none;"></div>
       <div class="summary-header">
         <div class="flawless-badge" id="flawlessBadge" style="display: none;">✦ Perfect Day</div>
         <div class="sum-title-row">
@@ -3194,7 +3193,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-351';
+    const CLIENT_BUILD = 'sync-352';
 
     let queue = [];
     let currentIndex = 0;
@@ -3289,8 +3288,7 @@
 
     window.onload = function() {
       attachSwipeBack("treasuryView", backTreasury, "left");
-      attachSwipeBack("verseListView", openTreasury, "right");      // swipe right on the Verses tab or on Review Complete opens the Treasury
-      attachSwipeBack("summaryView", openTreasury, "right");
+      attachSwipeBack("verseListView", openTreasury, "right");      // swipe right on the Verses tab opens the Treasury (the Review Complete screen has no link to it)
       ptsHeld = attachLongPress(document.getElementById("statGradBox"), openPtsPeek);
       attachSwipeBack("upcomingView", backUpcoming, "left");
       attachSwipeBack("searchView", backSearch, "left");
@@ -4070,12 +4068,12 @@
       const key = typeof pts === "number" ? String(pts) : "";
       if (wasHidden || el.getAttribute("data-pts") !== key) {   // rebuilt only when the number changes, so a refresh with the same total does not blink
         el.textContent = "";
-        // Treasury (plain) | 1,214 points \u203A (blue); with no total yet, just a blue "Treasury \u203A"
+        // Treasury (plain) | 1,214 points (blue); with no total yet, just a blue "Treasury". It is only a readout: no link.
         if (typeof pts === "number") {
           const a = document.createElement("span"); a.textContent = "Treasury"; el.appendChild(a);
-          const g = document.createElement("span"); g.className = "tp-go"; g.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> points \u203A"; el.appendChild(g);
-        } else { const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury \u203A"; el.appendChild(g); }
-        el.setAttribute("aria-label", (typeof pts === "number" ? "Treasury, " + pts + " points. " : "Treasury. ") + "Open");
+          const g = document.createElement("span"); g.className = "tp-go"; g.innerHTML = "<b>" + pts.toLocaleString("en-US") + "</b> points"; el.appendChild(g);
+        } else { const g = document.createElement("span"); g.className = "tp-go"; g.textContent = "Treasury"; el.appendChild(g); }
+        el.setAttribute("aria-label", typeof pts === "number" ? "Treasury, " + pts + " points" : "Treasury");
         el.setAttribute("data-pts", key);
       }
       el.style.display = "inline-flex";
