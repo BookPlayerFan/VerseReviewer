@@ -1306,7 +1306,9 @@
     .sync-warning.is-warn, .vr-toast.is-warn { background: #fdd663; color: #2b1d00; }
     .vr-toast.is-new { background: #81c995; color: #0b2e13; }   /* green: only ever "Updated to …" after a new version loads */
     .sync-warning.bn-under { visibility: hidden; }   /* a short message takes the spot while it shows */
-    .vr-toast { animation: toastIn 0.18s ease-out both; }
+    .sync-warning, .vr-toast { animation: toastIn 0.18s ease-out both; }   /* every banner fades up when it appears ... */
+    .bn-ghost { pointer-events: none; animation: toastOut 0.2s ease-in both; }   /* ... and fades down when it goes (a copy is left to fade while the real one is already gone) */
+    @keyframes toastOut { from { opacity: 1; transform: translateX(-50%) translateY(0); } to { opacity: 0; transform: translateX(-50%) translateY(6px); } }
     @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
   </style>
 </head>
@@ -3177,7 +3179,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-346';
+    const CLIENT_BUILD = 'sync-347';
 
     let queue = [];
     let currentIndex = 0;
@@ -3511,17 +3513,27 @@
 
     // The short messages: one banner, same spot everywhere (blue = information, amber = something went wrong). An empty message clears it.
     let toastTimer = null;
+    // A banner that disappears fades down instead of vanishing: a copy of it is left in the same spot for a moment.
+    function fadeOutCopy(el, wasShown) {
+      try {
+        if (!el || !el.textContent || (!wasShown && el.style.display === "none") || el.classList.contains("bn-under")) return;
+        const g = el.cloneNode(true);
+        g.removeAttribute("id"); g.removeAttribute("onclick"); g.style.display = "inline-flex"; g.classList.add("bn-ghost");
+        document.body.appendChild(g);
+        setTimeout(function() { if (g.parentNode) g.parentNode.removeChild(g); }, 260);
+      } catch (e) {}
+    }
     function toastBanner(msg, warn, ms, kind) {
       const el = document.getElementById("vrToast"), sw = document.getElementById("syncWarning");
       clearTimeout(toastTimer); toastTimer = null;
-      if (!msg) { el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); return; }
+      if (!msg) { fadeOutCopy(el); el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); return; }
       el.textContent = msg;
       el.classList.toggle("is-warn", !!warn);
       el.classList.toggle("is-new", kind === "new");
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";   // plays the entrance again for a new message
       el.style.display = "inline-flex";
       if (sw) sw.classList.add("bn-under");
-      toastTimer = setTimeout(function() { toastTimer = null; el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); }, ms || 3000);
+      toastTimer = setTimeout(function() { toastTimer = null; fadeOutCopy(el); el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); }, ms || 3000);
     }
     function showSummaryNotice(msg, isError) { toastBanner(msg, !!isError, isError ? 5000 : 3000); }
 
@@ -3772,6 +3784,9 @@
       if (!((updateReady || reloadingNow) && pendingCount() === 0 && !savingShown && !submitFailed && problemCount === 0)) el.classList.remove("is-update");
       el.classList.toggle("is-saving", el.style.display !== "none" && el.textContent === "Saving\u2026");
       el.classList.toggle("is-warn", el.style.display !== "none" && (submitFailed || problemCount > 0 || (reloadFailed && updateReady && !reloadingNow)));   // amber = something went wrong
+      const nowShown = el.style.display !== "none";
+      if (el._wasShown && !nowShown) fadeOutCopy(el, true);   // the text is still the old message, so the copy shows what was just there
+      el._wasShown = nowShown;
       if (updateReady) autoReloadIfIdle();
     }
 
