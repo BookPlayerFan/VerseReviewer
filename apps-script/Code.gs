@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-127'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-128'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1476,40 +1476,48 @@ function addChosenVerse(rowIndex, reference) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
     if (!sheet) return { success: false, message: 'Sheet "Verses" not found.' };
-    const want = cleanRef_(reference);
-    let row = Number(rowIndex);
-    const lastRow = sheet.getLastRow();
-    if (!(row >= 2 && row <= lastRow) || cleanRef_(sheet.getRange(row, 6).getValue()) !== want) {
-      row = findRowByRef_(sheet, want);
-    }
-    if (!row) return { success: false, message: 'That verse is no longer in the sheet.' };
-    const g = sheet.getRange(row, 5).getValue();
-    if (!(g === "" || g === null || g === undefined)) {
-      return { success: false, message: 'That verse was already added.' };
-    }
-    // One verse in Learn at a time: while another Level 0 verse is still in its Learn reps (a verse in Lock does not count) the new one joins the queue,
-    // and starts by itself when that one goes to Lock. This also covers a phone with an out-of-date screen.
-    const all = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 8).getValues() : [];
-    const queue = readQueue_();
-    if (learnBusy_(all)) {
-      if (queue.indexOf(want) < 0) {
-        if (queue.length >= MAX_LEARN_QUEUE) return { success: false, message: 'The queue is full.' };
-        queue.push(want); writeQueue_(queue);
-      }
-      return { success: true, queued: true, reference: want, rowIndex: row, queue: queue };
-    }
-    // Starts today if added before 12 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
-    const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
-    if (queue.length) {   // others were waiting first: the one at the front starts, this one waits behind them
-      if (queue.indexOf(want) < 0) { queue.push(want); writeQueue_(queue); }
-      const started = startNextQueued_(sheet, nowAt, startUnlock_);
-      if (started) return { success: true, queued: started.reference !== want, started: started.reference, reference: want, rowIndex: row, unlockAt: started.unlockAt || 0, queue: readQueue_() };
-    }
-    sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
-    return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0, queue: readQueue_() };
+    return startVerse_(sheet, rowIndex, reference);
   } finally {
     lock.releaseLock();
   }
+}
+
+// The work of addChosenVerse, run while the script lock is held (so "Save & Learn now" can save and start in one call).
+// When a verse starts, the answer carries its card (and, if another queued verse took the Learn slot first, that card), so the page can show it
+// without reloading the whole session.
+function startVerse_(sheet, rowIndex, reference) {
+  const want = cleanRef_(reference);
+  let row = Number(rowIndex);
+  const lastRow = sheet.getLastRow();
+  if (!(row >= 2 && row <= lastRow) || cleanRef_(sheet.getRange(row, 6).getValue()) !== want) {
+    row = findRowByRef_(sheet, want);
+  }
+  if (!row) return { success: false, message: 'That verse is no longer in the sheet.' };
+  const g = sheet.getRange(row, 5).getValue();
+  if (!(g === "" || g === null || g === undefined)) {
+    return { success: false, message: 'That verse was already added.' };
+  }
+  // One verse in Learn at a time: while another Level 0 verse is still in its Learn reps (a verse in Lock does not count) the new one joins the queue,
+  // and starts by itself when that one goes to Lock. This also covers a phone with an out-of-date screen.
+  const all = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 8).getValues() : [];
+  const queue = readQueue_();
+  if (learnBusy_(all)) {
+    if (queue.indexOf(want) < 0) {
+      if (queue.length >= MAX_LEARN_QUEUE) return { success: false, message: 'The queue is full.' };
+      queue.push(want); writeQueue_(queue);
+    }
+    return { success: true, queued: true, reference: want, rowIndex: row, queue: queue };
+  }
+  // Starts today if added before 12 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
+  const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
+  if (queue.length) {   // others were waiting first: the one at the front starts, this one waits behind them
+    if (queue.indexOf(want) < 0) { queue.push(want); writeQueue_(queue); }
+    const started = startNextQueued_(sheet, nowAt, startUnlock_);
+    if (started) return { success: true, queued: started.reference !== want, started: started.reference, reference: want, rowIndex: row, unlockAt: started.unlockAt || 0, card: started, queue: readQueue_() };
+  }
+  sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
+  const card = learningCard_(sheet.getRange(row, 1, 1, 8).getValues()[0], row - 1, nowAt);
+  return { success: true, reference: want, started: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0, card: card, queue: readQueue_() };
 }
 
 // Removes a verse that has no level yet (still in the Choose a verse list) from the Verses tab.
@@ -1864,7 +1872,7 @@ function sortVerses_() {
 
 // Adds a pasted verse as a new row at the top of the Verses tab: reference, version and text filled in,
 // Level left blank (unassigned), and the date it was added in column C.
-function addPastedVerse(reference, version, text) {
+function addPastedVerse(reference, version, text, learn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -1887,6 +1895,11 @@ function addPastedVerse(reference, version, text) {
       } catch (e) {}
     }
     sheet.getRange(2, 1, 1, 8).setValues([['', '', today_(), '', '', ref, ver, body]]);
+    if (learn === true) {   // "Save & Learn now" / "Save & add to queue": saved and started in this one call
+      const r = startVerse_(sheet, 2, ref);
+      if (r.success) return r;
+      return { success: true, reference: ref, rowIndex: 2, startFailed: r.message || 'it did not start' };
+    }
     return { success: true, reference: ref, rowIndex: 2 };
   } finally {
     lock.releaseLock();

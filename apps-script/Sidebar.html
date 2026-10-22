@@ -1256,7 +1256,7 @@
     }
     .picker.open { display: flex; }
     #picker.inline { bottom: var(--tab-h); padding-bottom: 8px; z-index: 39; }   /* the New tab with no card: the tab bar stays, the other tabs' pages sit above it */
-    #picker.inline .pk-cancel { display: none; }
+    #picker.inline:not(.held) .pk-cancel { display: none; }   /* the hold version (over a card) keeps Cancel */
     .picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
     .picker-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
     .picker-close { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
@@ -3182,7 +3182,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-338';
+    const CLIENT_BUILD = 'sync-339';
 
     let queue = [];
     let currentIndex = 0;
@@ -4387,7 +4387,8 @@
     function render() {
       closeContext();
       clearLevelUp();
-      if (document.getElementById("picker").classList.contains("inline") && !(mode === 'learning' && !learningCards[learningIndex])) closePicker();   // the New page is only the tab while there is no card
+      const pkEl = document.getElementById("picker");
+      if (pkEl.classList.contains("inline") && !pkEl.classList.contains("held") && !(mode === 'learning' && !learningCards[learningIndex])) closePicker();   // the New page is only the tab while there is no card (the hold version stays until Cancel or a choice)
       if (mode === 'learning') renderLearning();
       else renderCard();
       const kc = mode === 'learning' ? learningCards[learningIndex] : queue[currentIndex];
@@ -4400,6 +4401,7 @@
 
     function setMode(m) {
       mode = m;
+      if (document.getElementById("picker").classList.contains("held")) closePicker();   // switching tabs leaves the hold version behind
       if (m !== 'learning') clearView();
       // Changing tabs doesn't change the deck, so a review from the last couple of minutes can still be undone afterwards
       const keep = { id: undoId, label: undoLabel, exp: undoExp };
@@ -4418,24 +4420,16 @@
       }
     }
 
-    // Learning screen with no Level 0 verses: offer to add one.
+    // Learning screen with no card to show: the New tab is the Choose a verse page (In progress on top, Add new below). There is no separate
+    // "Nothing to learn now" / "No New Verse" screen; the page itself says what is waiting, and the next card's unlock time shows in In progress.
     function renderEmptyLearning() {
       isScoring = false;
-      const held = learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; })[0];
       document.getElementById("activeCard").style.display = "none";
-      document.getElementById("summaryView").style.display = "flex";
+      document.getElementById("summaryView").style.display = "none";
       document.getElementById("sessionProgressFill").style.width = "0%";
-
-      const icon = document.getElementById("summaryIcon");
-      icon.textContent = "";
-      icon.style.display = "none";
-      document.getElementById("summaryTitle").textContent = held ? "Nothing to learn now" : "No New Verse";
-      document.getElementById("summarySubtitle").textContent = held ? lockedText(held) : "Would you like to add a new verse?";
-      document.getElementById("summaryStats").style.display = "none";
-      document.getElementById("flawlessBadge").style.display = "none";
+      setSummaryButtons(false, false);
       countUpToken++;
       updateStatLists(); // an open Repeats / Leveled Up list from the Review screen must not follow you here
-      setSummaryButtons(!held, false);
       renderTomorrowNote();
       openNewPage();   // with no card to show, the New tab is the In progress / Add new page
     }
@@ -6064,7 +6058,7 @@
     // The New tab with no card showing: the same page, as the tab itself (the tab bar stays; no Cancel).
     function openNewPage() {
       const pk = document.getElementById("picker");
-      if (pk.classList.contains("open") && pk.classList.contains("inline")) { renderPicker(); return; }   // already up: just refresh it
+      if (pk.classList.contains("open") && !pk.classList.contains("held")) { renderPicker(); return; }   // already up: just refresh it
       if (pk.classList.contains("open")) return;                                                         // the hold version is up over it
       openPicker(true);
     }
@@ -6077,10 +6071,12 @@
       const token = ++pickerToken;
       pickerLoading = true;
       pickerItems = [];
+      addNote("");
       document.getElementById("pickerNote").textContent = "";
       document.getElementById("pickerSearch").value = "";
       const pk = document.getElementById("picker");
-      pk.classList.toggle("inline", !!inline);
+      pk.classList.add("inline");                    // always sits above the tab bar (the tab bar stays visible)
+      pk.classList.toggle("held", !inline);          // opened by holding the New tab over a card: keeps its Cancel
       pk.classList.add("open");
       renderPicker();
       google.script.run
@@ -6093,7 +6089,7 @@
         .withFailureHandler(function(err) {
           pickerLoading = false;
           if (token !== pickerToken) return;
-          if (!document.getElementById("picker").classList.contains("inline")) closePicker();
+          if (document.getElementById("picker").classList.contains("held")) closePicker();
           showSummaryNotice("Couldn't load verses: " + ((err && err.message) || err), true);
         })
         .listUnassigned();
@@ -6254,6 +6250,7 @@
       const btn = document.getElementById("ppAdd"), lbtn = document.getElementById("ppLearn");
       const lWas = lbtn.disabled;
       btn.disabled = true; lbtn.disabled = true;
+      if (learn === true) { note.textContent = "Saving and starting\u2026"; note.className = "pp-note"; }
       addParsedVerse(p, function(res, msg) {
         btn.disabled = false; lbtn.disabled = lWas;
         if (res) {
@@ -6298,30 +6295,41 @@
 
     // Saves the verse to the sheet (it joins the waiting list in the picker).
     function addParsedVerse(p, cb, learn) {
+      if (learn && adding) { cb(false, "One moment, a verse is still being added."); return; }
+      if (learn) { adding = true; addNote((haveVerseInLearn() ? "Adding " : "Starting ") + p.ref + "\u2026"); }
       google.script.run
         .withSuccessHandler(function(res) {
           if (res && res.success && learn) {
             cb(true);
-            closePicker();
-            chooseVerse({ r: res.rowIndex || 2, f: res.reference }, "Saved to your list, but ");
+            if (res.startFailed) {   // saved, but the server could not start it
+              pickerItems = pickerItems.filter(function(x) { return x.f !== res.reference; });
+              pickerItems.unshift({ r: res.rowIndex || 2, f: res.reference, v: "", t: "", d: 0, a: "", n: 1 });
+              renderPicker();
+              adding = false;
+              addNote("Saved to your list, but it didn't start: " + res.startFailed, true);
+            } else {
+              finishAdd(res, "Saved to your list, but ");
+            }
           } else if (res && res.success) {
             cb(true);
+            addNote("");
             document.getElementById("pickerNote").textContent = "Added " + res.reference + " (waiting in your list)";
             google.script.run
               .withSuccessHandler(function(list) { if (Array.isArray(list)) { pickerItems = list; renderPicker(); } })
               .listUnassigned();
           } else {
+            adding = false;
             cb(false, (res && res.message) || "Couldn't add that verse.");
           }
         })
-        .withFailureHandler(function(err) { cb(false, "Couldn't add: " + ((err && err.message) || err)); })
-        .addPastedVerse(p.ref, p.ver, p.text);
+        .withFailureHandler(function(err) { if (learn) adding = false; cb(false, "Couldn't add: " + ((err && err.message) || err)); })
+        .addPastedVerse(p.ref, p.ver, p.text, learn === true);
     }
 
     function closePicker() {
       pickerToken++; pickerLoading = false;
       const pk = document.getElementById("picker");
-      pk.classList.remove("open"); pk.classList.remove("inline");
+      pk.classList.remove("open"); pk.classList.remove("inline"); pk.classList.remove("held");
     }
 
     function renderPicker() {
@@ -6496,30 +6504,61 @@
         .withFailureHandler(function() { renderPicker(); })
         .unqueueVerse(ref);
     }
+    // A message about adding a verse: in the Choose a verse page while it is up, otherwise the usual notice line.
+    function addNote(msg, isError) {
+      if (document.getElementById("picker").classList.contains("open")) {
+        const el = document.getElementById("pickerNote");
+        el.textContent = msg || "";
+        el.style.color = !msg ? "" : isError ? "var(--badge-fail)" : "var(--text-meta)";
+      } else showSummaryNotice(msg, isError);
+    }
+    // One call answers both the save and the start, and carries the started card, so the page shows it at once (no reload of the whole session).
+    function finishAdd(res, failPrefix) {
+      adding = false;
+      if (res && res.success && res.queued && !res.started) {
+        learnQueue = Array.isArray(res.queue) ? res.queue.slice() : learnQueue.concat([res.reference]);
+        pickerItems = pickerItems.filter(function(x) { return x.f !== res.reference; });
+        if (document.getElementById("picker").classList.contains("open")) { addNote(""); renderPicker(); } else showSummaryNotice("Added " + res.reference + " to the queue");
+      } else if (res && res.success && res.card) {
+        if (Array.isArray(res.queue)) learnQueue = res.queue.slice();
+        const c = res.card;
+        viewRef = null;
+        learningCards = learningCards.filter(function(x) { return x.reference !== c.reference; });
+        learningHeld = learningHeld.filter(function(x) { return x.reference !== c.reference; });
+        learningCards.push(c);
+        sortLearning();
+        const want = res.started || res.reference;
+        const at = learningCards.findIndex(function(x) { return x.reference === want; });
+        learningIndex = at >= 0 ? at : 0;
+        pickerItems = pickerItems.filter(function(x) { return x.f !== res.reference; });
+        addNote("");
+        closePicker();
+        if (mode !== 'learning') setMode('learning'); else render();
+        postCache();
+        schedulePushSync("learn");   // the day's Learn reminders for the new card
+      } else if (res && res.success) {
+        // an older server answered without a card: reload the session, then jump to the verse
+        addNote("");
+        closePicker();
+        enterLearningAfterLoad = res.started || res.reference;
+        restartSession();
+      } else {
+        const m = (res && res.message) ? res.message : "Couldn't add that verse.";
+        addNote(failPrefix ? failPrefix + "it didn't start: " + m : m, true);
+      }
+    }
+    let adding = false;
     function chooseVerse(it, failPrefix) {
+      if (adding) return;
       const queueing = haveVerseInLearn();   // Learn is busy: the verse joins the queue and the list stays open
-      if (!queueing) closePicker();
-      const btn = document.getElementById("btnAddVerse");
-      if (btn && !queueing) { btn.disabled = true; btn.textContent = "Adding..."; }
+      adding = true;
+      // The Choose a verse page stays up until the answer is back, so nothing else shows in between.
+      addNote(queueing ? "Adding to the queue\u2026" : "Starting " + it.f + "\u2026");
       google.script.run
-        .withSuccessHandler(function(res) {
-          if (btn) { btn.disabled = false; btn.textContent = "Add New Verse"; }
-          if (res && res.success && res.queued && !res.started) {
-            learnQueue = Array.isArray(res.queue) ? res.queue.slice() : learnQueue.concat([res.reference]);
-            pickerItems = pickerItems.filter(function(x) { return x.f !== res.reference; });
-            if (document.getElementById("picker").classList.contains("open")) renderPicker(); else showSummaryNotice("Added " + res.reference + " to the queue");
-          } else if (res && res.success) {
-            if (document.getElementById("picker").classList.contains("open")) closePicker();
-            enterLearningAfterLoad = res.started || res.reference;
-            restartSession();
-          } else {
-            const m = (res && res.message) ? res.message : "Couldn't add that verse.";
-            showSummaryNotice(failPrefix ? failPrefix + "it didn't start: " + m : m, true);
-          }
-        })
+        .withSuccessHandler(function(res) { finishAdd(res, failPrefix); })
         .withFailureHandler(function(err) {
-          if (btn) { btn.disabled = false; btn.textContent = "Add New Verse"; }
-          showSummaryNotice((failPrefix ? failPrefix + "it didn't start: " : "Error adding verse: ") + ((err && err.message) || err), true);
+          adding = false;
+          addNote((failPrefix ? failPrefix + "it didn't start: " : "Error adding verse: ") + ((err && err.message) || err), true);
         })
         .addChosenVerse(it.r, it.f);
     }
