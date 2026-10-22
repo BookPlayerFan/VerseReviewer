@@ -1102,8 +1102,6 @@
     .vl-snip.full { color: var(--text-primary); }
     .vl-snip mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 3px; padding: 0 1px; }
     #picker { z-index: 70; }
-    .picker-actions { display: inline-flex; gap: 14px; align-items: center; }
-    #picker .picker-close:first-child { color: var(--text-accent); font-weight: 600; }
     .picker-note { font-size: 13px; color: var(--badge-pass); min-height: 0; margin: -4px 0 8px; font-weight: 600; }
     .picker-note:empty { display: none; }
     .paste-area { width: 100%; min-height: 200px; resize: none; outline: none; border: 1px solid var(--border-card); border-radius: 10px;
@@ -1235,37 +1233,48 @@
       position: fixed; inset: 0; z-index: 50;
       background: var(--bg-card);
       display: none; flex-direction: column;
-      padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
+      padding: max(14px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom));
     }
     .picker.open { display: flex; }
-    #picker.inline { bottom: var(--tab-h); padding-bottom: 8px; z-index: 39; }   /* the New tab with no card: the tab bar stays, the other tabs' pages sit above it */
-    #picker.inline:not(.held) .pk-cancel { display: none; }   /* the hold version (over a card) keeps Cancel */
-    .picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .picker-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    #picker.inline { bottom: var(--tab-h); padding-bottom: 0; z-index: 39; }   /* the New tab with no card: the tab bar stays, the other tabs' pages sit above it */
+    .picker-head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 14px; }
+    .picker-title { font-size: 24px; font-weight: 700; color: var(--text-primary); }
     .picker-close { background: none; border: 0; box-shadow: none; min-height: 0; width: auto;
       padding: 6px 4px; font-size: 14px; color: var(--text-muted); }
     .picker-search { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px;
       border: 1px solid var(--border-card); border-radius: 10px; background: transparent;
       color: var(--text-primary); margin-bottom: 8px; }
-    .picker-list { --fade: var(--bg-card); flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+    .picker-list { --fade: var(--bg-card); flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding-bottom: 12px; }
+    .np-bar { flex: none; padding: 8px 0 14px; }   /* the Add Verse button stays put; the list scrolls above it */
+    .np-add { width: 100%; min-height: 0; padding: 14px; border: 0; border-radius: 14px; background: var(--text-accent); color: var(--bg-card); font-size: 16px; font-weight: 600; box-shadow: none; }
+    .np-add:active { filter: brightness(.92); }
+    /* section label, then cards: In progress cards (the one on screen is outlined), a dashed card for the queue, and one panel for the verses to add */
+    .ip-head { margin: 4px 4px 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-meta); }
+    .ip-head.gap { margin-top: 20px; }
+    .ip-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; box-sizing: border-box; margin: 0 0 8px;
+      min-height: 0; padding: 12px 14px; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: 0 1px 3px rgba(60,64,67,.12); color: var(--text-primary); }
+    .ip-item.here { border-color: var(--text-accent); box-shadow: 0 0 0 1px var(--text-accent); }
+    .ip-item.queued { background: var(--bg-page); border-style: dashed; box-shadow: none; }
+    .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+    .ip-item .ip-ref { font-size: 17px; font-weight: 600; }
+    .ip-item .ip-when { display: flex; align-items: center; font-size: 13px; font-weight: 500; color: var(--text-meta); margin-top: 3px; }
+    .ip-chip { flex: none; font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--bg-card); color: var(--text-meta); border: 1px solid var(--border-card); white-space: nowrap; }
+    .ip-chip.open { background: var(--btn-pass-bg); color: var(--badge-pass); border-color: transparent; }
+    .ip-pips { display: inline-flex; gap: 6px; align-items: center; margin-left: 8px; }
+    .ip-pips i { width: 7px; height: 7px; border-radius: 50%; background: var(--border-body); border: 1px solid var(--border-card); box-sizing: border-box; }
+    .ip-pips i.f { background: var(--text-accent); border-color: var(--text-accent); transform: scale(1.15); box-shadow: 0 0 5px rgba(26,115,232,.4); }
+    .ip-pips i.c { background: transparent; border-color: var(--text-accent); transform: scale(1.25); box-shadow: 0 0 0 2px rgba(26,115,232,.22); }
+    .ip-pips.late i.f { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,.45); }
+    .ip-pips.late i.c { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.25); }
+    .ip-panel { border: 1px solid var(--border-card); border-radius: 16px; overflow: hidden; background: var(--bg-card); }
+    .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0; box-sizing: border-box;
+      box-shadow: none; min-height: 0; padding: 12px 14px; font-size: 17px; font-weight: 600; color: var(--text-primary); border-radius: 0; }
+    .picker-item + .picker-item { border-top: 1px solid var(--border-card); }
+    .picker-item .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+    .picker-item .pk-added { font-size: 13px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
+    .picker-item .pk-parts { flex: none; font-size: 15px; font-weight: 600; color: var(--text-accent); }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
     #treasuryView, #searchView, #upcomingView { touch-action: pan-y; }
-    .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
-      box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500;
-      color: var(--text-primary); border-bottom: 1px solid var(--border-card); border-radius: 0; }   /* square ends: a button's rounded corners made the line curl up at both sides */
-    .picker-item .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
-    .picker-item .pk-added { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
-    .picker-item .pk-parts { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); }
-    .ip-head { display: flex; justify-content: space-between; margin: 12px 4px 2px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-meta); }
-    .ip-head:first-child { margin-top: 2px; }
-    .ip-divider { height: 1px; margin: 14px 0 0; background: var(--text-meta); opacity: .45; }
-    .ip-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
-      box-shadow: none; min-height: 0; padding: 12px 4px; font-size: 16px; font-weight: 500; color: var(--text-primary); border-bottom: 1px solid var(--border-card); border-radius: 0; }
-    .ip-item.last { border-bottom: 0; }   /* the divider under the In progress list is the one line there */
-    .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
-    .ip-item .ip-when { font-size: 12px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
-    .ip-item .ip-when.open { color: var(--text-accent); font-weight: 600; }
-    .ip-item .ip-part { flex: none; font-size: 14px; font-weight: 600; color: var(--text-meta); text-align: right; }
     .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
 
     /* One notification style for the whole app: a rounded banner in the same spot on every screen (just above the buttons).
@@ -1518,16 +1527,10 @@
   </div>
 
   <div class="picker" id="picker">
-    <div class="picker-head">
-      <span class="picker-title">Choose a verse</span>
-      <span class="picker-actions">
-        <button type="button" class="picker-close" onclick="startPaste()">Paste verse</button>
-        <button type="button" class="picker-close pk-cancel" onclick="closePicker()">Cancel</button>
-      </span>
-    </div>
+    <div class="picker-head"><span class="picker-title">New</span></div>
     <div class="picker-note" id="pickerNote"></div>
-    <input type="search" class="picker-search" id="pickerSearch" placeholder="Search" autocomplete="off" oninput="renderPicker()">
     <div class="picker-list" id="pickerList"></div>
+    <div class="np-bar"><button type="button" class="np-add" onclick="startPaste()">Add Verse</button></div>
   </div>
 
   <script>
@@ -1814,6 +1817,7 @@
 
     // ── Bottom tabs ──
     function goTab(t) {
+      if (t === "new" && document.getElementById("picker").classList.contains("held")) { closePicker(); updateTabs(); return; }   // tapping New again leaves the held page
       closeUpcoming();
       closeTreasury();
       closeSearch(); closePeek();
@@ -3054,7 +3058,7 @@
       });
       obs.observe(el, { childList: true });
     }
-    ["svList", "upList", "trList", "pickerList"].forEach(watchEndCue);
+    ["svList", "upList", "trList"].forEach(watchEndCue);   // (the New page has no end marker)
 
     // Pull past the top of a list card (a swipe down that starts with the list already at its top), or push past its end (a swipe up that starts at the
     // end), and the card closes, like pulling down an open verse. A swipe that starts mid-list just scrolls.
@@ -3146,7 +3150,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-342';
+    const CLIENT_BUILD = 'sync-343';
 
     let queue = [];
     let currentIndex = 0;
@@ -6021,7 +6025,6 @@
       pickerItems = [];
       addNote("");
       document.getElementById("pickerNote").textContent = "";
-      document.getElementById("pickerSearch").value = "";
       const pk = document.getElementById("picker");
       pk.classList.add("inline");                    // always sits above the tab bar (the tab bar stays visible)
       pk.classList.toggle("held", !inline);          // opened by holding the New tab over a card: keeps its Cancel
@@ -6280,63 +6283,60 @@
       pk.classList.remove("open"); pk.classList.remove("inline"); pk.classList.remove("held");
     }
 
+    // The New tab's page (also what holding the New tab shows over a card): In progress cards on top (the one on screen is outlined, a queued verse is dashed),
+    // then the verses you can add in one panel. The Add Verse button is pinned below the list.
     function renderPicker() {
-      const q = document.getElementById("pickerSearch").value.trim().toLowerCase();
       const box = document.getElementById("pickerList");
       box.textContent = "";
-      const shown = pickerItems.filter(function(it) { return !q || it.f.toLowerCase().indexOf(q) >= 0; });
-      // Cards in progress sit above the list (nothing to show: no section), then a divider, then the verses you can add
-      const prog = learningCards.concat(learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; }))
-        .filter(function(c) { return !q || c.reference.toLowerCase().indexOf(q) >= 0; });
-      const head = function(text, n) {
-        const h = document.createElement("div"); h.className = "ip-head";
-        const a = document.createElement("span"); a.textContent = text; h.appendChild(a);
-        if (n !== null) { const b = document.createElement("span"); b.textContent = n; h.appendChild(b); }
-        box.appendChild(h);
+      const prog = learningCards.concat(learningHeld.slice().sort(function(a, b) { return a.unlockAt - b.unlockAt; }));
+      const onScreen = mode === 'learning' && !isScoring && learningCards[learningIndex] ? learningCards[learningIndex].reference : "";
+      const head = function(text, gap) {
+        const h = document.createElement("div"); h.className = "ip-head" + (gap ? " gap" : ""); h.textContent = text; box.appendChild(h);
       };
-      const qd = learnQueue.filter(function(f) { return !q || f.toLowerCase().indexOf(q) >= 0; });
+      const qd = learnQueue.slice();
       if (prog.length || qd.length) {
-        head("In progress", prog.length + qd.length);
-        prog.forEach(function(c, k) {
-          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item" + (k === prog.length - 1 && !qd.length ? " last" : "");
+        head("In progress", false);
+        prog.forEach(function(c) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item" + (c.reference === onScreen ? " here" : "");
           const main = document.createElement("span"); main.className = "ip-main";
           const r = document.createElement("span"); r.className = "ip-ref"; r.textContent = c.reference; main.appendChild(r);
-          const w = document.createElement("span"); w.className = "ip-when" + (isLocked(c) ? "" : " open"); w.textContent = progressWhen(c); main.appendChild(w);
+          const isLock = c.stage === 'lock';
+          const w = document.createElement("span"); w.className = "ip-when";
+          w.appendChild(document.createTextNode((isLock ? "Lock" : "Learn") + (!isLock && c.verseCount > 1 ? " \u00b7 " + stepWord(c) + " " + c.verseIndex + " of " + c.verseCount : "")));
+          const total = isLock ? 2 : 7, now = isLock ? (c.lockPart === 'pm' ? 2 : 1) : (c.dot || 1);
+          const pips = document.createElement("span"); pips.className = "ip-pips" + (lateLevel(c) ? " late" : "");
+          for (let i = 1; i <= total; i++) { const d = document.createElement("i"); d.className = i < now ? "f" : i === now ? "c" : ""; pips.appendChild(d); }
+          w.appendChild(pips);
+          main.appendChild(w);
           b.appendChild(main);
-          const p = document.createElement("span"); p.className = "ip-part"; p.textContent = repPart(c); b.appendChild(p);
-          b.onclick = function() { viewLearnCard(c.reference); };
+          const chip = document.createElement("span"); chip.className = "ip-chip" + (isLocked(c) ? "" : " open"); chip.textContent = progressWhen(c); b.appendChild(chip);
+          b.onclick = function() { if (c.reference === onScreen) closePicker(); else viewLearnCard(c.reference); };   // the one on screen: back to it
           box.appendChild(b);
         });
         // Verses waiting for the Learn slot, in the order they were added: tapping one takes it back out of the queue
-        qd.forEach(function(f, k) {
-          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item queued" + (k === qd.length - 1 ? " last" : "");
+        qd.forEach(function(f) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "ip-item queued";
           const main = document.createElement("span"); main.className = "ip-main";
           const r = document.createElement("span"); r.className = "ip-ref"; r.textContent = f; main.appendChild(r);
-          const w = document.createElement("span"); w.className = "ip-when"; w.textContent = learnQueue.indexOf(f) === 0 ? "Next up" : "Queued #" + (learnQueue.indexOf(f) + 1); main.appendChild(w);
+          const w = document.createElement("span"); w.className = "ip-when"; w.textContent = (learnQueue.indexOf(f) === 0 ? "Next up" : "Queued #" + (learnQueue.indexOf(f) + 1)) + " \u00b7 tap to remove"; main.appendChild(w);
           b.appendChild(main);
-          const p = document.createElement("span"); p.className = "ip-part"; p.textContent = "Tap to remove"; b.appendChild(p);
+          const chip = document.createElement("span"); chip.className = "ip-chip"; chip.textContent = "Queued"; b.appendChild(chip);
           b.onclick = function() { unqueueVerse(f); };
           box.appendChild(b);
         });
-        const dv = document.createElement("div"); dv.className = "ip-divider"; box.appendChild(dv);
-        head("Add new", pickerLoading || !shown.length ? null : shown.length);
       }
+      head("Add new", prog.length || qd.length);
+      const panel = document.createElement("div"); panel.className = "ip-panel"; box.appendChild(panel);
       if (pickerLoading) {
-        const e = document.createElement("div");
-        e.className = "picker-empty";
-        e.textContent = "Loading verses\u2026";
-        box.appendChild(e);
+        const e = document.createElement("div"); e.className = "picker-empty"; e.textContent = "Loading verses\u2026"; panel.appendChild(e);
         return;
       }
-      if (shown.length === 0) {
-        const e = document.createElement("div");
-        e.className = "picker-empty";
-        e.textContent = pickerItems.length === 0 ? "No unassigned verses. Tap \u201cPaste verse\u201d to add one." : "No matches";
-        box.appendChild(e);
+      if (pickerItems.length === 0) {
+        const e = document.createElement("div"); e.className = "picker-empty"; e.textContent = "Nothing waiting. Tap Add Verse to paste one."; panel.appendChild(e);
         return;
       }
       // Oldest added first. Verses added on the same day (the sheet only keeps the date) go in Bible order; verses with no date go last.
-      const ordered = shown.slice().sort(function(x, y) {
+      const ordered = pickerItems.slice().sort(function(x, y) {
         const ax = x.a || "9999", ay = y.a || "9999";
         if (ax !== ay) return ax < ay ? -1 : 1;
         const px = parseRef(x.f), py = parseRef(y.f);   // same day: Bible order
@@ -6353,22 +6353,20 @@
         ref.className = "pk-ref";
         ref.textContent = it.f;
         main.appendChild(ref);
-        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(it.a || "");
-        if (m) {
-          const sub = document.createElement("span");
-          sub.className = "pk-added";
-          sub.textContent = "Added " + MON[Number(m[2]) - 1] + " " + Number(m[3]);
-          main.appendChild(sub);
-        }
-        b.appendChild(main);
         const n = Math.max(1, Number(it.n) || 1);
-        const parts = document.createElement("span");
-        parts.className = "pk-parts";
-        parts.textContent = n + (n === 1 ? " part" : " parts");
-        b.appendChild(parts);
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(it.a || "");
+        const sub = document.createElement("span");
+        sub.className = "pk-added";
+        sub.textContent = (m ? "Added " + MON[Number(m[2]) - 1] + " " + Number(m[3]) + " \u00b7 " : "") + n + (n === 1 ? " part" : " parts");
+        main.appendChild(sub);
+        b.appendChild(main);
+        const add = document.createElement("span");
+        add.className = "pk-parts";
+        add.textContent = "Add";
+        b.appendChild(add);
         const heldItem = attachLongPress(b, function() { showPreview(it, true, true); });
         b.onclick = function() { if (heldItem()) return; showPreview(it); };
-        box.appendChild(b);
+        panel.appendChild(b);
       });
     }
 
