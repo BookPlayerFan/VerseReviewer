@@ -3182,7 +3182,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-340';
+    const CLIENT_BUILD = 'sync-341';
 
     let queue = [];
     let currentIndex = 0;
@@ -6670,6 +6670,7 @@
       row("Last check", (diag.checkedAt || "never") + (diag.result ? " \u00b7 " + diag.result : ""));
       if (diag.error) row("Error", diag.error, "bad");
       row("Loaded", (diag.adopted || "never") + (initialSession && initialSession.ms !== undefined ? " \u00b7 " + initialSession.ms + " ms" : ""));
+      if (initialSession && initialSession.ph) row("Server time", initialSession.ph + " (ms)");
       row("Queued saves", pendingCount() + (submitFailed ? " (failing)" : ""), pendingCount() === 0 && !submitFailed ? "ok" : "bad");
       if (shellInfo) {
         row("This icon since", shellInfo.first ? new Date(shellInfo.first).toLocaleDateString([], { month: "short", day: "numeric" }) + ", " + new Date(shellInfo.first).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?");

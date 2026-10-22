@@ -30,12 +30,12 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-128'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-129'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
 // so a new Sidebar.html is noticed by pages that are still open without touching this file. CLIENT_EXPECTED is only a floor,
-// used if the file can't be read. Looked up at most every two minutes.
+// used if the file can't be read. Looked up at most every ten minutes (reading the page file is the slowest thing a status check can do).
 const CLIENT_EXPECTED = 152;
 function clientExpected_() {
   try {
@@ -45,7 +45,7 @@ function clientExpected_() {
     const html = HtmlService.createHtmlOutputFromFile('Sidebar').getContent();
     const m = /const CLIENT_BUILD = 'sync-(\d+)'/.exec(html);
     const n = m ? Number(m[1]) : 0;
-    if (n) cache.put('VR_CLIENT_BUILD', String(n), 120);
+    if (n) cache.put('VR_CLIENT_BUILD', String(n), 600);
     return Math.max(CLIENT_EXPECTED, n);
   } catch (e) {
     return CLIENT_EXPECTED;
@@ -702,9 +702,9 @@ const SESSION_KEY = 'VR_SESSION';
 // The hint level of the card being learned, kept as one small line so every phone shows the same level: { k: "reference|verse|day|v2", l: 1..5, t: ms }.
 // A phone only uses it when k is the card it is showing; a new verse, step or day starts at Full as before. The last change wins.
 const HINT_KEY = 'VR_HINT';
-function readHint_() {
+function readHint_(snap) {
   try {
-    const h = JSON.parse(store_().getProperty(HINT_KEY) || 'null');
+    const h = JSON.parse((snap ? snap[HINT_KEY] : store_().getProperty(HINT_KEY)) || 'null');
     if (h && typeof h.k === 'string' && h.k && Number(h.l) >= 1 && Number(h.l) <= 5) return { k: h.k, l: Number(h.l), t: Number(h.t) || 0 };
   } catch (e) {}
   return null;
@@ -724,11 +724,11 @@ function store_() {
 const SESSION_CHUNK = 3000;
 const MAX_QUEUE = 2000;
 
-function readState_() {
-  const props = store_();
-  const n = Number(props.getProperty(SESSION_KEY + '_N'));
+// snap: all script properties, already read by the caller (one call serves the session, the queue and the hint). Without it they are read here.
+function readState_(snap) {
+  const all = snap || store_().getProperties();
+  const n = Number(all[SESSION_KEY + '_N']);
   if (!n) return null;
-  const all = props.getProperties();
   let json = '';
   for (let i = 0; i < n; i++) {
     const part = all[SESSION_KEY + '_' + i];
@@ -844,7 +844,7 @@ function seenFor_(s, learning) {
   return out;
 }
 
-function hydrate_(s, preRead) {
+function hydrate_(s, preRead, snap) {
   const data = preRead || readSheetData_();
   const nowMs = nowMs_();
 
@@ -908,12 +908,12 @@ function hydrate_(s, preRead) {
     stats: s.stats,
     cards: cards,
     learning: learning,
-    queue: liveQueue_(data),
+    queue: liveQueue_(data, snap),
     seen: seenFor_(s, learning),
     tomorrow: dueTomorrowCount_(data),
     tomorrowLoad: dueTomorrowLoad_(data),
     treasury: treasuryTotal_(data),
-    hint: readHint_()
+    hint: readHint_(snap)
   };
 }
 
@@ -949,20 +949,28 @@ function backfillPts_(s) {
   return true;
 }
 
+// out.ph says where the time went; the Status readout shows it for the page's first load.
 function loadSession() {
   const t0 = Date.now();
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
+  const t1 = Date.now();
   try {
+    const props = store_().getProperties();   // read while holding the lock: one call for the stored session, the queue and the hint
     const today = todayKey_();
-    let s = readState_();
+    let s = readState_(props);
+    const t2 = Date.now();
     let data = readSheetData_();
+    const t3 = Date.now();
     stampLearningDates_(data);
     if (!s || s.date !== today) { if (sortVerses_()) data = readSheetData_(); s = createState_(today); }
     else if (releaseLater_(s, nowMs_())) writeState_(s);
     if (s && s.date === today && backfillPts_(s)) writeState_(s);
-    const out = hydrate_(s, data);
-    out.ms = Date.now() - t0;
+    const t4 = Date.now();
+    const out = hydrate_(s, data, props);
+    const t5 = Date.now();
+    out.ms = t5 - t0;
+    out.ph = 'lock ' + (t1 - t0) + ' \u00b7 props ' + (t2 - t1) + ' \u00b7 sheet ' + (t3 - t2) + ' \u00b7 day ' + (t4 - t3) + ' \u00b7 build ' + (t5 - t4);
     return out;
   } finally {
     lock.releaseLock();
@@ -1384,16 +1392,16 @@ function undoLast(undoId) {
 // ── The Learn queue: verses waiting for the Learn slot, in the order they were added (references, kept in one script property) ──
 const QUEUE_KEY = 'LEARN_QUEUE';
 const MAX_LEARN_QUEUE = 100;
-function readQueue_() {
+function readQueue_(snap) {
   try {
-    const arr = JSON.parse(store_().getProperty(QUEUE_KEY) || '[]');
+    const arr = JSON.parse((snap ? snap[QUEUE_KEY] : store_().getProperty(QUEUE_KEY)) || '[]');
     return Array.isArray(arr) ? arr.filter(function(x) { return typeof x === 'string' && x; }).slice(0, MAX_LEARN_QUEUE) : [];
   } catch (e) { return []; }
 }
 function writeQueue_(list) { store_().setProperty(QUEUE_KEY, JSON.stringify(list.slice(0, MAX_LEARN_QUEUE))); }
 // The queue as the screen needs it: only verses that still wait in the sheet (no level yet), so a verse that was deleted or started another way drops out.
-function liveQueue_(data) {
-  const q = readQueue_(), out = [];
+function liveQueue_(data, snap) {
+  const q = readQueue_(snap), out = [];
   if (!q.length) return out;
   const wait = Object.create(null);
   for (let i = 1; i < data.length; i++) {
