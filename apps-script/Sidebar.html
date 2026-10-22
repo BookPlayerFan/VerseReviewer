@@ -3154,7 +3154,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-326';
+    const CLIENT_BUILD = 'sync-327';
 
     let queue = [];
     let currentIndex = 0;
@@ -3587,6 +3587,7 @@
         })
         .withFailureHandler(function() {
           inFlight = false;
+          learnPending = false;   // the button works again; the press stays queued and the Retry banner shows
           submitFailed = true;
           updateSyncWarning();
           checkSettled();
@@ -5107,9 +5108,39 @@
       pressLearning("press");
     }
 
+    // A tap on the main button (or Miss) that is ignored because the page is busy shows "Saving\u2026" for a moment, so it never looks dead. If the page stays busy for
+    // BUSY_MAX_MS (a save that never answered, an animation that never finished) the watchdog lets go of it, so the button cannot stay dead until the app is reloaded.
+    let busyLabelTimer = null, busyLabelFor = "", busyLabelWas = "", busySince = 0, BUSY_MAX_MS = 10000;
+    function tapBusy(textId) {
+      const el = document.getElementById(textId);
+      if (!el) return;
+      if (el.textContent !== "Saving\u2026") busyLabelWas = el.textContent;
+      el.textContent = "Saving\u2026";
+      busyLabelFor = textId;
+      if (busyLabelTimer) clearTimeout(busyLabelTimer);
+      busyLabelTimer = setTimeout(restoreBusyLabel, 1500);
+    }
+    function restoreBusyLabel() {
+      busyLabelTimer = null;
+      const el = document.getElementById(busyLabelFor);
+      if (!el || el.textContent !== "Saving\u2026") return;
+      const card = learningCards[learningIndex];
+      if (mode === 'learning' && card && busyLabelFor === "btnPassText") paintLearningButton(card); else el.textContent = busyLabelWas;
+    }
+    setInterval(function() {
+      if (!(isScoring || learnPending) || document.hidden) { busySince = (isScoring || learnPending) ? Date.now() : 0; return; }   // time in the background does not count
+      if (!busySince) { busySince = Date.now(); return; }
+      if (Date.now() - busySince < BUSY_MAX_MS) return;
+      diag.stuck = new Date().toLocaleTimeString() + " \u00b7 " + (isScoring ? "animation" : "save") + " \u00b7 " + Math.round((Date.now() - busySince) / 1000) + "s";
+      busySince = 0; isScoring = false; learnPending = false;
+      if (mode === 'learning' && learningCards[learningIndex]) paintLearningButton(learningCards[learningIndex]);
+      restoreBusyLabel();
+      renderDiag();
+    }, 1000);
+
     // kind: 'press' (the button). 'now', 'skip' and 'again' (press early, skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
     function pressLearning(kind) {
-      if (isScoring || learnPending) return;
+      if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); return; }   // a tap that is ignored says so
       const card = learningCards[learningIndex];
       if (!card) return;
       if (kind === "press" && isLocked(card)) return; // the unlock time is only in the hold menu
@@ -5252,7 +5283,8 @@
 
     function scoreCard(action) {
       if (mode === 'learning') { scoreLearning(action); return; }
-      if (isScoring || currentIndex >= activeEnd()) return;
+      if (isScoring) { tapBusy(action === "Fail" ? "btnFailText" : "btnPassText"); return; }   // a tap that is ignored says so
+      if (currentIndex >= activeEnd()) return;
       if (action === "Fail" && !canFail()) return;
       if (action === "Pass" && !canPass()) return;
       if (action === "Fail" && queue[currentIndex].isRepeat) return; // repeat cards have no Repeat button (the D key must not sneak one in)
@@ -6419,6 +6451,7 @@
       row("Page", CLIENT_BUILD + (updateReady ? " \u00b7 update waiting" : ""), updateReady ? "bad" : "");
       if (diag.expects && "sync-" + diag.expects !== CLIENT_BUILD) row("Server expects", "sync-" + diag.expects, "bad");
       row("Server", serverBuild || "?");
+      row("Button got stuck", diag.stuck || "never", diag.stuck ? "bad" : "ok");
       row("Session", "v" + sessionVersion + " \u00b7 " + (sessionDate || "no date"));
       row("Last check", (diag.checkedAt || "never") + (diag.result ? " \u00b7 " + diag.result : ""));
       if (diag.error) row("Error", diag.error, "bad");
