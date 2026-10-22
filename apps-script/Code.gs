@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-120'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-121'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -210,7 +210,7 @@ function msToDate_(ms) {
 function readSheetData_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
   const lastRow = sheet ? sheet.getLastRow() : 0;
-  return lastRow >= 2 ? sheet.getRange(1, 1, lastRow, 9).getValues() : [];   // column I = the learn-plan marker (PLAN_COL)
+  return lastRow >= 2 ? sheet.getRange(1, 1, lastRow, 8).getValues() : [];
 }
 
 // "Day 1" is the day a verse was added to Learning; column C holds that date while the verse is Level 0.
@@ -436,7 +436,7 @@ function skipStep_(info, n, now) {
 // A Level 0 row as a card for the screen.
 function learningCard_(row, i, now) {
   const ref = cleanRef_(row[5]);
-  const ps = isPlanRow_(row) ? planSteps_(row[7]) : null;     // a reference started under the learn plan has steps (parts); an older one has one step per verse
+  const ps = planSteps_(row[7]);     // every reference is learned in the steps of the learn plan (a whole verse, a part of a verse, or joined verses)
   const n = ps && ps.length ? ps.length : verseCount_(row[7]);
   const pm = !!(ps && ps.length && planIsParts_(ps));
   const rep = Number(row[3]) || 1;
@@ -503,7 +503,7 @@ function learnAction(reference, action, expectedRep) {
     const ref = cleanRef_(reference);
     const row = ref ? findRowByRef_(sheet, ref) : 0;
     if (!row) return { ok: false, reason: 'moved', message: 'That verse is no longer in the sheet.' };
-    const vals = sheet.getRange(row, 1, 1, 9).getValues()[0];
+    const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
     if (!isLevelZero_(vals[4])) return { ok: false, reason: 'notnew', message: 'That verse is not in Learn or Lock.' };
     if (action !== 'press' && action !== 'now' && action !== 'skip' && action !== 'again') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
 
@@ -513,7 +513,7 @@ function learnAction(reference, action, expectedRep) {
     if (expectedRep !== undefined && expectedRep !== null && Number(expectedRep) !== rep) {
       return { ok: false, reason: 'stale', card: learningCard_(vals, row - 1, now) };
     }
-    const info = stageInfo_(rep, n, vals[1], now, isPlanRow_(vals) && planIsParts_(planSteps_(vals[7])));
+    const info = stageInfo_(rep, n, vals[1], now, planIsParts_(planSteps_(vals[7])));
 
     let step;
     if (action === 'skip') {
@@ -1337,7 +1337,7 @@ function addChosenVerse(rowIndex, reference) {
     // One verse in Learn at a time: refuse if another Level 0 verse is still in its Learn reps (a verse in Lock does not block).
     // This also stops a phone with an out-of-date screen from adding a second.
     if (lastRow >= 2) {
-      const all = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+      const all = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
       for (let i = 0; i < all.length; i++) {
         if (!cleanRef_(all[i][5]) || !isLevelZero_(all[i][4])) continue;
         if ((Number(all[i][3]) || 1) <= REPS_PER_VERSE * stepCount_(all[i])) {
@@ -1348,8 +1348,6 @@ function addChosenVerse(rowIndex, reference) {
     // Starts today if added before 6 PM, otherwise at 6 AM tomorrow (before 6 AM: at 6 AM).
     const nowAt = nowMs_(), unlock = startUnlock_(nowAt);
     sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
-    sheet.getRange(row, PLAN_COL).setValue(PLAN_MARK);   // from here on the reference is learned in steps (parts), not one verse at a time
-    if (String(sheet.getRange(1, PLAN_COL).getValue() || '').trim() === '') sheet.getRange(1, PLAN_COL).setValue('Learn plan');
     return { success: true, reference: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0 };
   } finally {
     lock.releaseLock();
@@ -2581,12 +2579,9 @@ function planReference_(verses) {
 }
 
 // ───────────── Learn plan in use ─────────────
-// A reference started after this plan went in has PLAN_MARK in column I. Its learn steps come from the plan: whole verses joined into one step, or a long verse
-// cut into parts at its phrase breaks. A reference with a blank column I (started earlier) keeps one step per verse, exactly as before. Review, Lock and points
-// do not change: Lock is still the whole reference, and points still count real verses.
-const PLAN_COL = 9;
-const PLAN_MARK = 'p1';
-function isPlanRow_(row) { return String(row && row[PLAN_COL - 1] !== undefined && row[PLAN_COL - 1] !== null ? row[PLAN_COL - 1] : '').trim() === PLAN_MARK; }
+// Every reference is learned in the steps of the plan: whole verses joined into one step, or a long verse cut into parts at its phrase breaks. The steps are worked
+// out from the verse text each time they are needed (nothing is stored in the sheet), so change the plan only when no reference is part-way through its learn reps.
+// Review, Lock and points do not change: Lock is still the whole reference, and points still count real verses.
 
 // The flat list of learn steps for a reference's text: { f, l } = first and last verse (0-based) in the step, { k, pa, pb } = the verse is cut into k parts and this
 // part is phrases pa..pb-1 of it (k = 1 for a whole verse or a joined step).
@@ -2604,7 +2599,7 @@ function planSteps_(text) {
 // True when the plan differs from one whole verse per step (some step is a part or a join): the screen then says "Part N of M".
 function planIsParts_(steps) { return steps.some(function(x) { return x.k > 1 || x.l > x.f; }); }
 function stepCount_(row) {
-  if (isPlanRow_(row)) { const ps = planSteps_(row[7]); if (ps.length) return ps.length; }
+  const ps = planSteps_(row[7]); if (ps.length) return ps.length;
   return verseCount_(row[7]);
 }
 
