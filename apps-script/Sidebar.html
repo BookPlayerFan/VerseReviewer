@@ -1304,6 +1304,7 @@
       padding: 10px 20px; border-radius: 999px; border: 0; font-size: 16px; font-weight: 600; line-height: 1.25; text-align: center; white-space: normal;
       background: #8ab4f8; color: #14213d; box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
     .sync-warning.is-warn, .vr-toast.is-warn { background: #fdd663; color: #2b1d00; }
+    .vr-toast.is-new { background: #81c995; color: #0b2e13; }   /* green: only ever "Updated to …" after a new version loads */
     .sync-warning.bn-under { visibility: hidden; }   /* a short message takes the spot while it shows */
     .vr-toast { animation: toastIn 0.18s ease-out both; }
     @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
@@ -3176,7 +3177,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-345';
+    const CLIENT_BUILD = 'sync-346';
 
     let queue = [];
     let currentIndex = 0;
@@ -3349,7 +3350,8 @@
       if (d.type === "VR_EARLY") applyEarly(d);
       else if (d.type === "VR_REPLAY") replayLearn(d.items);
       else if (d.type === "VR_SHELL") {
-        shellInfo = Object.assign({}, d); delete shellInfo.vl; delete shellInfo.pills; renderDiag();
+        shellInfo = Object.assign({}, d); delete shellInfo.vl; delete shellInfo.pills; delete shellInfo.updated; renderDiag();
+        if (d.updated && d.updated.build) toastBanner("Updated to " + d.updated.build + (d.updated.srv ? " · " + d.updated.srv : ""), false, 2000, "new");
         if (Array.isArray(d.vl) && d.vl.length && !vlVerses.length) {   // the list from last time: the map shows at once, and the fresh list replaces it if it changed
           ingestVl(d.vl);
           if (document.getElementById("verseListView").classList.contains("open")) renderVerseList();
@@ -3385,7 +3387,10 @@
 
     function notifyReady() {
       // Apps Script nests this page in its own wrapper iframe, so the PWA shell is window.top.
-      try { window.top.postMessage({ type: 'VR_READY' }, '*'); } catch (e) {}
+      // The versions ride along so the shell can tell whether this open is the first one after an update.
+      const msg = { type: 'VR_READY', build: CLIENT_BUILD };
+      if (/^srv-/.test(serverBuild || "")) msg.srv = serverBuild;
+      try { window.top.postMessage(msg, '*'); } catch (e) {}
     }
 
     // ───────────── Loading ─────────────
@@ -3506,12 +3511,13 @@
 
     // The short messages: one banner, same spot everywhere (blue = information, amber = something went wrong). An empty message clears it.
     let toastTimer = null;
-    function toastBanner(msg, warn, ms) {
+    function toastBanner(msg, warn, ms, kind) {
       const el = document.getElementById("vrToast"), sw = document.getElementById("syncWarning");
       clearTimeout(toastTimer); toastTimer = null;
       if (!msg) { el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); return; }
       el.textContent = msg;
       el.classList.toggle("is-warn", !!warn);
+      el.classList.toggle("is-new", kind === "new");
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";   // plays the entrance again for a new message
       el.style.display = "inline-flex";
       if (sw) sw.classList.add("bn-under");
