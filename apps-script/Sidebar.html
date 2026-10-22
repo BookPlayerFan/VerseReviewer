@@ -1057,9 +1057,9 @@
     .tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
       display: flex; background: var(--bg-card); border-top: 1px solid var(--border-card);
-      padding: 0 0 max(env(safe-area-inset-bottom, 0px) - 14px, 0px); height: var(--tab-h);
+      padding: 0 0 max(env(safe-area-inset-bottom, 0px) - 21px, 0px); height: var(--tab-h);   /* 7px less room under the bar (to the phone's edge) goes to the bigger icons, so the whole bar is the same height as before */
     }
-    .tab { flex: 1; background: none; border: 0; box-shadow: none; min-height: 0; width: auto; padding: 4px 0 3px;
+    .tab { flex: 1; background: none; border: 0; box-shadow: none; min-height: 0; width: auto; padding: 5px 0 5px;
       display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0;
       font-size: 10.5px; font-weight: 600; color: var(--text-muted); position: relative; border-radius: 0;
       -webkit-tap-highlight-color: transparent; transition: color 0.2s; }
@@ -3194,7 +3194,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-350';
+    const CLIENT_BUILD = 'sync-351';
 
     let queue = [];
     let currentIndex = 0;
