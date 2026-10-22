@@ -3206,7 +3206,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-354';
+    const CLIENT_BUILD = 'sync-355';
 
     let queue = [];
     let currentIndex = 0;
@@ -3549,6 +3549,8 @@
         setTimeout(function() { if (g.parentNode) g.parentNode.removeChild(g); }, 260);
       } catch (e) {}
     }
+    // How long a short banner stays: blue 3 s, amber 4 s, green (Updated to ...) 2 s. The same everywhere; callers do not choose.
+    const TOAST_MS = { info: 3000, warn: 4000, "new": 2000 };
     function toastBanner(msg, warn, ms, kind) {
       const el = document.getElementById("vrToast"), sw = document.getElementById("syncWarning");
       clearTimeout(toastTimer); toastTimer = null;
@@ -3559,7 +3561,7 @@
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";   // plays the entrance again for a new message
       el.style.display = "inline-flex";
       if (sw) sw.classList.add("bn-under");
-      toastTimer = setTimeout(function() { toastTimer = null; fadeOutCopy(el); el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); }, ms || 3000);
+      toastTimer = setTimeout(function() { toastTimer = null; fadeOutCopy(el); el.style.display = "none"; el.textContent = ""; if (sw) sw.classList.remove("bn-under"); }, TOAST_MS[kind === "new" ? "new" : warn ? "warn" : "info"]);
     }
     function showSummaryNotice(msg, isError) { toastBanner(msg, !!isError, isError ? 5000 : 3000); }
 
