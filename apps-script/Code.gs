@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-132'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-133'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2180,7 +2180,7 @@ function dailyPush() {
   const r = osSend_(words.title, words.text, at > now + 30000 ? at : 0, 'vr-daily', go);
   if (r.ok) {
     props.setProperty(PUSH_DAILY_KEY, today);
-    if (r.json && r.json.id && at > now + 30000) props.setProperty(PUSH_DAILY_ID_KEY, JSON.stringify({ id: r.json.id, at: at }));
+    if (r.json && r.json.id && at > now + 30000) props.setProperty(PUSH_DAILY_ID_KEY, JSON.stringify({ id: r.json.id, at: at, title: words.title, text: words.text }));
   }
 }
 
@@ -2241,7 +2241,20 @@ function cancelDailyIfDone_(preRead) {
   if (!e || !e.id || !e.at || e.at <= now + 120000) { props.deleteProperty(PUSH_DAILY_ID_KEY); return false; }   // gone out already, or about to
   const data = preRead || readSheetData_();
   const nc = newCardCounts_(data, Math.max(now, e.at));   // as of the time the push goes out: the 6 AM cards count
-  if (pushWords_(getDueCards(false, data).length, nc.learnRefs, nc.lockRefs)) return false;   // something is still waiting
+  const due = getDueCards(false, data).length;
+  const words = pushWords_(due, nc.learnRefs, nc.lockRefs);
+  if (words) {   // something is still waiting
+    // But the push was worded for what was waiting when it was scheduled. If part of that is done (the reviews, say), re-send it with the words for what is left,
+    // so it does not still say "Review 12 verses" at 6:00. Same time; the old one is cancelled first.
+    if (e.title === words.title && e.text === words.text) return false;
+    const old = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
+    pushLog_('cancel (reworded)', e.text || '', e.at, !!old.ok, 'id ' + e.id + (old.ok ? '' : ' | ' + old.code + ' ' + String(old.text || '').slice(0, 160)));
+    if (!old.ok) return false;   // keep the record: the old one may still go out, and the next sync tries again
+    props.deleteProperty(PUSH_DAILY_ID_KEY);
+    const r = osSend_(words.title, words.text, e.at, 'vr-daily', due > 0 ? 'review' : 'new');
+    if (r.ok && r.json && r.json.id) props.setProperty(PUSH_DAILY_ID_KEY, JSON.stringify({ id: r.json.id, at: e.at, title: words.title, text: words.text }));
+    return false;
+  }
   const c = osCall_('delete', '/notifications/' + encodeURIComponent(e.id) + '?app_id=' + ONESIGNAL_APP_ID);
   pushLog_('cancel (all done early)', '', e.at, !!c.ok, 'id ' + e.id + (c.ok ? '' : ' | ' + c.code + ' ' + String(c.text || '').slice(0, 160)));
   props.deleteProperty(PUSH_DAILY_ID_KEY);

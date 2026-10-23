@@ -654,13 +654,10 @@
       color: var(--text-accent);
       user-select: none;
     }
-    .day-ring { position: relative; display: inline-flex; width: 26px; height: 26px; margin: -6px 0; align-items: center; justify-content: center; flex: none; }   /* the margin keeps the ring from making the bar taller than the text */
-    .day-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
-    .day-ring circle { fill: none; stroke-width: 3.5; }
-    .day-ring .dr-track { stroke: rgba(150, 150, 150, 0.28); }
-    .day-ring .dr-arc { stroke: var(--text-accent); stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
-    .day-ring b { position: relative; font: 500 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-primary); }
-    .day-ring.wide b { font-size: 9px; }
+    .day-ring { display: inline-flex; align-items: center; gap: 5px; height: 26px; margin: -6px 0; flex: none; color: var(--text-muted); }   /* the margin keeps this from making the bar taller than the text */
+    .day-ring svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+    .day-ring .dr-front { fill: var(--bg-card); }
+    .day-ring b { font: 500 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-primary); font-variant-numeric: tabular-nums; }
     .v-text.blurred.pk3 { filter: none; opacity: 1; background-color: transparent; }   /* Review / Lock hold: the first three words unblur in place; the rest stays blurred */
     .pk3-on { animation: pk3in .18s ease; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .pk3-rest { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -996,13 +993,14 @@
     .vb-bar { flex: none; display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; }
     .vb-bar button { flex-direction: row; min-height: 0; width: auto; margin: 0; box-shadow: none; transition: none; -webkit-tap-highlight-color: transparent; }
     .vb-bar button:active { transform: none; filter: none; }
-    .vb-search { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--vb-a); color: var(--text-muted); font-size: 16px; font-weight: 400; text-align: left; }
+    /* One field: the category tag sits inside the search bar, at its left, so nothing looks cut off */
+    .vb-field { flex: 1; min-width: 0; display: flex; align-items: center; height: 44px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--vb-a); overflow: hidden; }
+    .vb-search { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; height: 100%; padding: 0 12px; border: 0; background: none; color: var(--text-muted); font-size: 16px; font-weight: 400; text-align: left; }
     .vb-search svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
     .vb-search span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .vb-tok { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--text-accent) 14%, var(--bg-card)); color: var(--text-accent); font-size: 15px; font-weight: 700; }
-    .vb-tok b { font-size: 12px; font-weight: 700; }
-    .vb-info { flex: none; width: 40px; height: 44px; padding: 0; border: 0; background: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
-    .vb-info svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    .vb-tok { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 32px; margin: 0 0 0 5px; padding: 0 10px; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--text-accent) 16%, var(--bg-card)); color: var(--text-accent); font-size: 14.5px; font-weight: 700; }
+    .vb-tok + .vb-search { padding-left: 10px; }
+    .vb-tok b { font-size: 11px; font-weight: 700; }
     .vb-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
     .vb-two h4 { margin: 4px 2px 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-meta); }
     .vb-stack { display: flex; flex-direction: column; gap: 8px; }
@@ -1151,12 +1149,8 @@
     @keyframes ctxspin { to { transform: rotate(360deg); } }
     .sync-warning.is-saving { pointer-events: none; }
     /* Status readout */
-    .pv-card.help-card { height: 78%; max-height: 600px; }
-    .help-card .help-scroll { flex: 1 1 auto; display: none; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; }
-    .help-card .help-scroll.on { display: block; }
-    .help-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 11px; background: var(--bg-body); border: 1px solid var(--border-card); margin: 0 0 12px; flex: none; }
-    .help-tabs button { flex: 1; min-height: 0; width: auto; padding: 8px 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); font-size: 14px; font-weight: 700; box-shadow: none; }
-    .help-tabs button.on { background: var(--bg-card); color: var(--text-accent); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+    .pv-card.help-card { height: auto; max-height: calc(100% - 24px); overflow-y: auto; overscroll-behavior: contain; }   /* the status on one panel: it fits, and only the opened notification list can need a scroll */
+    .help-card .st-row { padding: 7px 0; }
     .st-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border-card); font-size: 14px; }
     .st-row:first-child { border-top: 0; }
     .st-row span { color: var(--text-muted); flex: none; }
@@ -1169,11 +1163,11 @@
     .st-caret { display: inline-block; font-style: normal; font-size: 18px; line-height: 1; margin-left: 6px; vertical-align: -1px; transition: transform .18s; }
     .st-caret.open { transform: rotate(90deg); }
     .st-sub { padding: 6px 0 6px 14px; font-size: 13.5px; border-top: 0; }
-    #notifList { padding: 0 0 4px; border-top: 1px solid var(--border-card); }
     .st-note { font-size: 12.5px; color: var(--text-muted); padding: 4px 0; }
     .st-btns { display: flex; gap: 10px; margin-top: 12px; }
     .st-btns button { flex: 1; min-height: 0; width: auto; padding: 9px 0; font-size: 13px; font-weight: 600; border: 1px solid var(--border-card); border-radius: 10px; background: var(--bg-body); color: var(--text-accent); box-shadow: none; }
     .pv-card .st-row b, .pv-card .st-row b * { -webkit-user-select: text; user-select: text; }
+    #notifList { padding: 0 0 4px; border-top: 1px solid var(--border-card); }
     /* Notices (Cleared / Re-queued, errors) float over the bottom of the verse box,
        so they take no room between the verse and the buttons. */
     .verse-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 8px; }
@@ -1344,11 +1338,10 @@
   </div>
 
   <div class="picker" id="verseListView">
-    <div class="vb-bar" id="vbBar">
+    <div class="vb-bar" id="vbBar"><div class="vb-field">
       <button type="button" class="vb-tok" id="vbTok" style="display:none" aria-label="Back to all verses" onclick="vlToFront()"><span id="vbTokName"></span><b aria-hidden="true">&#10005;</b></button>
       <button type="button" class="vb-search" id="vbSearch" onclick="openSearch()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span id="vbSearchTxt">Search reference or words</span></button>
-      <button type="button" class="vb-info" id="vbInfo" aria-label="Status and gestures" onclick="toggleHelp(true)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></svg></button>
-    </div>
+    </div></div>
     <div class="picker-list" id="vlList"></div>
   </div>
 
@@ -1411,58 +1404,8 @@
 
   <div class="pv" id="helpModal" onclick="if (event.target === this) toggleHelp(false)">
     <div class="pv-card help-card">
-      <div class="help-tabs" role="tablist">
-        <button type="button" role="tab" id="helpTabSt" onclick="showHelpTab('st')">Status</button>
-        <button type="button" role="tab" id="helpTabInfo" onclick="showHelpTab('info')">Info</button>
-        <button type="button" role="tab" id="helpTabCtl" onclick="showHelpTab('ctl')">Controls</button>
-      </div>
-      <div class="help-scroll" id="helpPaneInfo">
-        <div class="help-sub">A new day starts at midnight</div>
-        <div class="help-row"><span>Learn opens</span><kbd class="nw">6 · 8 · 10 AM · 12 · 2 · 4 · 8 PM</kbd></div>
-        <div class="help-row"><span>Lock opens</span><kbd class="nw">6 AM · 8 PM</kbd></div>
-        <div class="help-note">A verse added before 12 PM starts today and all 7 reps are done in one day; after 12 PM it waits for 6 AM tomorrow. A rep left an hour past opening shows amber. Press Review again to catch up: each rep whose time has passed opens at once.</div>
-        <div class="help-sub">Notifications</div>
-        <div class="help-row"><span>Reviews, plus the 6 AM Learn and Lock</span><kbd>6:00 AM</kbd></div>
-        <div class="help-row"><span>Learn at open</span><kbd class="nw">8 · 10 AM · 12 · 2 · 4 PM</kbd></div>
-        <div class="help-row"><span>The 8 PM Learn and Lock</span><kbd>8:00 PM</kbd></div>
-        <div class="help-note">The 6 AM Learn and Lock do not send their own notification: they ride the 6 AM one. Every other rep notifies when it opens. Only sent when something is waiting; finishing early cancels what is left.</div>
-      </div>
-      <div class="help-scroll" id="helpPaneCtl">
-        <div class="help-sub">Verse box</div>
-        <div class="help-row"><span>Reveal the next piece</span><kbd>Tap</kbd></div>
-        <div class="help-row"><span>Reveal all</span><kbd>Swipe right</kbd></div>
-        <div class="help-row"><span>Hide all</span><kbd>Swipe left</kbd></div>
-        <div class="help-row"><span>Raise, lower the level (New tab)</span><kbd>Swipe up, down</kbd></div>
-        <div class="help-row"><span>Step to the next level (New tab)</span><kbd>Tap the number</kbd></div>
-        <div class="help-row"><span>Peek: full words (New tab)</span><kbd>Hold</kbd></div>
-        <div class="help-row"><span>Peek: first 3 words (Review and Lock)</span><kbd>Hold</kbd></div>
-        <div class="help-note">A piece is a phrase on New and a whole verse on Review and Lock. Tapping stops when everything shows. On New, tap shows the verse you are learning first, then goes through the reference from its first verse. The number on the bar is the level, and the higher it is the less help you get: 1 plain words, 2 the first letter of every word, 3 every other word, 4 the first word of each phrase, 5 blurred like a Review card. A long swipe crosses several levels; on a long verse that scrolls, tap the number instead (after 5 it goes round to 1). Each verse starts at level 1 every day. Swipe left hides everything except the verse you are learning (at level 5 that is hidden too).</div>
-        <div class="help-sub">Holds</div>
-        <div class="help-row"><span>Background for the verse</span><kbd>Hold the reference</kbd></div>
-        <div class="help-row"><span>Add a new verse</span><kbd>Hold New tab</kbd></div>
-        <div class="help-row"><span>Undo the last review</span><kbd>Hold Review tab</kbd></div>
-        <div class="help-row"><span>Search the verse list</span><kbd>Hold Verses tab</kbd></div>
-        <div class="help-sub">Verse lists</div>
-        <div class="help-row"><span>Open a book on the map; switch books while one is open</span><kbd>Tap its tile</kbd></div>
-        <div class="help-row"><span>Open a day on the schedule; switch days while one is open</span><kbd>Tap its day</kbd></div>
-        <div class="help-row"><span>First words of a verse in a list</span><kbd>Tap the verse</kbd></div>
-        <div class="help-row"><span>Full verse, and its Background</span><kbd>Hold the verse</kbd></div>
-        <div class="help-row"><span>Flip the open verse to its Background</span><kbd>Hold its reference</kbd></div>
-        <div class="help-row"><span>Close an open verse</span><kbd>Tap it, or pull it down</kbd></div>
-        <div class="help-row"><span>Close a list card</span><kbd>Pull past its top or end</kbd></div>
-        <div class="help-row"><span>This sheet</span><kbd>ⓘ on the Verses map, or ?</kbd></div>
-        <div class="help-sub">Keyboard (Review tab)</div>
-        <div class="help-row"><span>Reveal next piece</span><kbd>Space</kbd></div>
-        <div class="help-row"><span>Reveal all / hide</span><kbd>R</kbd></div>
-        <div class="help-row"><span>Pass</span><kbd>F</kbd></div>
-        <div class="help-row"><span>Miss</span><kbd>D</kbd></div>
-        <div class="help-row"><span>Undo</span><kbd>Z</kbd></div>
-        <div class="help-row"><span>Show / hide this sheet</span><kbd>?</kbd></div>
-      </div>
-      <div class="help-scroll" id="helpPaneSt">
-        <div id="diagText"></div>
-        <div class="st-btns"><button type="button" id="diagTest" onclick="sendTestPush()">Test notification</button><button type="button" id="diagReload" onclick="reloadApp()">Reload</button></div>
-      </div>
+      <div id="diagText"></div>
+      <div class="st-btns"><button type="button" id="diagTest" onclick="sendTestPush()">Test notification</button><button type="button" id="diagReload" onclick="reloadApp()">Reload</button></div>
       <div class="pv-btns"><button type="button" class="pv-close" onclick="toggleHelp(false)">Close</button></div>
     </div>
   </div>
@@ -1910,15 +1853,28 @@
       const now = nowSrv();
       let next = Infinity;
       learningCards.concat(learningHeld).forEach(function(c) { if (c.unlockAt > now && c.unlockAt < next) next = c.unlockAt; });
-      if (next < Infinity) badgeTimer = setTimeout(function() {
-        const wasEmpty = !learningCards.length;
-        sortLearning(); updateTabs();
-        if (wasEmpty && learningCards.length && mode === 'learning' && !isScoring) { learningIndex = 0; render(); }   // its time came while the New tab sat empty
-      }, Math.min(next - now + 500, 2147483000));
+      if (next < Infinity) badgeTimer = setTimeout(openDueCards, Math.min(next - now + 500, 2147483000));
+    }
+    // A card waiting for its time has reached it: it joins the New tab, the New icon shows it, and if the New tab was sitting on the Add page it switches to the card.
+    // Runs from the timer, when the app comes back to the front, and from the regular sync check (a phone can pause the timer while the app is away).
+    function openDueCards() {
+      const now = nowSrv();
+      if (!learningHeld.some(function(c) { return c.unlockAt <= now; })) return;
+      const wasEmpty = !learningCards.length;
+      sortLearning(); updateTabs();
+      const pk = document.getElementById("picker");
+      const pageUp = pk.classList.contains("open") && !pk.classList.contains("held");
+      if (wasEmpty && learningCards.length && !isScoring) {
+        if (mode === 'learning') {
+          if (pageUp && pickerAddOpen) { renderPicker(); return; }   // in the middle of picking a verse: the list and the icon update, the page stays
+          if (pageUp) closePicker();
+          learningIndex = 0; render();
+        }
+      } else if (pk.classList.contains("open")) renderPicker();
     }
     document.addEventListener("visibilitychange", function() {
       if (!document.hidden) {
-        updateTabs(); autoReloadIfIdle();
+        openDueCards(); updateTabs(); autoReloadIfIdle();
         const c = learningCards[learningIndex];
         if (mode === 'learning' && c) { paintLateState(c); scheduleLate(c); }
       }
@@ -2590,7 +2546,6 @@
       document.getElementById("vbTok").style.display = vlCat ? "" : "none";
       document.getElementById("vbTokName").textContent = vlCat ? "‹ " + vlCat : "";
       document.getElementById("vbSearchTxt").textContent = vlCat ? "Search" : "Search reference or words";
-      document.getElementById("vbInfo").style.display = vlCat ? "none" : "";
     }
     function vlToFront() {
       vlCat = null; vlUnit = null; vlRowOpen = null;
@@ -2750,7 +2705,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-362';
+    const CLIENT_BUILD = 'sync-364';
 
     let queue = [];
     let currentIndex = 0;
@@ -3223,14 +3178,16 @@
 
     // After a press or review is saved, the server brings the push reminders in line. That takes a few seconds, so it is a separate call
     // (the save itself returns at once), joined into one when several saves come close together.
-    let pushSyncTimer = null, pushSyncKind = "";
-    function schedulePushSync(kind) {
+    let pushSyncTimer = null, pushSyncKind = "", pushSyncTries = 0;
+    function schedulePushSync(kind, delay) {
       if (kind === "learn" || !pushSyncKind) pushSyncKind = kind;
       if (pushSyncTimer) return;
       pushSyncTimer = setTimeout(function() {
         const k = pushSyncKind; pushSyncKind = ""; pushSyncTimer = null;
-        try { google.script.run.withFailureHandler(function() {}).syncPushes(k); } catch (e) {}
-      }, 2500);
+        // The server answers "busy" when another sync is still running; that one may not have seen this save, so ask again a little later (up to 3 times).
+        const again = function() { if (pushSyncTries < 3) { pushSyncTries++; schedulePushSync(k, 6000); } };
+        try { google.script.run.withSuccessHandler(function(r) { if (r && r.ok === false && r.reason === "busy") again(); else pushSyncTries = 0; }).withFailureHandler(again).syncPushes(k); } catch (e) {}
+      }, delay || 2500);
     }
 
     function pumpOutbox() {
@@ -4368,11 +4325,9 @@
       if (n <= 60) return n + " days ago";
       return Math.round(n / 30) + " months ago";
     }
-    // The Review bar's ring: the share of today's deck already done, and how many cards are left (this one included) in the middle.
+    // The Review bar's cards left: a small stack of cards and the number counting down (this card included).
     function dayRing(left, total) {
-      const r = 13, c = 2 * Math.PI * r, off = c * (1 - (total - left) / total);
-      return '<span class="day-ring' + (left >= 100 ? ' wide' : '') + '" role="img" aria-label="' + left + ' left"><svg width="26" height="26" viewBox="0 0 34 34">' +
-        '<circle class="dr-track" cx="17" cy="17" r="' + r + '"/><circle class="dr-arc" cx="17" cy="17" r="' + r + '" stroke-dasharray="' + c.toFixed(2) + '" stroke-dashoffset="' + off.toFixed(2) + '"/></svg><b>' + left + '</b></span>';
+      return '<span class="day-ring" role="img" aria-label="' + left + ' left"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="2.5" width="13" height="16" rx="3"/><rect class="dr-front" x="2.5" y="6.5" width="13" height="16" rx="3"/></svg><b>' + left + '</b></span>';
     }
     function renderCardBody() {
       const body = document.getElementById("cardBody");
@@ -6293,25 +6248,13 @@
       }
     });
 
-    // One sheet with three panels: Status (the readout, with the test and reload buttons; opens first), Info (the day's schedule and when
-    // notifications go out) and Controls (the gestures). The \u24d8 cell on the Verses map (or the ? key) shows or hides it.
-    let helpTab = "st", notif = null, notifOpen = false;
-    function showHelpTab(which) {
-      helpTab = which === "ctl" || which === "info" ? which : "st";
-      [["info", "Info"], ["ctl", "Ctl"], ["st", "St"]].forEach(function(p) {
-        const on = p[0] === helpTab;
-        document.getElementById("helpTab" + p[1]).classList.toggle("on", on);
-        document.getElementById("helpTab" + p[1]).setAttribute("aria-selected", on ? "true" : "false");
-        document.getElementById("helpPane" + p[1]).classList.toggle("on", on);
-      });
-      const pane = document.getElementById("helpPane" + (helpTab === "info" ? "Info" : helpTab === "ctl" ? "Ctl" : "St"));
-      pane.scrollTop = 0; endCue(pane, null);
-    }
+    // One sheet: the status readout with its Test notification and Reload buttons. A two-finger tap anywhere in the app (or the ? key) shows or hides it.
+    let notif = null, notifOpen = false;
     function toggleHelp(open) {
       open = !!open;
       diagOn = open;
       document.getElementById("helpModal").classList.toggle("open", open);
-      if (open) { showHelpTab("st"); renderDiag(); loadNotif(); }   // always opens on Status
+      if (open) { renderDiag(); loadNotif(); }
     }
     // What the server has set to go out today, and whether the pieces that send it are in place (so the phone can say it, not the spreadsheet).
     function loadNotif() {
@@ -6338,6 +6281,25 @@
         r.appendChild(t); r.appendChild(b); el.appendChild(r);
       });
     }
+
+    // A quick tap with two fingers, neither moving far (a pinch or a two-finger scroll does not count).
+    (function() {
+      let t0 = 0, p0 = null;
+      document.addEventListener("touchstart", function(e) {
+        if (e.touches.length === 2) { t0 = Date.now(); p0 = [[e.touches[0].clientX, e.touches[0].clientY], [e.touches[1].clientX, e.touches[1].clientY]]; }
+        else if (e.touches.length > 2) t0 = 0;
+      }, { passive: true, capture: true });
+      document.addEventListener("touchmove", function(e) {
+        if (!t0 || e.touches.length !== 2) return;
+        for (let i = 0; i < 2; i++) if (Math.abs(e.touches[i].clientX - p0[i][0]) > 24 || Math.abs(e.touches[i].clientY - p0[i][1]) > 24) { t0 = 0; return; }
+      }, { passive: true, capture: true });
+      document.addEventListener("touchend", function(e) {
+        if (!t0) return;
+        const quick = Date.now() - t0 < 400; t0 = 0;
+        if (quick && e.touches.length <= 1) toggleHelp(!document.getElementById("helpModal").classList.contains("open"));
+      }, { passive: true, capture: true });
+      document.addEventListener("touchcancel", function() { t0 = 0; }, { passive: true, capture: true });
+    })();
 
     // ───────────── Staying in sync with your other device ─────────────
     // We ask the server whether the session has moved on: when you come back to the app,
@@ -6409,6 +6371,7 @@
 
     function syncCheck() {
       if (document.visibilityState === "hidden") return;
+      openDueCards();
       if (submitFailed && !inFlight) retrySubmit();
       if (hintPending && !hintSendTimer) sendHint();
       if (isFetching || isRefreshing || isScoring || pendingCount() > 0) return;
