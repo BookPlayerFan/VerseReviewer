@@ -2501,7 +2501,7 @@
     // to close; hold shows the whole verse at once. Swipe right (or tap the tag in the search bar) goes back to the front; tapping Verses does too.
     // one chip for several books: [label, first book, last book]; "wide" ones get a slightly different look
     const VL_GROUPS = [["Law", 0, 4], ["History", 5, 16], ["Jeremiah", 23, 24], ["Minor", 27, 38],
-      ["Corinthians", 45, 46], ["Thessalonians", 51, 52], ["Timothy", 53, 54], ["Peter", 59, 60], ["1\u20133 John", 61, 63]];
+      ["Corinthians", 45, 46], ["Thessalon", 51, 52], ["Timothy", 53, 54], ["Peter", 59, 60], ["1\u20133 John", 61, 63]];
     const VL_WIDE = { "Law": 1, "History": 1, "Minor": 1 };
     const VL_UNIT_OF = {};
     VL_GROUPS.forEach(function(g) { for (let i = g[1]; i <= g[2]; i++) VL_UNIT_OF[i] = "g:" + g[0]; });
@@ -2660,7 +2660,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-371';
+    const CLIENT_BUILD = 'sync-372';
 
     let queue = [];
     let currentIndex = 0;
