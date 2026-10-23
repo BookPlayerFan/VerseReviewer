@@ -1037,7 +1037,6 @@
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vr-ic { --rc: var(--rd); } }
     :root[data-theme="dark"] .vr-ic { --rc: var(--rd); }
     .vr-b.two .vr-nx { margin-top: -1px; margin-bottom: -1px; }   /* the chip is 22 px tall: it must not make the top line taller than the reference's 20 px, or the reference would drop */
-    .vr-b.two .version-badge { display: none; }   /* a peek or an open verse keeps the top line to the reference and one item on the right: no version pill (a closed row keeps it) */
     .fail-list .vr { border-bottom-color: var(--border-body); }
     .pk-bubble .vr-b { padding-left: 16px; padding-right: 16px; }
     @keyframes vrIn { from { opacity: 0; } to { opacity: 1; } }
@@ -2735,7 +2734,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-385';
+    const CLIENT_BUILD = 'sync-386';
 
     let queue = [];
     let currentIndex = 0;
@@ -4586,6 +4585,7 @@
 
     // A held Review press that raised the level: the bar's left label becomes a small pill, "Level 3 · Every other", for a moment, then goes back to the verse.
     const LVL_ARROW = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    const LVL_HOLD_MS = 1600;   // after a level-raising hold, the card stays up this long at its new level before it moves on
     const LVL_PILL_MS = 3000;   // how long the "Level 3 · Every other" notice stays after a held Review (it was 1.5 s: gone before it could be read)
     let lvlPill = { L: 0, ref: "", until: 0 };
     function lvlPillHtml(L) { return '<span class="lvl-pill">' + LVL_ARROW + "Level " + L + " \u00b7 " + HINT_NAMES[L] + "</span>"; }
@@ -4925,10 +4925,23 @@
             if (ghost) verseGhostFade(ghost);
           });
         }, PIP_FILL_MS + PIP_FINALE_MS);
+      } else if (climbed) {
+        // A held Review that raised the level: the card you are on stays up for a moment at its new level, with the notice on its bar, and only then moves on.
+        const startedIn = epoch;
+        isScoring = true;
+        flashLevelUp(hintLevel);
+        setTimeout(function() {
+          if (startedIn !== epoch) return;
+          isScoring = false;
+          const now = learningCards.concat(learningHeld).find(function(x) { return x.reference === card.reference; });
+          if (now && now.rep === card.rep) applyLearnCard(predictLearn(card, kind));   // the server has not answered yet: show the next state
+          else if (mode === 'learning') render();                                        // it has: the card is already updated underneath
+          else updateTabs();
+          rehideAfterPress(card);
+        }, LVL_HOLD_MS);
       } else {
         applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
         rehideAfterPress(card);
-        if (climbed) flashLevelUp(hintLevel);   // after the card is rebuilt, so the notice is on the bar that stays
       }
     }
 
