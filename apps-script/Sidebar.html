@@ -1228,6 +1228,11 @@
     .ip-item.waiting .ip-ref { color: var(--text-accent); font-size: 16px; }
     .ip-item.waiting { background: transparent; border-style: dashed; box-shadow: none; }
     .ip-item.waiting .ip-ref { color: var(--text-accent); font-size: 16px; }
+    /* the dashed row stays exactly where it is while pressed (no shrink): a soft tint says it is being pressed, a chevron says it opens/folds */
+    .ip-item.waiting:active { transform: none; filter: none; background: color-mix(in srgb, var(--text-accent) 8%, transparent); }
+    .ip-item.waiting .ip-chip { display: inline-flex; align-items: center; }
+    .ip-chip .chev { flex: none; width: 6px; height: 6px; margin: 0 1px 0 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
+    .ip-item.waiting.open .ip-chip .chev { transform: translateY(1.5px) rotate(-135deg); }
     .ip-item.queued { background: var(--bg-page); border-style: dashed; box-shadow: none; }
     .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .ip-item .ip-ref { font-size: 17px; font-weight: 600; }
@@ -1240,7 +1245,7 @@
     .ip-pips i.c { background: transparent; border-color: var(--text-accent); transform: scale(1.25); box-shadow: 0 0 0 2px rgba(26,115,232,.22); }
     .ip-pips.late i.f { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,.45); }
     .ip-pips.late i.c { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.25); }
-    .ip-panel { border: 1px solid var(--border-card); border-radius: 16px; overflow: hidden; background: var(--bg-card); }
+    .ip-panel { animation: pkFade .18s ease-out; border: 1px solid var(--border-card); border-radius: 16px; overflow: hidden; background: var(--bg-card); }
     .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0; box-sizing: border-box;
       box-shadow: none; min-height: 0; padding: 12px 14px; font-size: 17px; font-weight: 600; color: var(--text-primary); border-radius: 0; }
     .picker-item + .picker-item { border-top: 1px solid var(--border-card); }
@@ -2319,8 +2324,8 @@
     // ── Verse List search ──
     let vlQuery = "";
     function vlNorm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
-    // Search is its own screen. Hold the Verses tab (from any tab) to open it with the keyboard up.
-    function openSearch(fromHold) {
+    // Search is its own screen, opened from the search bar on the Verses page.
+    function openSearch() {
       hideVerseTip();
       const view = document.getElementById("searchView"), input = document.getElementById("vlSearch");
       const was = view.classList.contains("open");
@@ -2331,12 +2336,6 @@
         loadVlVerses(function() { if (view.classList.contains("open")) renderSearch(); }, function() {});
       }
       input.focus();
-      // The hold fires from a timer, which iOS does not count as a tap; focus again on the touch that ends the hold, which it does.
-      if (fromHold) {
-        const again = function() { input.focus(); ["touchend", "pointerup", "click"].forEach(function(t) { document.removeEventListener(t, again, true); }); };
-        ["touchend", "pointerup", "click"].forEach(function(t) { document.addEventListener(t, again, true); });
-        setTimeout(function() { ["touchend", "pointerup", "click"].forEach(function(t) { document.removeEventListener(t, again, true); }); }, 4000);
-      }
     }
     // Cancel: a quick fade back to the Verses page.
     let skCloseTimer = null;
@@ -2522,7 +2521,6 @@
     const VL_UNIT_OF = {};
     VL_GROUPS.forEach(function(g) { for (let i = g[1]; i <= g[2]; i++) VL_UNIT_OF[i] = "g:" + g[0]; });
     const VL_PEEK_WORDS = 3;
-    let vlHeld = function() { return false; };   // set below: true when the press that just ended was a hold
     let vlCat = null, vlRowOpen = null, vlRowStage = 0, vlShownCat = null, vlSwipedAt = 0;   // vlCat = the chip that is open (a unit id), or null on the front
     const vlRowOf = {};
     const vlEl = function(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -2561,12 +2559,12 @@
       units.forEach(function(u, i) {
         if (!skeleton && i > 0 && sect(u) !== sect(units[i - 1])) chips.appendChild(vlEl("div", "vb-cut"));   // a line between Old and New Testament, and before custom books
         const c = vlEl("button", "vb-chip" + (skeleton ? " skel" : "") + (VL_WIDE[u.label] ? " grp" : "") + (u.label.length > 12 ? " lg" : ""), u.label); c.type = "button";
-        if (!skeleton) c.onclick = function() { if (vlHeld()) return; vlPickUnit(u.id); };
+        if (!skeleton) c.onclick = function() { vlPickUnit(u.id); };
         chips.appendChild(c);
       });
       box.appendChild(chips);
     }
-    // Hold anywhere on the front (a chip or the blank space): a legend of the combined chips and what is in each.
+    // Hold the Verses tab: a legend of the combined chips and what is in each.
     function openVlLegend() {
       const body = document.getElementById("vlLegendBody");
       body.textContent = "";
@@ -2673,7 +2671,6 @@
       vlShownCat = vlCat;
       if (same) box.scrollTop = keep;
     }
-    vlHeld = attachLongPress(document.getElementById("vlList"), openVlLegend, function() { return !vlCat && vlVerses.length > 0; });
     // swipe right on the Verses page: back to the front
     (function() {
       const view = document.getElementById("verseListView");
@@ -2698,7 +2695,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-374';
+    const CLIENT_BUILD = 'sync-375';
 
     let queue = [];
     let currentIndex = 0;
@@ -5900,7 +5897,7 @@
         const wm = document.createElement("span"); wm.className = "ip-main";
         const wr = document.createElement("span"); wr.className = "ip-ref"; wr.textContent = "Choose from your list"; wm.appendChild(wr);
         wb.appendChild(wm);
-        const wc = document.createElement("span"); wc.className = "ip-chip"; wc.textContent = pickerAddOpen ? "Hide" : pickerItems.length + " waiting"; wb.appendChild(wc);
+        const wc = document.createElement("span"); wc.className = "ip-chip"; wc.textContent = pickerAddOpen ? "Hide" : pickerItems.length + " waiting"; wc.appendChild(document.createElement("i")).className = "chev"; wb.appendChild(wc);
         wb.onclick = pickerAddOpen ? closeAddList : openAddList;
         box.appendChild(wb);
       }
@@ -6237,13 +6234,13 @@
         .sendTestPush();
     }
 
-    // Hold the Verses tab to search the list. A plain tap switches to the Verses tab.
+    // Hold the Verses tab (from any tab) for the legend of combined chips. A plain tap switches to the Verses tab.
     let versesTabHeld = null;
     function onVersesTabClick() {
       if (versesTabHeld && versesTabHeld()) return;   // the click that follows a hold is not a tap
       goTab("verses");
     }
-    versesTabHeld = attachLongPress(document.getElementById("tabVerses"), function() { openSearch(true); });
+    versesTabHeld = attachLongPress(document.getElementById("tabVerses"), openVlLegend);
 
     function noteCheck(result, error) {
       diag.checkedAt = new Date().toLocaleTimeString();
