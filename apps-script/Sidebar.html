@@ -2604,7 +2604,7 @@
     // A row's button and its reference are created once and never replaced; a tap only changes what follows the reference, so the reference cannot flicker.
     // Each list keeps its own state on its box (open row, stage), so lists do not disturb each other.
     function vrCtl(box) { return box._vr || (box._vr = { open: null, stage: 0, rows: {}, slide: null }); }
-    function vrReset(box) { const c = vrCtl(box); c.open = null; c.stage = 0; c.rows = {}; }
+    function vrReset(box) { const c = vrCtl(box); vrStopPeek(c); c.animTok = (c.animTok || 0) + 1; c.open = null; c.stage = 0; c.rows = {}; }
     function vrIcon(g) {
       g = g | 0;
       if (g < 1 || g > 8 || !RANK_ICON[g]) return null;
@@ -2634,14 +2634,19 @@
       const d = opt.days ? opt.days(v) : null, dated = d !== null && d !== undefined;
       const dueText = opt.dueText || vlDueShort;
       w.className = "vr" + (open ? " open" : ""); b.className = "vr-b" + (open ? " two " + (peekOnly ? "pk" : "full") : "");
-      while (b.lastChild !== b.firstChild) b.removeChild(b.lastChild);
+      // The bar line of a peek is kept as it is when the whole verse opens (only its words change), so nothing blinks; a closed row has none.
+      const keepQ = open ? b.querySelector(".vr-q") : null;
+      Array.prototype.slice.call(b.childNodes, 1).forEach(function(n) { if (n !== keepQ) b.removeChild(n); });
       while (w.lastChild !== b) w.removeChild(w.lastChild);
       if (open) {
         // top line: the reference and one item on the right, the next-review date; second line: the bar and the words (3 of them, or all of them)
         if (dated) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d))); }
-        const q = vlEl("div", "vr-q");
-        q.appendChild(vlEl("span", "vr-qt" + (peekOnly ? " one" : ""), peekOnly ? ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " \u2026" : "") : (ws.join(" ") || "No text saved for this verse.")));
-        b.appendChild(q);
+        const q = keepQ || vlEl("div", "vr-q"), txt = !ws.length ? "No text saved for this verse." : peekOnly ? ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " \u2026" : "") : ws.join(" ");
+        let qt = q.firstChild;
+        if (!qt) { qt = vlEl("span", "vr-qt"); q.appendChild(qt); }
+        qt.className = "vr-qt" + (peekOnly ? " one" : "");
+        if (qt.textContent !== txt) qt.textContent = txt;
+        if (q.parentNode !== b) b.appendChild(q);
       } else {
         const rt = opt.right ? opt.right(v) : null;
         if (rt) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(rt); }
@@ -2650,37 +2655,67 @@
     function vrRefresh(box) { const c = vrCtl(box); Object.keys(c.rows).forEach(function(k) { vrFill(box, k); }); }   // data arrived (dates, counts): redraw the rows as they are
     // Changes only the rows involved (the one tapped and the one that closes), then puts the tapped row back exactly where it was on screen;
     // whatever the list cannot absorb by scrolling (the very top, a verse above closing) slides in.
+    function vrScroller(box) {   // the list itself, or (the calendar day bubble) the nearest ancestor that scrolls
+      let sc = box;
+      while (sc && sc !== document.body && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      return sc && sc !== document.body ? sc : null;
+    }
+    const VR_EASE_MS = 200;
     function vrUpdate(box, tapKey, prevKey) {
       const c = vrCtl(box), o = c.rows[tapKey] && c.rows[tapKey].w, t0 = o ? o.getBoundingClientRect().top : null;
+      const grow = [prevKey, tapKey].filter(Boolean).map(function(k) { const e = c.rows[k] && c.rows[k].w; return e ? { e: e, h0: e.getBoundingClientRect().height } : null; }).filter(Boolean);
       [prevKey, tapKey].forEach(function(k) { if (k) vrFill(box, k); });
       if (!o || t0 === null) return;
-      const d = o.getBoundingClientRect().top - t0; if (Math.abs(d) > 0.5) box.scrollTop += d;
-      vrReveal(box, o);
-      const rem = o.getBoundingClientRect().top - t0, rl = c.slide;
-      if (rl && Math.abs(rem) > 0.5) { rl.style.transition = "none"; rl.style.transform = "translateY(" + (-rem) + "px)"; void rl.offsetHeight; rl.style.transition = "transform .22s ease"; rl.style.transform = "none"; }
+      const moving = grow.filter(function(g) { return o.animate && Math.abs(g.e.getBoundingClientRect().height - g.h0) >= 1; });
+      if (!moving.length) {   // nothing changes height (or no animation support): put the tapped row back exactly where it was, and show the verse in full
+        const d = o.getBoundingClientRect().top - t0; if (Math.abs(d) > 0.5) box.scrollTop += d;
+        vrReveal(box, o);
+        const rem = o.getBoundingClientRect().top - t0, rl = c.slide;
+        if (rl && Math.abs(rem) > 0.5) { rl.style.transition = "none"; rl.style.transform = "translateY(" + (-rem) + "px)"; void rl.offsetHeight; rl.style.transition = "transform .22s ease"; rl.style.transform = "none"; }
+        return;
+      }
+      // Rows ease to their new heights (the one that closes shrinks while the one that opens grows) and, frame by frame, the list is scrolled so the row you tapped stays exactly under your finger.
+      const sc = vrScroller(box), t1 = performance.now();
+      moving.forEach(function(g) {
+        const h1 = g.e.getBoundingClientRect().height;
+        g.e.style.overflow = "hidden";
+        const an = g.e.animate([{ height: g.h0 + "px" }, { height: h1 + "px" }], { duration: VR_EASE_MS, easing: "ease" });
+        an.onfinish = an.oncancel = function() { g.e.style.overflow = ""; };
+      });
+      const tok = c.animTok = (c.animTok || 0) + 1;
+      (function frame() {
+        if (c.animTok !== tok) return;
+        const d = o.getBoundingClientRect().top - t0;
+        if (sc && Math.abs(d) > 0.5) sc.scrollTop += d;
+        if (performance.now() - t1 < VR_EASE_MS + 40) requestAnimationFrame(frame); else vrReveal(box, o);   // then, if the verse runs past the list's bottom, bring it into view
+      })();
     }
     // An opened verse that runs past the bottom of its list scrolls up just far enough to be seen in full (never past its own top).
     function vrReveal(box, o) {
       if (!o.classList.contains("open")) return;
-      let sc = box;   // the list itself, or (the calendar day bubble) the nearest ancestor that scrolls
-      while (sc && sc !== document.body && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
-      if (!sc || sc === document.body) return;
+      const sc = vrScroller(box); if (!sc) return;
       const bb = sc.getBoundingClientRect(), rb = o.getBoundingClientRect();
       const by = Math.min(rb.bottom - bb.bottom, rb.top - bb.top);
       if (by > 0.5) { try { sc.scrollTo({ top: sc.scrollTop + by, behavior: "smooth" }); } catch (e) { sc.scrollTop += by; } }
     }
+    // A tap peeks at the first words for 2 seconds (or until you tap the row, or another one); only a hold opens the whole verse, and that stays until you tap the row or open another.
+    const VR_PEEK_MS = 2000;
+    function vrStopPeek(c) { if (c.peekTimer) { clearTimeout(c.peekTimer); c.peekTimer = null; } }
     function vrHold(box, key) {
       const c = vrCtl(box); if (!c.rows[key] || (c.open === key && c.stage === 2)) return;
       const prev = c.open;
+      vrStopPeek(c);
       c.open = key; c.stage = 2;
       vrUpdate(box, key, prev !== key ? prev : null);
     }
     function vrTap(box, key) {
       const c = vrCtl(box), r = c.rows[key]; if (!r) return;
       const prev = c.open;
-      if (c.open !== key) { c.open = key; c.stage = vrWords(r).length > VL_PEEK_WORDS ? 1 : 2; }   // another verse opening closes the last one
-      else if (c.stage === 1) c.stage = 2;                                                       // second tap: the whole verse
-      else c.open = null;                                                                        // third tap: close
+      vrStopPeek(c);
+      if (c.open !== key) {                       // another verse opening closes the last one
+        c.open = key; c.stage = 1;
+        c.peekTimer = setTimeout(function() { c.peekTimer = null; if (c.open === key && c.stage === 1) { c.open = null; vrUpdate(box, key, null); } }, VR_PEEK_MS);
+      } else c.open = null;                       // a tap on the open row (peek or whole verse) closes it
       vrUpdate(box, key, prev !== key ? prev : null);
     }
     // The Verses list: its rank icon on the right; the day only for verses that are in review.
@@ -2734,7 +2769,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-386';
+    const CLIENT_BUILD = 'sync-388';
 
     let queue = [];
     let currentIndex = 0;
