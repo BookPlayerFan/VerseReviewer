@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-133'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-134'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -95,7 +95,7 @@ function balancedDueDate_(sheet, group, today, skipRow) {
     for (let i = 0; i < vals.length; i++) {
       if (i + 2 === skipRow) continue;
       const d = toMidnight_(vals[i][0]);
-      if (!d || !(Number(vals[i][3]) > 0)) continue;
+      if (!d || !(Number(vals[i][3]) >= 1)) continue;   // New cards (Level 0, 0.1, 0.2) keep their unlock time in column B: not a review day
       const k = d.getTime();
       counts[k] = (counts[k] || 0) + verseLoad_(vals[i][6]);
     }
@@ -282,10 +282,11 @@ function stampLearningDates_(preRead) {
 
 // ───────────── New-verse stages: Learn -> Lock -> Bronze ─────────────
 //
-// A Level 0 verse is a "New" card. Its Rep (column D) is the rep you are ON, which is also the filled dot:
-//   rep 1 .. 7n   Learn   (n = number of verses; verse = ceil(rep / 7), dot = ((rep - 1) mod 7) + 1)
-//   rep 7n + 1    Lock AM
-//   rep 7n + 2    Lock PM  (its button is Promote: Level 1, Rep 1)
+// A New verse has Level 0.1 (Learn) or 0.2 (Lock) in column E, so the Level column says the stage and the Rep (column D) only says where you are in it:
+//   Level 0.1 Learn   Rep 1 .. 7n   (n = number of steps; step = ceil(rep / 7), dot = ((rep - 1) mod 7) + 1)
+//   Level 0.2 Lock    Rep 0 or 1    (the passes in a row; a second pass is Promote: Level 1, Rep 1)
+// Rows written before this (Level 0) are still read the old way (Lock was rep 1000 + passes, or older still 7n + 1 / 7n + 2) and are rewritten to the new form on
+// their next press; migrateLevels() (run from the editor) converts them all at once.
 // Column B (Next due) holds the time the button next unlocks (empty = live now). Level 0 rows ignore it everywhere else.
 // Learn reps open at fixed times of the day (rep 1 at 6 AM ... rep 7 at 8 PM): the first and last open exactly when their notification goes out.
 // A rep that is missed is made up: once pressed, the next rep opens at once if its time has passed.
@@ -294,10 +295,11 @@ const REPS_PER_VERSE = 7;
 const DAY_START_MIN = 0;            // a Learn/Lock day runs midnight to midnight (which day a time belongs to); the first rep of the day opens at 6 AM (LEARN_SLOTS[0])
 const LOCK_PM_MIN = 20 * 60;        // the evening Lock slot opens at 8 PM
 // Lock: a verse that has finished Learn comes up at 6 AM and 8 PM, one attempt per slot (Pass or Miss), until it has been passed twice in a row.
-// A Lock card's rep (column D) is LOCK_BASE + passes in a row + attempts / 100: 1000.00 = nothing yet, 1001.03 = one pass in a row after 3 attempts. It no longer
-// depends on how many steps the learn plan gives the reference, so a change to the plan cannot move a Lock card. (Older Lock rows count the reps after the last
-// Learn rep instead; they are still read, as streak 0 unless they are exactly one past the first Lock rep.)
-const LOCK_BASE = 1000;
+// A Lock card is Level 0.2 and its rep (column D) is the passes in a row (0 or 1). It does not depend on how many steps the learn plan gives the reference,
+// so a change to the plan cannot move a Lock card. (The older forms, rep 1000 + passes + attempts / 100 at Level 0, and before that the reps after the last
+// Learn rep, are still read.)
+const LEARN_LEVEL = 0.1, LOCK_LEVEL = 0.2;
+const LOCK_BASE = 1000;   // the old Lock rep form, read only
 const LOCK_SLOTS = [6 * 60, 20 * 60];
 const PASSES_TO_CLEAR = 2;
 const START_LIVE_BEFORE_MIN = 12 * 60; // a verse added before noon starts today (the reps whose time has already passed open at once, to catch up); later it can be read at once but its reps start at 6 AM tomorrow
@@ -404,19 +406,28 @@ function verseCountMap_() {
   return map;
 }
 
-// Where a Lock card is, read from its rep (column D): { streak: passes in a row (0 or 1), tries: attempts so far }, or null when the rep is a Learn rep.
-function lockPos_(raw, total) {
-  const v = Number(raw);
-  if (!(v >= 1)) return null;
-  if (v >= LOCK_BASE) {
-    const f = Math.floor(v + 1e-9);
-    return { streak: Math.max(0, Math.min(PASSES_TO_CLEAR - 1, f - LOCK_BASE)), tries: Math.max(0, Math.min(99, Math.round((v - f) * 100))) };
-  }
-  const r = Math.floor(v);
-  if (r > total) return { streak: r === total + 2 ? 1 : 0, tries: 0 };   // an older Lock row
+// Which stage the Level column (E) names: 'learn' (0.1), 'lock' (0.2), or null for a plain 0 (an older row, read from its rep) or anything else.
+function levelKind_(raw) {
+  const s = String(raw === null || raw === undefined ? '' : raw).trim();
+  if (s === '' || isNaN(Number(s))) return null;
+  const v = Number(s);
+  if (v >= 0.05 && v < 0.15) return 'learn';
+  if (v >= 0.15 && v < 0.25) return 'lock';
   return null;
 }
-function lockRep_(streak, tries) { return Math.round((LOCK_BASE + streak + Math.min(99, tries) / 100) * 100) / 100; }
+// Where a Lock card is: { streak: passes in a row (0 or 1) }, or null when it is a Learn card. levelRaw is the row's Level (column E).
+function lockPos_(raw, total, levelRaw) {
+  const kind = levelKind_(levelRaw);
+  const v = Number(raw);
+  if (kind === 'lock') return { streak: Math.max(0, Math.min(PASSES_TO_CLEAR - 1, Math.floor((isNaN(v) ? 0 : v) + 1e-9))) };
+  if (kind === 'learn') return null;
+  // an older row (Level 0): Lock is read from the rep
+  if (!(v >= 1)) return null;
+  if (v >= LOCK_BASE) return { streak: Math.max(0, Math.min(PASSES_TO_CLEAR - 1, Math.floor(v + 1e-9) - LOCK_BASE)) };
+  const r = Math.floor(v);
+  if (r > total) return { streak: r === total + 2 ? 1 : 0 };   // the oldest form
+  return null;
+}
 // The next Lock slot (6 AM or 8 PM) after `now`.
 function nextLockSlot_(now) {
   for (let d = 0; d < 3; d++) {
@@ -429,16 +440,16 @@ function nextLockSlot_(now) {
 }
 
 // Everything the screen needs to know about a New card's position.
-function stageInfo_(rep, n, bRaw, now, pm) {
+function stageInfo_(rep, n, bRaw, now, pm, levelRaw) {
   const total = REPS_PER_VERSE * n;
-  const lp = lockPos_(rep, total);
+  const lp = lockPos_(rep, total, levelRaw);
   const r = Math.max(1, Math.floor(Number(rep) || 1));
   let unlockAt = 0, readyAt = 0;
   if (bRaw instanceof Date) {
     const t = bRaw.getTime();
     if (!isNaN(t)) { readyAt = t; if (t > now) unlockAt = t; }
   }
-  const out = { stage: 'learn', verseIndex: 1, verseCount: n, dot: 1, lockPart: '', label: 'Review', unlockAt: unlockAt, readyAt: readyAt };
+  const out = { stage: 'learn', verseIndex: 1, verseCount: n, dot: 1, lockPart: '', label: 'Review', unlockAt: unlockAt, readyAt: readyAt, rep: r };   // rep: what the screen shows and sends back (a Lock card's is its passes in a row)
   if (!lp) {
     out.verseIndex = Math.ceil(r / REPS_PER_VERSE);
     out.dot = ((r - 1) % REPS_PER_VERSE) + 1;
@@ -447,7 +458,7 @@ function stageInfo_(rep, n, bRaw, now, pm) {
     out.stage = 'lock';
     out.verseIndex = n;
     out.dot = 0;
-    out.tries = lp.tries;
+    out.rep = lp.streak;
     if (lp.streak === 0) { out.lockPart = 'am'; out.label = 'Pass'; }     // lockPart is the streak: 'am' = no pass yet, 'pm' = one pass in a row
     else { out.lockPart = 'pm'; out.label = 'Promote'; }
   }
@@ -459,22 +470,21 @@ function stageInfo_(rep, n, bRaw, now, pm) {
 // and the second one in a row clears it; either way the card is back at the next 6 AM / 8 PM slot.
 function nextStep_(info, rep, now, action) {
   if (info.stage === 'learn') {
-    if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, unlock: catchUpSlot_(info.dot, now) };   // may be in the past: ready at once
-    if (info.verseIndex >= info.verseCount) return { rep: LOCK_BASE, unlock: nextDayStart_(now), learned: true };   // Learned: Lock starts at 6 AM tomorrow
-    return { rep: rep + 1, unlock: nextDayStart_(now) };   // Next Verse / Next Part: starts again at 6 AM tomorrow
+    if (info.dot < REPS_PER_VERSE) return { rep: rep + 1, level: LEARN_LEVEL, unlock: catchUpSlot_(info.dot, now) };   // may be in the past: ready at once
+    if (info.verseIndex >= info.verseCount) return { rep: 0, level: LOCK_LEVEL, unlock: nextDayStart_(now), learned: true };   // Learned: Lock starts at 6 AM tomorrow
+    return { rep: rep + 1, level: LEARN_LEVEL, unlock: nextDayStart_(now) };   // Next Verse / Next Part: starts again at 6 AM tomorrow
   }
   const streak = info.lockPart === 'pm' ? 1 : 0;
-  const tries = (info.tries || 0) + 1;
-  if (action === 'miss') return { rep: lockRep_(0, tries), unlock: nextLockSlot_(now) };
+  if (action === 'miss') return { rep: 0, level: LOCK_LEVEL, unlock: nextLockSlot_(now) };
   if (streak + 1 >= PASSES_TO_CLEAR) return { promote: true };
-  return { rep: lockRep_(streak + 1, tries), unlock: nextLockSlot_(now) };
+  return { rep: streak + 1, level: LOCK_LEVEL, unlock: nextLockSlot_(now) };
 }
 
 
 // Skip Verse (before the last verse) or Skip to Lock (last verse). Learn cards only.
 function skipStep_(info, n, now) {
-  if (info.verseIndex < n) return { rep: REPS_PER_VERSE * info.verseIndex + 1, unlock: 0 };
-  return { rep: LOCK_BASE, unlock: nextDayStart_(now), learned: true };
+  if (info.verseIndex < n) return { rep: REPS_PER_VERSE * info.verseIndex + 1, level: LEARN_LEVEL, unlock: 0 };
+  return { rep: 0, level: LOCK_LEVEL, unlock: nextDayStart_(now), learned: true };
 }
 
 // A Level 0 row as a card for the screen.
@@ -483,7 +493,7 @@ function learningCard_(row, i, now) {
   const ps = planSteps_(row[7]);     // every reference is learned in the steps of the learn plan (a whole verse, a part of a verse, or joined verses)
   const n = ps && ps.length ? ps.length : verseCount_(row[7]);
   const pm = !!(ps && ps.length && planIsParts_(ps));
-  const rep = Number(row[3]) || 1;
+  const rep = Number(row[3]) || 1;   // (a Lock card's real rep is read in stageInfo_ and replaces this)
   const card = {
     rowIndex: i + 1,
     reference: ref,
@@ -496,7 +506,7 @@ function learningCard_(row, i, now) {
     isRepeat: false,
     day: learningDay_(row[2])
   };
-  const info = stageInfo_(rep, n, row[1], now, pm);
+  const info = stageInfo_(isNaN(Number(row[3])) ? 1 : Number(row[3]), n, row[1], now, pm, row[4]);
   Object.keys(info).forEach(function(k) { card[k] = info[k]; });
   if (ps && ps.length) { card.plan = ps.map(function(x) { return [x.f, x.l, x.k, x.pa, x.pb]; }); if (pm) card.pm = 1; }
   if (info.stage === 'lock') card.ago = agoDays_(row[2]);   // days since Learn finished (column C is stamped when the last rep is pressed)
@@ -513,9 +523,12 @@ function levelOf_(raw) {
   return Math.max(0, Math.min(MAX_GROUP, Math.floor(Number(s))));
 }
 
+// A New verse (in Learn or Lock): its Level is 0, or 0.1 / 0.2 (see the stages above). A blank Level is a verse that has not been started.
 function isLevelZero_(raw) {
   const s = String(raw === null || raw === undefined ? '' : raw).trim();
-  return s !== '' && Number(s) === 0;
+  if (s === '' || isNaN(Number(s))) return false;
+  const v = Number(s);
+  return v >= 0 && v < 1;
 }
 
 // Unlocked New cards right now, split by stage: { learn, lock } counts, plus learnRefs / lockRefs (references, sheet order).
@@ -533,21 +546,20 @@ function newCardCounts_(data, now) {
 /**
  * A press on the New card's button.
  *   action 'press'  - the button (refused with 'locked' until its unlock time)
- *   action 'now'    - the same step, ignoring the lock (hold menu)
  *   action 'skip'   - Skip Verse / Skip to Lock (Learn cards only)
  *   action 'miss'   - a missed Lock attempt: the passes in a row go back to 0 and the card returns at the next 6 AM / 8 PM slot ('again', the old
  *                     Keep in Lock another day, is read as a miss)
  * On Lock the button is Pass: the first pass in a row brings the card back at the next slot, the second one is Promote (the verse becomes Bronze rep 1, due tomorrow).
- * expectedRep is the rep the screen showed (Lock reps carry the attempts as a decimal), so a second phone that is behind, or a press sent twice, gets 'stale'
- * and the current card.
+ * expectedRep is the rep the screen showed (a Lock card's is its passes in a row), so a second phone that is behind, or a press sent twice after a Pass, gets
+ * 'stale' and the current card. A press sent twice after a Miss is refused as 'locked': every Lock press writes the next 6 AM / 8 PM slot into column B.
  */
-// The extra Log columns for a Learn / Lock press: which step of how many and its words (Learn), the reference's size, what the screen sent, and a Lock card's streak and attempt.
+// The extra Log columns for a Learn / Lock press: which step of how many and its words (Learn), the reference's size, what the screen sent, and a Lock card's streak.
 function logExtras_(text, info, x, lock) {
   const cx = cleanX_(x), o = { rw: refWords_(text), nv: verseCount_(text), secs: cx.s, peeks: cx.p };
   if (info.stage === 'learn') {
     const sizes = stepSizes_(text);
     o.hint = cx.h; o.step = info.verseIndex + '/' + info.verseCount; o.sw = sizes[info.verseIndex - 1] || '';
-  } else if (lock) { o.lstreak = lock.streak; o.lattempt = lock.attempt; }
+  } else if (lock) { o.lstreak = lock.streak; }
   return o;
 }
 function learnAction(reference, action, expectedRep, x) {
@@ -561,16 +573,16 @@ function learnAction(reference, action, expectedRep, x) {
     if (!row) return { ok: false, reason: 'moved', message: 'That verse is no longer in the sheet.' };
     const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
     if (!isLevelZero_(vals[4])) return { ok: false, reason: 'notnew', message: 'That verse is not in Learn or Lock.' };
-    if (action !== 'press' && action !== 'now' && action !== 'skip' && action !== 'again' && action !== 'miss') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
+    if (action !== 'press' && action !== 'skip' && action !== 'again' && action !== 'miss') return { ok: false, reason: 'invalid', message: 'Unknown action.' };
     if (action === 'again') action = 'miss';
 
     const now = nowMs_();
     const n = stepCount_(vals);
-    const rep = Number(vals[3]) || 1;
+    const info = stageInfo_(isNaN(Number(vals[3])) ? 1 : Number(vals[3]), n, vals[1], now, planIsParts_(planSteps_(vals[7])), vals[4]);
+    const rep = info.rep;   // Learn: the rep; Lock: the passes in a row
     if (expectedRep !== undefined && expectedRep !== null && Math.abs(Number(expectedRep) - rep) > 0.001) {
       return { ok: false, reason: 'stale', card: learningCard_(vals, row - 1, now) };
     }
-    const info = stageInfo_(rep, n, vals[1], now, planIsParts_(planSteps_(vals[7])));
 
     let step;
     if (action === 'skip') {
@@ -578,7 +590,7 @@ function learnAction(reference, action, expectedRep, x) {
       step = skipStep_(info, n, now);
     } else {
       if (action === 'miss' && info.stage !== 'lock') return { ok: false, reason: 'nolock', card: learningCard_(vals, row - 1, now) };
-      if ((action === 'press' || action === 'miss') && info.unlockAt) {
+      if (info.unlockAt) {
         return { ok: false, reason: 'locked', unlockAt: info.unlockAt, card: learningCard_(vals, row - 1, now) };
       }
       step = nextStep_(info, rep, now, action === 'miss' ? 'miss' : 'pass');
@@ -591,16 +603,16 @@ function learnAction(reference, action, expectedRep, x) {
       const w = writeReview_({ rowIndex: row, reference: ref, rep: 1, group: 1 });
       if (!w.ok) return w;
       promoted = true;
-      logEvent_(Object.assign({ ref: ref, result: 'Level Up', lb: 0, la: 1, rb: rep, ra: 1, tries: '', repeat: false }, logExtras_(vals[7], info, x, { streak: PASSES_TO_CLEAR, attempt: (info.tries || 0) + 1 })));
+      logEvent_(Object.assign({ ref: ref, result: 'Level Up', lb: 0, la: 1, rb: rep, ra: 1, tries: '', repeat: false }, logExtras_(vals[7], info, x, { streak: PASSES_TO_CLEAR })));
     } else {
       sheet.getRange(row, 2).setValue(step.unlock ? new Date(step.unlock) : '');
-      sheet.getRange(row, 4).setValue(step.rep);
+      sheet.getRange(row, 4, 1, 2).setValues([[step.rep, step.level]]);   // the Rep and the Level together (an older Level 0 row is rewritten to 0.1 / 0.2 here)
       vals[1] = step.unlock ? new Date(step.unlock) : '';
-      vals[3] = step.rep;
+      vals[3] = step.rep; vals[4] = step.level;
       if (step.learned) { const td = today_(); sheet.getRange(row, 3).setValue(td); vals[2] = td; }   // column C becomes the day Learn finished ("Learned N days ago" on the Lock card)
-      const lk = info.stage === 'lock' ? lockPos_(step.rep, 0) : null;
+      const lk = info.stage === 'lock' ? { streak: step.rep } : null;
       logEvent_(Object.assign({ ref: ref, result: info.stage === 'lock' ? (action === 'miss' ? 'Lock Miss' : 'Lock Pass') : (action === 'skip' ? 'Skip' : 'Dot'), lb: 0, la: 0, rb: rep, ra: step.rep, tries: '', repeat: false },
-        logExtras_(vals[7], info, x, lk ? { streak: lk.streak, attempt: lk.tries } : null)));
+        logExtras_(vals[7], info, x, lk)));
       card = learningCard_(vals, row - 1, now);
       // This verse just went to Lock: the next queued verse takes the Learn slot (visible at once, its first rep opens at 6 AM tomorrow).
       if (step.learned) nextCard = startNextQueued_(sheet, now, nextDayStart_);
@@ -1414,7 +1426,30 @@ function liveQueue_(data, snap) {
 }
 // A verse is in its Learn reps (not yet in Lock) when its rep is not a Lock rep.
 function inLearnReps_(row) {
-  return isLevelZero_(row[4]) && !lockPos_(row[3], REPS_PER_VERSE * stepCount_(row));
+  return isLevelZero_(row[4]) && !lockPos_(row[3], REPS_PER_VERSE * stepCount_(row), row[4]);
+}
+// Run once from the editor (after pasting this version): rewrites every older New row to the new form. Level 0 in Learn becomes 0.1; Level 0 in Lock
+// (rep 1000 + passes, or the oldest form) becomes 0.2 with the rep set to the passes in a row (0 or 1). Rows already in the new form, and every other level, are
+// left alone. The app reads the older form too, so this is for tidiness; it can be run again safely. Make a copy of the sheet first.
+function migrateLevels() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+  if (!sheet) throw new Error('Sheet "Verses" not found.');
+  const last = sheet.getLastRow();
+  if (last < 2) { console.log('No rows.'); return { learn: 0, lock: 0, kept: 0 }; }
+  const rows = sheet.getRange(2, 1, last - 1, 8).getValues();
+  const out = rows.map(function(r) { return [r[3], r[4]]; });
+  let learn = 0, lock = 0, kept = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!cleanRef_(r[5]) || !isLevelZero_(r[4])) continue;
+    if (levelKind_(r[4])) { kept++; continue; }   // already 0.1 / 0.2
+    const lp = lockPos_(r[3], REPS_PER_VERSE * stepCount_(r), r[4]);
+    if (lp) { out[i] = [lp.streak, LOCK_LEVEL]; lock++; console.log(cleanRef_(r[5]) + ': Lock, ' + lp.streak + ' pass(es) in a row (was rep ' + r[3] + ')'); }
+    else { out[i] = [Number(r[3]) >= 1 ? r[3] : 1, LEARN_LEVEL]; learn++; console.log(cleanRef_(r[5]) + ': Learn, rep ' + out[i][0]); }
+  }
+  if (learn + lock) sheet.getRange(2, 4, rows.length, 2).setValues(out);
+  console.log('Done: ' + learn + ' in Learn (0.1), ' + lock + ' in Lock (0.2), ' + kept + ' already converted.');
+  return { learn: learn, lock: lock, kept: kept };
 }
 function learnBusy_(rows) {
   for (let i = 0; i < rows.length; i++) if (cleanRef_(rows[i][5]) && inLearnReps_(rows[i])) return true;
@@ -1433,7 +1468,7 @@ function startNextQueued_(sheet, now, unlockFn) {
     const at = all.findIndex(function(r) { return cleanRef_(r[5]) === ref && (r[4] === '' || r[4] === null || r[4] === undefined); });
     if (at < 0) continue;
     const unlock = unlockFn(now), row = at + 2;
-    sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : '', today_(), 1, 0]]);
+    sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : '', today_(), 1, LEARN_LEVEL]]);
     writeQueue_(q);
     const vals = sheet.getRange(row, 1, 1, 8).getValues()[0];
     return learningCard_(vals, row - 1, now);
@@ -1524,7 +1559,7 @@ function startVerse_(sheet, rowIndex, reference) {
     const started = startNextQueued_(sheet, nowAt, startUnlock_);
     if (started) return { success: true, queued: started.reference !== want, started: started.reference, reference: want, rowIndex: row, unlockAt: started.unlockAt || 0, card: started, queue: readQueue_() };
   }
-  sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, 0]]);
+  sheet.getRange(row, 2, 1, 4).setValues([[unlock ? new Date(unlock) : "", today_(), 1, LEARN_LEVEL]]);
   const card = learningCard_(sheet.getRange(row, 1, 1, 8).getValues()[0], row - 1, nowAt);
   return { success: true, reference: want, started: want, rowIndex: row, unlockAt: unlock > nowAt ? unlock : 0, card: card, queue: readQueue_() };
 }

@@ -717,7 +717,6 @@
 
     .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time); a Review card before anything is revealed: inert */
     .pt-right { display: inline-flex; align-items: center; gap: 10px; }
-    .pt-att { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 15px; }   /* Lock bar, right: Attempt #N, the same look as the left text */
     .pt-note { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; }   /* Review bar: Card N of M */
     .pt-note b { font-weight: 800; }
     .v-num.dim { opacity: 0.45; }                           /* verses other than the one you are learning today */
@@ -2705,7 +2704,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-364';
+    const CLIENT_BUILD = 'sync-365';
 
     let queue = [];
     let currentIndex = 0;
@@ -2832,7 +2831,7 @@
             f: c.reference, v: c.version || "", day: c.day || 0,
             stage: c.stage === 'lock' ? 'lock' : 'learn', vi: c.verseIndex || 1, vc: c.verseCount || 1, dot: c.dot || 1,
             part: c.lockPart || "", label: c.label || "Review", unlockAt: c.unlockAt || 0,
-            hdr: c.stage === 'lock' ? (typeof c.ago === 'number' ? 'Learned ' + agoWords(c.ago) : '') : learnStatus(c), att: c.stage === 'lock' ? (c.tries || 0) + 1 : 0, blk: c.stage !== 'lock' && c.pm && c.verseCount > 1 ? 1 : 0,
+            hdr: c.stage === 'lock' ? (typeof c.ago === 'number' ? 'Learned ' + agoWords(c.ago) : '') : learnStatus(c), blk: c.stage !== 'lock' && c.pm && c.verseCount > 1 ? 1 : 0,
             segs: learnUnits(c).map(function(u) { return { n: u.num, t: u.text, l: u.letter, v: u.vi }; })
           };
         });
@@ -3119,8 +3118,8 @@
       let added = 0;
       items.slice(0, 20).forEach(function(it) {
         if (!it || typeof it.ref !== 'string' || !it.ref || !it.id || have[it.id]) return;
-        if (it.action !== 'press' && it.action !== 'now' && it.action !== 'skip' && it.action !== 'again' && it.action !== 'miss') return;
-        if (!(Number(it.rep) >= 1) || !(Date.now() - Number(it.at) < 6 * 3600 * 1000)) return;
+        if (it.action !== 'press' && it.action !== 'skip' && it.action !== 'again' && it.action !== 'miss') return;
+        if (!(Number(it.rep) >= 0) || !(Date.now() - Number(it.at) < 6 * 3600 * 1000)) return;
         outbox.push({ learn: { ref: it.ref, action: it.action, rep: Number(it.rep), promote: !!it.promote, id: String(it.id), at: Number(it.at), x: it.x && typeof it.x === 'object' ? { h: Number(it.x.h) || 0, s: Number(it.x.s) || 0, p: Number(it.x.p) || 0 } : null } });
         have[it.id] = 1; added++;
       });
@@ -4356,7 +4355,6 @@
       // right side: the level number on a Learn card; on Review a ring that fills as the deck is done, with the number of cards left in the middle (not on a repeat card); nothing on a Lock card
       let right = flag;
       if (!isNew && baseCount > 0 && currentIndex < baseCount) right = dayRing(baseCount - currentIndex, baseCount);
-      else if (lockCard) right = '<span class="pt-att">Attempt #' + ((lc.tries || 0) + 1) + '</span>';
       let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
@@ -4784,7 +4782,7 @@
       renderCardBody();
     }
 
-    // kind: 'press' (the button). 'now', 'skip' and 'again' (press early, skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
+    // kind: 'press' (the button). 'skip' and 'again' (skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
     function pressLearning(kind) {
       if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); else if (kind === "miss") tapBusy("btnFailText"); return; }   // a tap that is ignored says so
       const card = learningCards[learningIndex];
@@ -4794,7 +4792,7 @@
       if (kind === "miss" && card.stage !== 'lock') return;
       if (card.stage === 'lock' && (kind === "press" || kind === "miss") && !isFlipped) return;   // like Review: reveal something first (a peek does not count)
       learnPending = true;
-      const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press' || kind === 'now');
+      const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote, x: { h: card.stage === 'learn' ? hintLevel : 0, s: cardSeconds(), p: peekCount } });
       // Every Review press on reps 2 to 6 of a step makes the next rep one hint level harder (never past 5). It adds one to whatever level you are on, so a level
       // you changed yourself carries on from there. Rep 1 does not add, so reps 1 and 2 are both at the starting level; rep 7 ends the step (the next one starts at Full).
@@ -4852,27 +4850,20 @@
     function lAt(ms, dayOff, mins) { const d = new Date(ms); d.setDate(d.getDate() + dayOff); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return d.getTime(); }
     function lDayBase(ms) { return ms; }   // days run midnight to midnight (same as the server's learnDayBase_)
     function lDayStart(ms) { return lAt(lDayBase(ms), 1, L_SLOTS[0]); }   // when the next day's first rep opens (6 AM)
-    function lockRepOf(streak, tries) { return Math.round((1000 + streak + Math.min(99, tries) / 100) * 100) / 100; }
     function nextLockSlot(now) {
       for (let d = 0; d < 3; d++) for (const m of [360, 1200]) { const t = lAt(now, d, m); if (t > now) return t; }
       return now + 12 * 3600000;
     }
-    function lInfo(rep, n, pm) {
+    // Where a card is, from its rep and stage ('learn' or 'lock'). A Lock card's rep is its passes in a row (0 or 1); the server sends the stage with the card.
+    function lInfo(rep, n, pm, stage) {
       const total = 7 * n, o = { stage: 'learn', verseIndex: 1, dot: 1, lockPart: '', label: 'Review' };
-      if (rep >= 1000) {   // a Lock rep: 1000 + passes in a row + attempts / 100 (the same on every plan)
-        const f = Math.floor(rep + 1e-9), st = Math.max(0, Math.min(1, f - 1000));
-        o.stage = 'lock'; o.verseIndex = n; o.dot = 0; o.tries = Math.max(0, Math.min(99, Math.round((rep - f) * 100)));
-        if (st === 0) o.lockPart = 'am'; else { o.lockPart = 'pm'; o.label = 'Promote'; }
-        if (st === 0) o.label = 'Pass';
+      if (stage === 'lock') {
+        o.stage = 'lock'; o.verseIndex = n; o.dot = 0;
+        if (rep >= 1) { o.lockPart = 'pm'; o.label = 'Promote'; } else { o.lockPart = 'am'; o.label = 'Pass'; }
         return o;
       }
-      if (rep <= total) {
-        o.verseIndex = Math.ceil(rep / 7); o.dot = ((rep - 1) % 7) + 1;
-        if (o.dot === 7) o.label = o.verseIndex < n ? (pm ? 'Next Part' : 'Next Verse') : 'Learned';
-      } else {
-        o.stage = 'lock'; o.verseIndex = n; o.dot = 0; o.tries = 0;   // an older Lock row (rep after the last Learn rep)
-        if (rep === total + 1) { o.lockPart = 'am'; o.label = 'Pass'; } else { o.lockPart = 'pm'; o.label = 'Promote'; }
-      }
+      o.verseIndex = Math.ceil(Math.max(1, Math.min(rep, total)) / 7); o.dot = ((Math.max(1, Math.min(rep, total)) - 1) % 7) + 1;
+      if (o.dot === 7) o.label = o.verseIndex < n ? (pm ? 'Next Part' : 'Next Verse') : 'Learned';
       return o;
     }
     // Late reps: the same rules as the server's lateInfo_. A rep is late an hour after it opens (6 AM rep: 7 AM; 8 PM rep and Lock PM: 9 PM;
@@ -4929,22 +4920,19 @@
     // The words for where a card is: "Part 2 \u00b7 Rep 3 of 7", or "Rep 1 of 2" on a Lock card ... (shown beside each card in the In progress list).
     function repPart(card) { return card.stage === 'lock' ? (card.lockPart === 'pm' ? "Rep 2 of 2" : "Rep 1 of 2") : (card.verseCount > 1 ? stepWord(card) + " " + card.verseIndex + " \u00b7 " : "") + "Rep " + card.dot + " of 7"; }
     function predictLearn(card, kind) {
-      const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n, card.pm);
-      let nr, unlock;
+      const now = nowSrv(), n = card.verseCount || 1, rep = card.rep, info = lInfo(rep, n, card.pm, card.stage);
+      let nr, nstage = 'learn', unlock;
       if (info.stage === 'lock') {
-        // a pass adds one to the passes in a row, a Miss puts it back to none; either way the card waits for the next 6 AM / 8 PM and counts one more attempt
-        const tries = (info.tries || 0) + 1, streak = kind === 'miss' ? 0 : (info.lockPart === 'pm' ? 1 : 0) + 1;
-        nr = lockRepOf(Math.min(streak, 1), tries); unlock = nextLockSlot(now);
-      } else if (kind === 'again' || kind === 'miss') {
-        nr = 7 * n + 1; unlock = lDayStart(now);
+        // a pass adds one to the passes in a row, a Miss puts it back to none; either way the card waits for the next 6 AM / 8 PM
+        nstage = 'lock'; nr = kind === 'miss' ? 0 : Math.min((info.lockPart === 'pm' ? 1 : 0) + 1, 1); unlock = nextLockSlot(now);
       } else if (kind === 'skip') {
-        if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nr = 1000; unlock = lDayStart(now); }
+        if (info.verseIndex < n) { nr = 7 * info.verseIndex + 1; unlock = 0; } else { nstage = 'lock'; nr = 0; unlock = lDayStart(now); }
       } else {
         if (info.dot < 7) { nr = rep + 1; unlock = lAt(lDayBase(now), 0, L_SLOTS[Math.min(info.dot, 6)]); }   // a rep whose time has passed is ready at once
-        else if (info.verseIndex >= n) { nr = 1000; unlock = lDayStart(now); }                            // Learned: Lock starts at 6 AM tomorrow
+        else if (info.verseIndex >= n) { nstage = 'lock'; nr = 0; unlock = lDayStart(now); }                  // Learned: Lock starts at 6 AM tomorrow
         else { nr = rep + 1; unlock = lDayStart(now); }
       }
-      return Object.assign({}, card, lInfo(nr, n, card.pm), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 }, info.stage === 'learn' && nr >= 1000 ? { ago: 0 } : {});
+      return Object.assign({}, card, lInfo(nr, n, card.pm, nstage), { rep: nr, unlockAt: unlock > now ? unlock : 0, readyAt: unlock, late: 0, lateAt: 0 }, info.stage === 'learn' && nstage === 'lock' ? { ago: 0 } : {});
     }
 
     function scoreCard(action) {
