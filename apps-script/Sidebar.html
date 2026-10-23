@@ -1017,13 +1017,17 @@
     .vr-b { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; transition: none; width: 100%; min-height: 39px; margin: 0; box-sizing: border-box; padding: 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; font: inherit; font-size: 15px; font-weight: 600; line-height: 20px; color: var(--text-primary); cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
     .vr-b, .vr-b * { -webkit-tap-highlight-color: transparent; outline: none; }
     .vr-b:active, .vr-b:focus, .vr-b.lp-down { background: none; transform: none; filter: none; }
-    .vr-b.two { flex-wrap: wrap; align-content: flex-start; padding-top: 9.5px; padding-bottom: 0; }   /* peek and open: the top line is the closed row's line, untouched (reference and one item on the right); the bar line sits under it */
     .vr-rf { flex: none; display: block; white-space: nowrap; height: 20px; line-height: 20px; font-weight: 600; }   /* a plain 20 px line, built the same way as the peek words beside it, so the two sit on one baseline */
     .vr-rf .version-badge { display: inline-block; vertical-align: middle; position: relative; top: -1px; margin-left: 6px; }
     .vr-sp { flex: 1 1 auto; }
-    .vr-q { flex: 0 0 100%; min-width: 0; box-sizing: border-box; margin: 1px 0 0; padding: 0 0 10px; animation: vrIn .16s ease; }
-    .vr-qt { display: block; padding-left: 10px; border-left: 2px solid var(--border-body); font-size: 15px; font-weight: 400; line-height: 21px; color: var(--verse-ink); text-align: left; }
-    .vr-qt.one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* The verse words: italic, the darker ink, 15.4 px lifted 0.4 px so their middle sits on the middle of the bold reference. A peek: one line next to the reference (reference, words, date chip). Open: the same words carry on along the first line and wrap flush left, no pills. */
+    .vr-qt { position: relative; top: -0.4px; font-size: 15.4px; font-style: italic; font-weight: 400; line-height: 20px; color: var(--verse-ink); }
+    .vr-b.pk .vr-qt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vr-b.full { display: block; min-height: 0; padding-top: 8.5px; padding-bottom: 2px; text-align: left; line-height: 21px; }   /* its first line starts where the closed row's reference does, so the reference never moves */
+    .vr-b.full .vr-rf { display: inline; height: auto; line-height: inherit; }
+    .vr-b.full .vr-qt { line-height: inherit; margin-left: 4px; }   /* with the space after the reference, the same 8 px the peek has */
+    .vr.open .vr-b.full { padding-bottom: 12px; }
+    .vr-b.pk .version-badge, .vr-b.full .version-badge { display: none; }   /* no version pill while the words are showing */
     .vr-nx { flex: none; margin-left: 6px; padding: 1px 9px; border-radius: 11px; background: var(--vb-a, color-mix(in srgb, var(--text-muted) 12%, var(--bg-card))); font-size: 15px; font-weight: 600; line-height: 20px; color: var(--text-muted); }
     .vr-nx.now { color: var(--text-accent); }
     .vr-pts { flex: none; min-width: 34px; text-align: right; font-weight: 800; font-size: 15px; line-height: 20px; }
@@ -1036,7 +1040,6 @@
     .vr-ic svg { width: 22px; height: 22px; display: block; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vr-ic { --rc: var(--rd); } }
     :root[data-theme="dark"] .vr-ic { --rc: var(--rd); }
-    .vr-b.two .vr-nx { margin-top: -1px; margin-bottom: -1px; }   /* the chip is 22 px tall: it must not make the top line taller than the reference's 20 px, or the reference would drop */
     .fail-list .vr { border-bottom-color: var(--border-body); }
     .pk-bubble .vr-b { padding-left: 16px; padding-right: 16px; }
     @keyframes vrIn { from { opacity: 0; } to { opacity: 1; } }
@@ -2633,20 +2636,18 @@
       const w = r.w, v = r.v, opt = r.opt, b = w.firstChild, open = c.open === key, peekOnly = open && c.stage === 1, ws = vrWords(r);
       const d = opt.days ? opt.days(v) : null, dated = d !== null && d !== undefined;
       const dueText = opt.dueText || vlDueShort;
-      w.className = "vr" + (open ? " open" : ""); b.className = "vr-b" + (open ? " two " + (peekOnly ? "pk" : "full") : "");
-      // The bar line of a peek is kept as it is when the whole verse opens (only its words change), so nothing blinks; a closed row has none.
-      const keepQ = open ? b.querySelector(".vr-q") : null;
-      Array.prototype.slice.call(b.childNodes, 1).forEach(function(n) { if (n !== keepQ) b.removeChild(n); });
+      w.className = "vr" + (open ? " open" : ""); b.className = "vr-b" + (open ? (peekOnly ? " pk" : " full") : "");
+      // The words span is kept when a peek opens into the whole verse (only its text changes), so nothing blinks; a closed row has none.
+      const keepQt = open ? b.querySelector(".vr-qt") : null;
+      Array.prototype.slice.call(b.childNodes, 1).forEach(function(n) { if (n !== keepQt) b.removeChild(n); });
       while (w.lastChild !== b) w.removeChild(w.lastChild);
       if (open) {
-        // top line: the reference and one item on the right, the next-review date; second line: the bar and the words (3 of them, or all of them)
-        if (dated) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d))); }
-        const q = keepQ || vlEl("div", "vr-q"), txt = !ws.length ? "No text saved for this verse." : peekOnly ? ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " \u2026" : "") : ws.join(" ");
-        let qt = q.firstChild;
-        if (!qt) { qt = vlEl("span", "vr-qt"); q.appendChild(qt); }
-        qt.className = "vr-qt" + (peekOnly ? " one" : "");
+        const txt = !ws.length ? "No text saved for this verse." : peekOnly ? ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " \u2026" : "") : ws.join(" ");
+        const qt = keepQt || vlEl("span", "vr-qt");
         if (qt.textContent !== txt) qt.textContent = txt;
-        if (q.parentNode !== b) b.appendChild(q);
+        if (!peekOnly) b.appendChild(document.createTextNode(" "));   // a space between the reference and the verse, as in a line of text
+        b.appendChild(qt);
+        if (peekOnly && dated) b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d)));   // a peek: the next review on the right; the whole verse: nothing on the right
       } else {
         const rt = opt.right ? opt.right(v) : null;
         if (rt) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(rt); }
@@ -2769,7 +2770,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-388';
+    const CLIENT_BUILD = 'sync-389';
 
     let queue = [];
     let currentIndex = 0;
