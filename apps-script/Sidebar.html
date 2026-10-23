@@ -1037,12 +1037,10 @@
     .vr-b.full { display: block; min-height: 0; padding-top: 9px; padding-bottom: 2px; font-size: 15px; font-weight: 400; line-height: 1.45; color: var(--text-muted); }
     .vr-b.full .vr-rf { margin-right: 6px; font-size: 15px; color: var(--text-primary); }
     .vr-ft { animation: vrIn .16s ease; }
-    .vr-snip { padding: 0 24px 11px 2px; margin-top: -2px; }
-    .vr-meta { margin-top: 5px; font-size: 12px; color: var(--text-meta); }
-    .vr-meta b { font-weight: 600; color: var(--text-primary); }
+    .vr.open .vr-b.full { padding-bottom: 11px; }
+    .vr-b.pk .version-badge { display: none; }   /* a peek is the reference and the first words side by side: no version pill in between */
     .fail-list .vr { border-bottom-color: var(--border-body); }
     .pk-bubble .vr-b { padding-left: 16px; padding-right: 16px; }
-    .pk-bubble .vr-snip { padding-left: 16px; }
     @keyframes vrIn { from { opacity: 0; } to { opacity: 1; } }
     .vl-searchbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .vl-searchbar .picker-search { flex: 1; min-width: 0; margin-bottom: 0; }
@@ -2599,8 +2597,8 @@
     }
     const vlKey = function(v) { return v.f + "|" + (v.v || ""); };
     const vlWords = function(v) { return (v.x || "").split(/\s+/).filter(Boolean); };
-    const vlDueShort = function(d) { d = Math.max(0, d | 0); return d === 0 ? "Today" : d === 1 ? "Tomorrow" : "in " + d + "d"; };
-    function vlDueDate(d) { const t = new Date(); t.setDate(t.getDate() + Math.max(0, d | 0)); return t.toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+    // Days until the next review, the same everywhere: Today, 1 day, N days.
+    const vlDueShort = function(d) { d = Math.max(0, d | 0); return d === 0 ? "Today" : d === 1 ? "1 day" : d + " days"; };
     // ── One verse row for every list ──
     // The Verses list, Reviewed / Missed / Treasury on Review Complete and the calendar day popup all use this row: the reference on the left and one small thing
     // on the right (rank icon, next review day, points, or times missed). Tap: the first words and the next review day. Tap again: the whole verse in the row,
@@ -2645,13 +2643,6 @@
         if (dated) b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d)));
       } else if (open) {
         b.appendChild(vlEl("span", "vr-ft", ws.join(" ") || "No text saved for this verse."));
-        if (dated) {
-          const sn = vlEl("div", "vr-snip"), m = vlEl("div", "vr-meta");
-          m.appendChild(document.createTextNode("Next review "));
-          m.appendChild(vlEl("b", null, d <= 1 ? vlDueShort(d) : vlDueDate(d)));
-          if (d > 1) m.appendChild(document.createTextNode(" \u00b7 in " + d + " days"));
-          sn.appendChild(m); w.appendChild(sn);
-        }
       } else {
         const rt = opt.right ? opt.right(v) : null;
         if (rt) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(rt); }
@@ -2733,7 +2724,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-379';
+    const CLIENT_BUILD = 'sync-380';
 
     let queue = [];
     let currentIndex = 0;
@@ -5485,14 +5476,6 @@
       for (let i = 0; i < vlVerses.length; i++) if (vlVerses[i].f === ref) return typeof vlVerses[i].d === "number" ? vlVerses[i].d : null;
       return null;
     }
-    // "Tomorrow", "Fri Oct 23": the day a reviewed verse moved to.
-    function dueDayWords(n) {
-      if (n === null || n === undefined) return "";
-      if (n <= 0) return "Today";
-      if (n === 1) return "Tomorrow";
-      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n);
-      return d.toLocaleDateString([], { month: "short", day: "numeric" });
-    }
     // Times a verse has been missed (column A of the sheet, counted from sync-379 on), from the Verses list; null until that list has arrived.
     function missOf(ref) {
       for (let i = 0; i < vlVerses.length; i++) if (vlVerses[i].f === ref) return typeof vlVerses[i].m === "number" ? vlVerses[i].m : null;
@@ -5504,11 +5487,10 @@
         text: function(v) { return plainVerse(verseInfoFor(v.f).t); },
         ver: function(v) { return verseInfoFor(v.f).v; },
         days: function(v) { return dueDaysOf(v.f); },
-        dueText: kind === "done" ? dueDayWords : vlDueShort,
-        right: function(v) {
+                right: function(v) {
           if (kind === "done") {
             const n = dueDaysOf(v.f);
-            return n === null ? null : vlEl("span", "vr-nx" + (n <= 0 ? " now" : ""), dueDayWords(n));
+            return n === null ? null : vlEl("span", "vr-nx" + (n <= 0 ? " now" : ""), vlDueShort(n));
           }
           if (kind === "grad") return v.d ? vlEl("span", "vr-pts " + (v.d > 0 ? "up" : "down"), fmtPts(v.d)) : null;
           const m = missOf(v.f);
