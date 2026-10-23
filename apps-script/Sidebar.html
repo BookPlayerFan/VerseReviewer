@@ -20,6 +20,7 @@
       
       --text-primary: #202124;
       --text-muted: #5f6368;
+      --verse-ink: #3c4043;
       --text-meta: #70757a;
       --text-accent: #1a73e8;
       --text-repeat: #d97706;
@@ -51,6 +52,7 @@
         
         --text-primary: #f1f3f4;
         --text-muted: #9aa0a6;
+        --verse-ink: #c4c7cc;
         --text-meta: #9aa0a6;
         --text-accent: #8ab4f8;
         --text-repeat: #fbbf24;
@@ -1015,11 +1017,13 @@
     .vr-b { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; transition: none; width: 100%; min-height: 39px; margin: 0; box-sizing: border-box; padding: 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; font: inherit; font-size: 15px; font-weight: 600; line-height: 20px; color: var(--text-primary); cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
     .vr-b, .vr-b * { -webkit-tap-highlight-color: transparent; outline: none; }
     .vr-b:active, .vr-b:focus, .vr-b.lp-down { background: none; transform: none; filter: none; }
-    .vr-b.pk { align-items: center; }
+    .vr-b.two { flex-wrap: wrap; align-content: flex-start; padding-top: 9.5px; padding-bottom: 0; }   /* peek and open: the top line is the closed row's line, untouched (reference and one item on the right); the bar line sits under it */
     .vr-rf { flex: none; display: block; white-space: nowrap; height: 20px; line-height: 20px; font-weight: 600; }   /* a plain 20 px line, built the same way as the peek words beside it, so the two sit on one baseline */
     .vr-rf .version-badge { display: inline-block; vertical-align: middle; position: relative; top: -1px; margin-left: 6px; }
     .vr-sp { flex: 1 1 auto; }
-    .vr-pt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; font-weight: 400; line-height: 20px; color: var(--text-muted); animation: vrIn .16s ease; }
+    .vr-q { flex: 0 0 100%; min-width: 0; box-sizing: border-box; margin: 1px 0 0; padding: 0 0 10px; animation: vrIn .16s ease; }
+    .vr-qt { display: block; padding-left: 10px; border-left: 2px solid var(--border-body); font-size: 15px; font-weight: 400; line-height: 21px; color: var(--verse-ink); text-align: left; }
+    .vr-qt.one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .vr-nx { flex: none; margin-left: 6px; padding: 1px 9px; border-radius: 11px; background: var(--vb-a, color-mix(in srgb, var(--text-muted) 12%, var(--bg-card))); font-size: 15px; font-weight: 600; line-height: 20px; color: var(--text-muted); }
     .vr-nx.now { color: var(--text-accent); }
     .vr-pts { flex: none; min-width: 34px; text-align: right; font-weight: 800; font-size: 15px; line-height: 20px; }
@@ -1032,11 +1036,8 @@
     .vr-ic svg { width: 22px; height: 22px; display: block; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vr-ic { --rc: var(--rd); } }
     :root[data-theme="dark"] .vr-ic { --rc: var(--rd); }
-    .vr-b.full { display: block; min-height: 0; padding-top: 8.5px; padding-bottom: 2px; font-size: 15px; font-weight: 400; line-height: 21px; color: var(--text-muted); }   /* its first line starts where the closed row's reference does (9.5 px down), so nothing jumps */
-    .vr-b.full .vr-rf { display: inline; height: auto; line-height: inherit; margin-right: 6px; font-size: 15px; color: var(--text-primary); }
-    .vr-ft { animation: vrIn .16s ease; }
-    .vr.open .vr-b.full { padding-bottom: 12px; }
-    .vr-b.pk .version-badge, .vr-b.full .version-badge { display: none; }   /* a peek or an open verse is the reference and the words side by side: no version pill in between (a closed row keeps it) */
+    .vr-b.two .vr-nx { margin-top: -1px; margin-bottom: -1px; }   /* the chip is 22 px tall: it must not make the top line taller than the reference's 20 px, or the reference would drop */
+    .vr-b.two .version-badge { display: none; }   /* a peek or an open verse keeps the top line to the reference and one item on the right: no version pill (a closed row keeps it) */
     .fail-list .vr { border-bottom-color: var(--border-body); }
     .pk-bubble .vr-b { padding-left: 16px; padding-right: 16px; }
     @keyframes vrIn { from { opacity: 0; } to { opacity: 1; } }
@@ -2633,14 +2634,15 @@
       const w = r.w, v = r.v, opt = r.opt, b = w.firstChild, open = c.open === key, peekOnly = open && c.stage === 1, ws = vrWords(r);
       const d = opt.days ? opt.days(v) : null, dated = d !== null && d !== undefined;
       const dueText = opt.dueText || vlDueShort;
-      w.className = "vr" + (open ? " open" : ""); b.className = "vr-b" + (peekOnly ? " pk" : open ? " full" : "");
+      w.className = "vr" + (open ? " open" : ""); b.className = "vr-b" + (open ? " two " + (peekOnly ? "pk" : "full") : "");
       while (b.lastChild !== b.firstChild) b.removeChild(b.lastChild);
       while (w.lastChild !== b) w.removeChild(w.lastChild);
-      if (peekOnly) {
-        b.appendChild(vlEl("span", "vr-pt", ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " …" : "")));
-        if (dated) b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d)));
-      } else if (open) {
-        b.appendChild(vlEl("span", "vr-ft", ws.join(" ") || "No text saved for this verse."));
+      if (open) {
+        // top line: the reference and one item on the right, the next-review date; second line: the bar and the words (3 of them, or all of them)
+        if (dated) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d))); }
+        const q = vlEl("div", "vr-q");
+        q.appendChild(vlEl("span", "vr-qt" + (peekOnly ? " one" : ""), peekOnly ? ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " \u2026" : "") : (ws.join(" ") || "No text saved for this verse.")));
+        b.appendChild(q);
       } else {
         const rt = opt.right ? opt.right(v) : null;
         if (rt) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(rt); }
@@ -2654,8 +2656,19 @@
       [prevKey, tapKey].forEach(function(k) { if (k) vrFill(box, k); });
       if (!o || t0 === null) return;
       const d = o.getBoundingClientRect().top - t0; if (Math.abs(d) > 0.5) box.scrollTop += d;
+      vrReveal(box, o);
       const rem = o.getBoundingClientRect().top - t0, rl = c.slide;
       if (rl && Math.abs(rem) > 0.5) { rl.style.transition = "none"; rl.style.transform = "translateY(" + (-rem) + "px)"; void rl.offsetHeight; rl.style.transition = "transform .22s ease"; rl.style.transform = "none"; }
+    }
+    // An opened verse that runs past the bottom of its list scrolls up just far enough to be seen in full (never past its own top).
+    function vrReveal(box, o) {
+      if (!o.classList.contains("open")) return;
+      let sc = box;   // the list itself, or (the calendar day bubble) the nearest ancestor that scrolls
+      while (sc && sc !== document.body && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      if (!sc || sc === document.body) return;
+      const bb = sc.getBoundingClientRect(), rb = o.getBoundingClientRect();
+      const by = Math.min(rb.bottom - bb.bottom, rb.top - bb.top);
+      if (by > 0.5) { try { sc.scrollTo({ top: sc.scrollTop + by, behavior: "smooth" }); } catch (e) { sc.scrollTop += by; } }
     }
     function vrHold(box, key) {
       const c = vrCtl(box); if (!c.rows[key] || (c.open === key && c.stage === 2)) return;
@@ -2722,7 +2735,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-383';
+    const CLIENT_BUILD = 'sync-384';
 
     let queue = [];
     let currentIndex = 0;
