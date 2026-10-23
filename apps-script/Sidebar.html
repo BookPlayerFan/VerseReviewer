@@ -2735,7 +2735,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-384';
+    const CLIENT_BUILD = 'sync-385';
 
     let queue = [];
     let currentIndex = 0;
@@ -4387,7 +4387,7 @@
       // right side: the level number on a Learn card; on Review a ring that fills as the deck is done, with the number of cards left in the middle (not on a repeat card); nothing on a Lock card
       let right = flag;
       if (!isNew && baseCount > 0 && currentIndex < baseCount) right = dayRing(baseCount - currentIndex, baseCount);
-      const pillOn = lvlPill.until > Date.now() && mode === 'learning' && !!learningCard() && lvlPill.ref === learningCard().reference;   // a rebuild inside the 1.5 s the level notice shows keeps it
+      const pillOn = lvlPill.until > Date.now() && mode === 'learning' && !!learningCard() && lvlPill.ref === learningCard().reference;   // a rebuild while the level notice is showing keeps it
       let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${pillOn ? lvlPillHtml(lvlPill.L) : status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
@@ -4586,11 +4586,12 @@
 
     // A held Review press that raised the level: the bar's left label becomes a small pill, "Level 3 · Every other", for a moment, then goes back to the verse.
     const LVL_ARROW = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    const LVL_PILL_MS = 3000;   // how long the "Level 3 · Every other" notice stays after a held Review (it was 1.5 s: gone before it could be read)
     let lvlPill = { L: 0, ref: "", until: 0 };
     function lvlPillHtml(L) { return '<span class="lvl-pill">' + LVL_ARROW + "Level " + L + " \u00b7 " + HINT_NAMES[L] + "</span>"; }
     function flashLevelUp(L) {
       const card = learningCards[learningIndex];
-      lvlPill = { L: L, ref: card ? card.reference : "", until: Date.now() + 1500 };
+      lvlPill = { L: L, ref: card ? card.reference : "", until: Date.now() + LVL_PILL_MS };
       const el = document.querySelector("#cardBody .passage-toolbar .passage-status"); if (!el) return;
       clearTimeout(lvlFlashTimer);
       el.style.opacity = 0;
@@ -4598,7 +4599,7 @@
       lvlFlashTimer = setTimeout(function() {
         const e2 = document.querySelector("#cardBody .passage-toolbar .passage-status");
         if (e2 && !peeking) swapLabel(e2, e2.getAttribute("data-base") || "");
-      }, 1500);
+      }, LVL_PILL_MS);
     }
 
     // Hold the Review button on a Learn card: the button fills, and at the end that press is a Review that also raises the hint level by one. A tap is a plain Review.
