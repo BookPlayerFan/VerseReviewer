@@ -1007,6 +1007,8 @@
     .vb-chip.grp { background: color-mix(in srgb, var(--text-accent) 10%, var(--vb-a)); color: var(--text-accent); font-weight: 700; }
     .vb-chip.skel { opacity: .5; pointer-events: none; }
     .vb-chip:active { transform: none; filter: none; opacity: .7; }
+    #vlList.vlfront { display: flex; flex-direction: column; }
+    #vlList.vlfront .vb-chips { margin-top: auto; }
     .vb-rows { position: relative; }
     .vr { border-bottom: 1px solid var(--border-card); }
     .vr:last-child { border-bottom: 0; }
@@ -2500,9 +2502,9 @@
     // A chip opens that book's verses as rows. A row: tap for the first words beside the reference, tap again for the whole verse, tap a third time
     // to close; hold shows the whole verse at once. Swipe right (or tap the tag in the search bar) goes back to the front; tapping Verses does too.
     // one chip for several books: [label, first book, last book]; "wide" ones get a slightly different look
-    const VL_GROUPS = [["Law", 0, 4], ["History", 5, 16], ["Jeremiah", 23, 24], ["Minor", 27, 38],
+    const VL_GROUPS = [["Law", 0, 4], ["History", 5, 17], ["Jeremiah", 23, 24], ["Minor", 27, 38], ["Gospels", 39, 42],
       ["Corinthians", 45, 46], ["Thessalon", 51, 52], ["Timothy", 53, 54], ["Peter", 59, 60], ["1\u20133 John", 61, 63]];
-    const VL_WIDE = { "Law": 1, "History": 1, "Minor": 1 };
+    const VL_WIDE = { "Law": 1, "History": 1, "Minor": 1, "Gospels": 1 };   // the categories: tinted, and first in their testament
     const VL_UNIT_OF = {};
     VL_GROUPS.forEach(function(g) { for (let i = g[1]; i <= g[2]; i++) VL_UNIT_OF[i] = "g:" + g[0]; });
     const VL_PEEK_WORDS = 3;
@@ -2536,11 +2538,13 @@
       const units = [], seen = {};
       if (skeleton) { for (let i = 0; i < 24; i++) units.push({ id: "", label: "", order: i }); }
       else vlVerses.forEach(function(v) { const id = vlUnitOf(v); if (!seen[id]) { seen[id] = 1; const u = vlUnitInfo(id); units.push({ id: id, label: u.label, order: u.order }); } });
-      units.sort(function(a, b) { return a.order - b.order || (a.label < b.label ? -1 : 1); });
+      // each testament: its categories first (Law, History, Minor / Gospels), then its single books in Bible order; custom books last
+      const sect = function(u) { return u.order < 39 ? 0 : u.order < 1000 ? 1 : 2; };
+      units.sort(function(a, b) { return sect(a) - sect(b) || (VL_WIDE[b.label] ? 1 : 0) - (VL_WIDE[a.label] ? 1 : 0) || a.order - b.order || (a.label < b.label ? -1 : 1); });
+      box.classList.add("vlfront");   // the chips sit at the bottom of the page, within thumb reach
       const chips = vlEl("div", "vb-chips");
       units.forEach(function(u, i) {
-        const before = i > 0 ? units[i - 1].order : -1;
-        if (!skeleton && i > 0 && ((u.order >= 39 && before < 39) || (u.order >= 1000 && before < 1000))) chips.appendChild(vlEl("div", "vb-cut"));   // a line between Old and New Testament, and before custom books
+        if (!skeleton && i > 0 && sect(u) !== sect(units[i - 1])) chips.appendChild(vlEl("div", "vb-cut"));   // a line between Old and New Testament, and before custom books
         const c = vlEl("button", "vb-chip" + (skeleton ? " skel" : "") + (VL_WIDE[u.label] ? " grp" : "") + (u.label.length > 12 ? " lg" : ""), u.label); c.type = "button";
         if (!skeleton) c.onclick = function() { vlPickUnit(u.id); };
         chips.appendChild(c);
@@ -2622,6 +2626,7 @@
       hideVerseTip();
       const box = document.getElementById("vlList"), keep = box.scrollTop, same = vlShownCat === vlCat;
       box.textContent = "";
+      box.classList.remove("vlfront");
       vlSetBar();
       if (skeleton === true) { vlFront(box, true); return; }   // empty tiles while the list loads
       if (vlVerses.length === 0) {
@@ -2660,7 +2665,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-372';
+    const CLIENT_BUILD = 'sync-373';
 
     let queue = [];
     let currentIndex = 0;
