@@ -2652,7 +2652,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-369';
+    const CLIENT_BUILD = 'sync-370';
 
     let queue = [];
     let currentIndex = 0;
@@ -5557,7 +5557,7 @@
     function openAddList() {   // the waiting verses, from the "Choose from your list" row (the Add Verse button itself goes straight to pasting)
       if (pickerLoading || pickerItems.length === 0) return;
       pickerAddOpen = true; renderPicker();
-      const bx = document.getElementById("pickerList"); if (bx) bx.scrollTop = 0;
+      const wr = document.getElementById("ipWaiting"); if (wr && wr.scrollIntoView) wr.scrollIntoView({ block: "nearest" });   // keep the row and the start of its list in view
     }
     function closeAddList() { pickerAddOpen = false; renderPicker(); }
     function addNewVerse() { openPicker(false); }
@@ -5848,26 +5848,24 @@
         });
       }
       const bar = document.getElementById("npBar"); if (bar) bar.style.display = "";   // Add Verse stays on screen
+      // verses waiting in your list: one quiet row under the in-progress and queued ones; tapping it opens the list right below it (tap again to fold it up)
+      if (!pickerLoading && pickerItems.length) {
+        const wb = document.createElement("button"); wb.type = "button"; wb.className = "ip-item waiting" + (pickerAddOpen ? " open" : ""); wb.id = "ipWaiting";
+        const wm = document.createElement("span"); wm.className = "ip-main";
+        const wr = document.createElement("span"); wr.className = "ip-ref"; wr.textContent = "Choose from your list"; wm.appendChild(wr);
+        wb.appendChild(wm);
+        const wc = document.createElement("span"); wc.className = "ip-chip"; wc.textContent = pickerAddOpen ? "Hide" : pickerItems.length + " waiting"; wb.appendChild(wc);
+        wb.onclick = pickerAddOpen ? closeAddList : openAddList;
+        box.appendChild(wb);
+      }
       if (!pickerAddOpen) {
-        // verses waiting in your list: one quiet row (shown once the list has loaded and only if there are any)
-        if (!pickerLoading && pickerItems.length) {
-          const wb = document.createElement("button"); wb.type = "button"; wb.className = "ip-item waiting"; wb.id = "ipWaiting";
-          const wm = document.createElement("span"); wm.className = "ip-main";
-          const wr = document.createElement("span"); wr.className = "ip-ref"; wr.textContent = "Choose from your list"; wm.appendChild(wr);
-          wb.appendChild(wm);
-          const wc = document.createElement("span"); wc.className = "ip-chip"; wc.textContent = pickerItems.length + " waiting"; wb.appendChild(wc);
-          wb.onclick = openAddList;
-          box.appendChild(wb);
-        }
         if (!prog.length && !qd.length) {
           const e = document.createElement("div"); e.className = "ip-none"; e.textContent = "Nothing in progress. Tap Add Verse to paste one."; box.appendChild(e);   // no Loading line here: the list loads quietly and shows its own once opened
         }
         return;
       }
-      // The waiting verses (opened from the Choose from your list row); the Add Verse button below goes to pasting
-      const back = document.createElement("button"); back.type = "button"; back.className = "ip-back"; back.textContent = "\u2039 Back"; back.onclick = closeAddList; box.appendChild(back);
-      head("Your list", false);
-      const panel = document.createElement("div"); panel.className = "ip-panel"; box.appendChild(panel);
+      if (!pickerItems.length && !pickerLoading) { pickerAddOpen = false; return renderPicker(); }
+      const panel = document.createElement("div"); panel.className = "ip-panel"; panel.id = "ipPanel"; box.appendChild(panel);
       if (pickerLoading) {
         const e = document.createElement("div"); e.className = "picker-empty"; e.textContent = "Loading verses\u2026"; panel.appendChild(e);
         return;
