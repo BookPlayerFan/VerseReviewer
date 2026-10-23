@@ -1038,7 +1038,7 @@
     .vr-b.full .vr-rf { margin-right: 6px; font-size: 15px; color: var(--text-primary); }
     .vr-ft { animation: vrIn .16s ease; }
     .vr.open .vr-b.full { padding-bottom: 11px; }
-    .vr-b.pk .version-badge { display: none; }   /* a peek is the reference and the first words side by side: no version pill in between */
+    .vr-b.pk .version-badge, .vr-b.full .version-badge { display: none; }   /* a peek or an open verse is the reference and the words side by side: no version pill in between (a closed row keeps it) */
     .fail-list .vr { border-bottom-color: var(--border-body); }
     .pk-bubble .vr-b { padding-left: 16px; padding-right: 16px; }
     @keyframes vrIn { from { opacity: 0; } to { opacity: 1; } }
@@ -2724,7 +2724,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-380';
+    const CLIENT_BUILD = 'sync-381';
 
     let queue = [];
     let currentIndex = 0;
