@@ -1009,6 +1009,12 @@
     .vb-chip:active { transform: none; filter: none; opacity: .7; }
     #vlList.vlfront { display: flex; flex-direction: column; }
     #vlList.vlfront .vb-chips { margin-top: auto; }
+    .lg-row { display: flex; align-items: baseline; gap: 12px; padding: 9px 2px; border-top: 1px solid var(--border-card); }
+    .lg-row:first-child { border-top: 0; }
+    .lg-n { flex: none; width: 96px; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .lg-n.cat { color: var(--text-accent); font-weight: 700; }
+    .lg-b { min-width: 0; font-size: 14px; color: var(--text-muted); text-align: left; hyphens: manual; }
+    .lg-row { text-align: left; }
     .vb-rows { position: relative; }
     .vr { border-bottom: 1px solid var(--border-card); }
     .vr:last-child { border-bottom: 0; }
@@ -1393,6 +1399,13 @@
         <button type="button" class="pv-del" id="pvDel" style="display:none"></button>
         <button type="button" class="pv-add" id="pvAdd">Add</button>
       </div>
+    </div>
+  </div>
+
+  <div class="pv" id="vlLegend" onclick="if (event.target === this) closeVlLegend()">
+    <div class="pv-card">
+      <div class="pv-head">Combined chips</div>
+      <div class="pv-text" id="vlLegendBody"></div>
     </div>
   </div>
 
@@ -2503,11 +2516,13 @@
     // to close; hold shows the whole verse at once. Swipe right (or tap the tag in the search bar) goes back to the front; tapping Verses does too.
     // one chip for several books: [label, first book, last book]; "wide" ones get a slightly different look
     const VL_GROUPS = [["Law", 0, 4], ["History", 5, 17], ["Jeremiah", 23, 24], ["Minor", 27, 38], ["Gospels", 39, 42],
-      ["Corinthians", 45, 46], ["Thessalon", 51, 52], ["Timothy", 53, 54], ["Peter", 59, 60], ["1\u20133 John", 61, 63]];
-    const VL_WIDE = { "Law": 1, "History": 1, "Minor": 1, "Gospels": 1 };   // the categories: tinted, and first in their testament
+      ["Corinthians", 45, 46], ["Thessalon", 51, 52], ["Pastoral", 53, 56], ["Peter", 59, 60], ["1\u20133 John", 61, 63]];
+    const VL_WIDE = { "Law": 1, "History": 1, "Minor": 1, "Gospels": 1, "Pastoral": 1 };   // the categories: tinted
+    const VL_FIRST = { "Law": 1, "History": 1, "Gospels": 1 };   // these lead their testament; Minor and Pastoral stay where their books are
     const VL_UNIT_OF = {};
     VL_GROUPS.forEach(function(g) { for (let i = g[1]; i <= g[2]; i++) VL_UNIT_OF[i] = "g:" + g[0]; });
     const VL_PEEK_WORDS = 3;
+    let vlHeld = function() { return false; };   // set below: true when the press that just ended was a hold
     let vlCat = null, vlRowOpen = null, vlRowStage = 0, vlShownCat = null, vlSwipedAt = 0;   // vlCat = the chip that is open (a unit id), or null on the front
     const vlRowOf = {};
     const vlEl = function(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -2538,19 +2553,36 @@
       const units = [], seen = {};
       if (skeleton) { for (let i = 0; i < 24; i++) units.push({ id: "", label: "", order: i }); }
       else vlVerses.forEach(function(v) { const id = vlUnitOf(v); if (!seen[id]) { seen[id] = 1; const u = vlUnitInfo(id); units.push({ id: id, label: u.label, order: u.order }); } });
-      // each testament: its categories first (Law, History, Minor / Gospels), then its single books in Bible order; custom books last
+      // each testament: Law and History lead the Old, Gospels leads the New; everything else in Bible order (Minor and Pastoral sit where their books are); custom books last
       const sect = function(u) { return u.order < 39 ? 0 : u.order < 1000 ? 1 : 2; };
-      units.sort(function(a, b) { return sect(a) - sect(b) || (VL_WIDE[b.label] ? 1 : 0) - (VL_WIDE[a.label] ? 1 : 0) || a.order - b.order || (a.label < b.label ? -1 : 1); });
+      units.sort(function(a, b) { return sect(a) - sect(b) || (VL_FIRST[b.label] ? 1 : 0) - (VL_FIRST[a.label] ? 1 : 0) || a.order - b.order || (a.label < b.label ? -1 : 1); });
       box.classList.add("vlfront");   // the chips sit at the bottom of the page, within thumb reach
       const chips = vlEl("div", "vb-chips");
       units.forEach(function(u, i) {
         if (!skeleton && i > 0 && sect(u) !== sect(units[i - 1])) chips.appendChild(vlEl("div", "vb-cut"));   // a line between Old and New Testament, and before custom books
         const c = vlEl("button", "vb-chip" + (skeleton ? " skel" : "") + (VL_WIDE[u.label] ? " grp" : "") + (u.label.length > 12 ? " lg" : ""), u.label); c.type = "button";
-        if (!skeleton) c.onclick = function() { vlPickUnit(u.id); };
+        if (!skeleton) c.onclick = function() { if (vlHeld()) return; vlPickUnit(u.id); };
         chips.appendChild(c);
       });
       box.appendChild(chips);
     }
+    // Hold anywhere on the front (a chip or the blank space): a legend of the combined chips and what is in each.
+    function openVlLegend() {
+      const body = document.getElementById("vlLegendBody");
+      body.textContent = "";
+      VL_GROUPS.slice().sort(function(a, b) { return a[1] - b[1]; }).forEach(function(g) {
+        const first = BIBLE_BOOKS[g[1]][0], last = BIBLE_BOOKS[g[2]][0];
+        const r = vlEl("div", "lg-row");
+        r.appendChild(vlEl("span", "lg-n" + (VL_WIDE[g[0]] ? " cat" : ""), g[0]));
+        const fm = /^(\d) (.+)$/.exec(first), lm = /^(\d) (.+)$/.exec(last);
+        const books = fm && lm && fm[2] === lm[2] ? fm[1] + "\u2013" + lm[1] + " " + fm[2]   // 1 Peter + 2 Peter: "1\u20132 Peter"
+          : g[2] - g[1] === 1 ? first + ", " + last : first + " \u2013 " + last;
+        r.appendChild(vlEl("span", "lg-b", books));
+        body.appendChild(r);
+      });
+      document.getElementById("vlLegend").classList.add("open");
+    }
+    function closeVlLegend() { document.getElementById("vlLegend").classList.remove("open"); }
     function vlBook(box) {
       const vs = vlVerses.filter(function(v) { return vlUnitOf(v) === vlCat; });
       if (!vs.length) { vlCat = null; vlSetBar(); vlFront(box, false); return; }
@@ -2641,6 +2673,7 @@
       vlShownCat = vlCat;
       if (same) box.scrollTop = keep;
     }
+    vlHeld = attachLongPress(document.getElementById("vlList"), openVlLegend, function() { return !vlCat && vlVerses.length > 0; });
     // swipe right on the Verses page: back to the front
     (function() {
       const view = document.getElementById("verseListView");
@@ -2665,7 +2698,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-373';
+    const CLIENT_BUILD = 'sync-374';
 
     let queue = [];
     let currentIndex = 0;
@@ -6075,7 +6108,7 @@
         return;
       }
       // Not while a popup is open
-      const popupOpen = ["picker", "pickerPreview", "pasteModal", "undoConfirm", "searchView"].some(function(id) {
+      const popupOpen = ["picker", "pickerPreview", "pasteModal", "undoConfirm", "vlLegend", "searchView"].some(function(id) {
         return document.getElementById(id).classList.contains("open");
       });
       if (popupOpen) return;
