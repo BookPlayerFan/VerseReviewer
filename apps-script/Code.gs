@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-131'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-132'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -2000,11 +2000,11 @@ function getMonthStats(year, month) {
 // ─────────────────────────── Push reminders (OneSignal) ───────────────────────────
 //
 // Setup, once:  1) Script Property ONESIGNAL_KEY = your OneSignal REST API key.
-//               2) Run installDailyPush() from the editor (creates the ~4:00 AM trigger; approve the permissions).
+//               2) Run installDailyPush() from the editor (creates the midnight trigger; approve the permissions).
 //               3) Run testPush() to send yourself a test.
 // Two kinds of reminder:
-//   - Daily: at 6:00 AM (scheduled by a trigger that runs at about 4:00), one push for due reviews plus any Learn / Lock card that opens at 6 AM (dailyPush). Sent once a day.
-//   - Learn / Lock unlocks: the 4 AM job (dailyPush) schedules the whole day's slot pushes up front (syncSlotPushes_): 8, 10, 12, 2, 4 PM,
+//   - Daily: at 6:00 AM (scheduled by a trigger that runs just after midnight), one push for due reviews plus any Learn / Lock card that opens at 6 AM (dailyPush). Sent once a day.
+//   - Learn / Lock unlocks: the midnight job (dailyPush) schedules the whole day's slot pushes up front (syncSlotPushes_): 8, 10, 12, 2, 4 PM,
 //     and 8 PM for the last rep (which opens at 8 PM). There is one push per time, naming every verse waiting then ("Learn A and 1 more", "Learn A, lock B"), so a rep
 //     you forgot to press never leaves a gap. After each press the same sync runs again: it cancels what is no longer needed (the last rep of the
 //     day, Skip, Promote) and adds anything missing. The 6 AM unlocks are covered by the daily push.
@@ -2161,7 +2161,7 @@ function prepareDay_() {
   }
 }
 
-// Runs from the daily trigger (installDailyPush), at about 4:00 AM (Apps Script starts it somewhere in 4:00 to 4:15). It works out what is
+// Runs from the daily trigger (installDailyPush), just after midnight (Apps Script starts it somewhere in 12:00 to 12:15 AM). It works out what is
 // waiting then, and schedules the push for exactly 6:00 AM: due reviews, a Learn card and a Lock AM card (both open at 6 AM, so they are counted as of 6:00).
 // If it happens to run after 6:00 the push goes out right away. Sent once a day, and only if something is waiting.
 function dailyPush() {
@@ -2229,8 +2229,8 @@ function checkLoadBalance() {
   console.log(plus ? 'A verse moves only when another day is clearly quieter, so a short or empty list can be normal.' : 'No Platinum+ verses yet, so nothing is moved by balancing.');
 }
 
-// The 6:00 AM daily push is scheduled at about 4:00. If everything it would mention (due reviews, the 6 AM Learn / Lock cards) is finished before it
-// goes out, it is cancelled. Cheap: it does nothing unless a daily push is still waiting, which is only between about 4:00 and 6:00 AM.
+// The 6:00 AM daily push is scheduled just after midnight. If everything it would mention (due reviews, the 6 AM Learn / Lock cards) is finished before it
+// goes out, it is cancelled. Cheap: it does nothing unless a daily push is still waiting, which is only between about midnight and 6:00 AM.
 function cancelDailyIfDone_(preRead) {
   const props = PropertiesService.getScriptProperties();
   const raw = props.getProperty(PUSH_DAILY_ID_KEY);
@@ -2254,7 +2254,7 @@ function pushStatus() {
   const props = PropertiesService.getScriptProperties();
   const trig = ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'dailyPush'; });
   pushLog_('status: trigger', 'dailyPush', 0, trig.length === 1, trig.length + ' daily trigger(s)' + (trig.length ? ' (' + trig[0].getEventType() + ')' : ' - run installDailyPush()'));
-  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 4:00 and 4:15 in THIS zone. It builds the day (sort and deck), schedules the Learn / Lock pushes, and schedules the 6:00 morning push.');
+  pushLog_('status: time', Session.getScriptTimeZone(), 0, null, 'script time zone ' + Session.getScriptTimeZone() + ', now ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') + '. The daily trigger fires between 12:00 and 12:15 AM in THIS zone. It builds the day (sort and deck), schedules the Learn / Lock pushes, and schedules the 6:00 morning push.');
   pushLog_('status: today', '', 0, null, 'last daily push marked ' + (props.getProperty(PUSH_DAILY_KEY) || 'never') + ', today is ' + todayKey_());
   pushLog_('status: key', 'ONESIGNAL_KEY', 0, !!props.getProperty('ONESIGNAL_KEY'), props.getProperty('ONESIGNAL_KEY') ? 'set' : 'NOT set');
   const slots = slotMap_();
@@ -2270,13 +2270,13 @@ function pushStatus() {
   pushLog_('status: waiting', '', 0, null, due + ' due, ' + nc.learnRefs.length + ' learn, ' + nc.lockRefs.length + ' lock' + (pushWords_(due, nc.learnRefs, nc.lockRefs) ? '' : ' (nothing waiting, so no push is sent)'));
 }
 
-// Run once from the editor (run it again after updating to this version so the trigger moves to about 4:00 AM).
+// Run once from the editor (run it again after updating to this version so the trigger moves to midnight).
 function installDailyPush() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'dailyPush') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('dailyPush').timeBased().atHour(4).nearMinute(0).everyDays(1).create();
-  console.log('Daily trigger created for about 4:00 AM. Each morning it builds the day (sort and deck), schedules the Learn / Lock pushes, and schedules the 6:00 AM push.');
+  ScriptApp.newTrigger('dailyPush').timeBased().atHour(0).nearMinute(0).everyDays(1).create();
+  console.log('Daily trigger created for just after midnight. Each morning it builds the day (sort and deck), schedules the Learn / Lock pushes, and schedules the 6:00 AM push.');
 }
 
 // Run from the editor to check the connection. View -> Logs shows the answer.
