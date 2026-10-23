@@ -1231,8 +1231,8 @@
     /* the dashed row stays exactly where it is while pressed (no shrink): a soft tint says it is being pressed, a chevron says it opens/folds */
     .ip-item.waiting:active { transform: none; filter: none; background: color-mix(in srgb, var(--text-accent) 8%, transparent); }
     .ip-item.waiting .ip-chip { display: inline-flex; align-items: center; }
-    .ip-chip .chev { flex: none; width: 6px; height: 6px; margin: 0 1px 0 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
-    .ip-item.waiting.open .ip-chip .chev { transform: translateY(1.5px) rotate(-135deg); }
+    .ip-chip .chev { flex: none; width: 6px; height: 6px; margin: 0 1px 0 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); }   /* pointing right while folded */
+    .ip-item.waiting.open .ip-chip .chev { transform: translateY(-2px) rotate(45deg); }   /* pointing down while open */
     .ip-item.queued { background: var(--bg-page); border-style: dashed; box-shadow: none; }
     .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .ip-item .ip-ref { font-size: 17px; font-weight: 600; }
@@ -2695,7 +2695,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-375';
+    const CLIENT_BUILD = 'sync-376';
 
     let queue = [];
     let currentIndex = 0;
