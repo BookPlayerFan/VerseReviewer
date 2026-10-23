@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-130'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-131'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -857,10 +857,11 @@ function hydrate_(s, preRead, snap) {
 
     if (isLevelZero_(data[i][4])) learning.push(learningCard_(data[i], i, nowMs));
   }
-  // Unlocked cards first, Lock before Learn, then sheet order.
+  // Unlocked cards first, then the Learn card, then Lock cards (the one learned longest ago first), then sheet order.
   learning.sort(function(a, b) {
     return ((a.unlockAt > 0 ? 1 : 0) - (b.unlockAt > 0 ? 1 : 0)) ||
-      ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
+      ((a.stage === 'lock' ? 1 : 0) - (b.stage === 'lock' ? 1 : 0)) ||
+      (a.stage === 'lock' ? ((b.ago || 0) - (a.ago || 0)) : 0) || (a.rowIndex - b.rowIndex);
   });
 
   let idx = s.currentIndex;

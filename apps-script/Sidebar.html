@@ -743,8 +743,9 @@
     .day-ring b { position: relative; font: 500 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-primary); }
     .day-ring.wide b { font-size: 9px; }
     .v-text.blurred.pk3 { filter: none; opacity: 1; background-color: transparent; }   /* Review / Lock hold: the first three words unblur in place; the rest stays blurred */
-    .pk3-on { animation: pk3in .18s ease; }
-    .pk3-rest { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); user-select: none; }
+    .pk3-on { animation: pk3in .18s ease; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .pk3-rest { filter: blur(var(--spoiler-blur)); opacity: 0.2; background-color: var(--spoiler-bg); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #cardBody, #cardBody .v-text, #cardBody .v-text * { -webkit-tap-highlight-color: transparent; outline: none; }
     @keyframes pk3in { from { filter: blur(var(--spoiler-blur)); opacity: 0.2; } to { filter: none; opacity: 1; } }
     .v-text.hinted .hz { color: transparent; }
     .v-text.hinted .hu { color: transparent; position: relative; transition: color .22s ease; }
@@ -1905,7 +1906,8 @@
       learningHeld = all.filter(hiddenLock);
       learningCards.sort(function(a, b) {
         return ((a.unlockAt > nowSrv() ? 1 : 0) - (b.unlockAt > nowSrv() ? 1 : 0)) ||
-          ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
+          ((a.stage === 'lock' ? 1 : 0) - (b.stage === 'lock' ? 1 : 0)) ||
+          (a.stage === 'lock' ? ((b.ago || 0) - (a.ago || 0)) : 0) || (a.rowIndex - b.rowIndex);   // Learn card first, then Lock cards: the one learned longest ago first
       });
       // A Lock card whose time has come sorts ahead of the Learn card on screen. Without this the index stayed put, so it pointed at the Lock card while the
       // screen still showed the Learn verse: the button then acted on the Lock card (Promote) under the Learn card's text.
@@ -3055,7 +3057,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-357';
+    const CLIENT_BUILD = 'sync-358';
 
     let queue = [];
     let currentIndex = 0;
@@ -4913,8 +4915,6 @@
       const learn = mode === 'learning' && isLearnCard(learningCard());
       peeking = true; peekCount++;
       if (learn) document.body.classList.add("peek"); else peekFirstWords();
-      const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
-      if (el) { clearTimeout(lvlFlashTimer); swapLabel(el, learn ? "Holding \u00b7 full words" : "Peeking: first 3 words"); }
     }
     function peekFirstWords() {
       const el = document.querySelector("#cardBody .v-text");
@@ -4923,22 +4923,30 @@
       const txt = el.textContent, m = /^\s*\S+(?:\s+\S+){0,2}/.exec(txt);
       if (!m) return;
       peek3 = { el: el, html: el.innerHTML };
+      // Both changes happen with the box's own fade switched off and in one go, so no frame ever shows the whole text clear (the box fading out of its blur while
+      // the pieces are swapped is what flashed the card).
+      el.style.transition = "none";
       el.classList.add("pk3");
       el.innerHTML = '<span class="pk3-on">' + escapeHtml(m[0]) + '</span><span class="pk3-rest">' + escapeHtml(txt.slice(m[0].length)) + '</span>';
+      clearSel();
     }
     function undoPeek3() {
       if (!peek3) return;
-      peek3.el.classList.remove("pk3");
-      peek3.el.innerHTML = peek3.html;
+      const el = peek3.el;
+      el.style.transition = "none";
+      el.classList.remove("pk3");
+      el.innerHTML = peek3.html;
       peek3 = null;
+      void el.offsetWidth;                   // apply that now, then give the box its fade back for its next change
+      el.style.transition = "";
+      clearSel();
     }
+    function clearSel() { try { const sel = window.getSelection && window.getSelection(); if (sel && sel.rangeCount) sel.removeAllRanges(); } catch (e) {} }
     function endPeek() {
       if (!peeking) return;
       peeking = false;
       document.body.classList.remove("peek");
       undoPeek3();
-      const el = document.querySelector("#cardBody .passage-toolbar .passage-status");
-      if (el) swapLabel(el, el.getAttribute("data-base") || "");
     }
     function attachRevealHold() {
       const body = document.getElementById("cardBody");
