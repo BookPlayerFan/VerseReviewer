@@ -1741,6 +1741,8 @@
       closeUpcoming();
       closeSearch(); closePeek();
       const listOpen = document.getElementById("verseListView").classList.contains("open");
+      // Looking at a card that is not open yet, with nothing due: tapping New again goes back to the New page
+      if (t === "new" && !listOpen && mode === "learning" && viewRef !== null && !learningCards.some(function(c) { return !isLocked(c); })) { clearView(); render(); return; }
       if (t === "verses") {
         if (!listOpen) openVerseList(); else vlToFront();   // tapping Verses again goes back to the front
         updateTabs();
@@ -2695,7 +2697,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-376';
+    const CLIENT_BUILD = 'sync-377';
 
     let queue = [];
     let currentIndex = 0;
