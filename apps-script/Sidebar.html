@@ -266,7 +266,7 @@
     .lu-spark.dot { font-size: 6px; }
 
     /* Verse List screen (reuses the full-screen sheet used by the verse picker) */
-    .vl-row:active, .picker-item:active, .ip-paste:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
+    .vl-row:active, .picker-item:active, .picker-close:active, .vl-verse:active { transform: none; filter: none; }
     .vl-row, .picker-close { transition: none; }
     .vl-row .chev { transition: transform 0.15s ease; }
     .vl-total { font-size: 13px; color: var(--text-muted); margin: 0; }
@@ -1053,7 +1053,7 @@
     .pp-note.bad { color: var(--badge-fail); }
     .paste-card .pp-note:empty { display: none; }
     .pc-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; }
-    #pasteModal { align-items: flex-start; padding-top: max(env(safe-area-inset-top, 0px) + 16px, 7vh); }   /* near the top, so the keyboard never covers the choices */
+    #pasteModal { align-items: flex-start; padding-top: max(env(safe-area-inset-top, 0px) + 16px, 14vh); }   /* a little above the middle, so the keyboard never covers the choices */
     .paste-card { padding: 20px 18px 18px; border-radius: 20px; max-height: none; }
     .paste-card .paste-area { min-height: 112px; border: 1.5px solid transparent; border-radius: 14px; background: color-mix(in srgb, var(--text-muted) 9%, var(--bg-card)); padding: 12px 14px; font-size: 15.5px; box-sizing: border-box; }
     .paste-card .paste-area:focus { border-color: color-mix(in srgb, var(--text-accent) 55%, transparent); }
@@ -1066,7 +1066,8 @@
     #pasteChoices.on { display: flex; }
     #pasteChoices { margin-top: 12px; }
     #pasteChoices.solo .pv-save { background: color-mix(in srgb, var(--text-accent) 14%, var(--bg-card)); border-color: transparent; }
-    .paste-hint .version-badge { margin-left: 2px; }
+    .paste-hint .ph-t { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+    .paste-hint .version-badge { margin: 0; }
     .pp-start { display: flex; align-items: center; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--btn-restart-bg); color: var(--text-accent); font-size: 14px; font-weight: 500; line-height: 1.35; }
     .pp-start.wait { background: color-mix(in srgb, #f9ab00 20%, var(--bg-card)); color: var(--text-primary); }
     .pp-start:empty { display: none; }
@@ -1207,6 +1208,10 @@
     .ip-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; box-sizing: border-box; margin: 0 0 8px;
       min-height: 0; padding: 12px 14px; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border-card); box-shadow: 0 1px 3px rgba(60,64,67,.12); color: var(--text-primary); }
     .ip-item.here { border-color: var(--text-accent); box-shadow: 0 0 0 1px var(--text-accent); }
+    .ip-item.waiting { background: transparent; border-style: dashed; box-shadow: none; }
+    .ip-item.waiting .ip-ref { color: var(--text-accent); font-size: 16px; }
+    .ip-item.waiting { background: transparent; border-style: dashed; box-shadow: none; }
+    .ip-item.waiting .ip-ref { color: var(--text-accent); font-size: 16px; }
     .ip-item.queued { background: var(--bg-page); border-style: dashed; box-shadow: none; }
     .ip-item .ip-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .ip-item .ip-ref { font-size: 17px; font-weight: 600; }
@@ -1220,12 +1225,12 @@
     .ip-pips.late i.f { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,.45); }
     .ip-pips.late i.c { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.25); }
     .ip-panel { border: 1px solid var(--border-card); border-radius: 16px; overflow: hidden; background: var(--bg-card); }
-    .picker-item, .ip-paste { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0; box-sizing: border-box;
+    .picker-item { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0; box-sizing: border-box;
       box-shadow: none; min-height: 0; padding: 12px 14px; font-size: 17px; font-weight: 600; color: var(--text-primary); border-radius: 0; }
-    .picker-item + .picker-item, .ip-paste + .picker-item { border-top: 1px solid var(--border-card); }
-    .picker-item .pk-main, .ip-paste .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+    .picker-item + .picker-item { border-top: 1px solid var(--border-card); }
+    .picker-item .pk-main { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
     .picker-item .pk-added { font-size: 13px; font-weight: 500; color: var(--text-meta); margin-top: 2px; }
-    .picker-item .pk-parts, .ip-paste .pk-parts { flex: none; font-size: 15px; font-weight: 600; color: var(--text-accent); }
+    .picker-item .pk-parts { flex: none; font-size: 15px; font-weight: 600; color: var(--text-accent); }
     #verseListView { overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain; }
     #searchView, #upcomingView { touch-action: pan-y; }
     .picker-empty { padding: 20px 4px; color: var(--text-muted); font-size: 14px; text-align: center; }
@@ -1419,7 +1424,7 @@
     <div class="picker-head"><span class="picker-title">New</span></div>
     <div class="picker-note" id="pickerNote"></div>
     <div class="picker-list" id="pickerList"></div>
-    <div class="np-bar" id="npBar"><button type="button" class="np-add" onclick="openAddList()">Add Verse</button></div>
+    <div class="np-bar" id="npBar"><button type="button" class="np-add" onclick="startPaste()">Add Verse</button></div>
   </div>
 
   <script>
@@ -2647,7 +2652,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-368';
+    const CLIENT_BUILD = 'sync-369';
 
     let queue = [];
     let currentIndex = 0;
@@ -5549,8 +5554,8 @@
     let pickerLoading = false;
     let pickerToken = 0;
     let pickerAddOpen = false;   // the list of waiting verses is behind the Add Verse button; this is true while that list is up
-    function openAddList() {
-      if (!pickerLoading && pickerItems.length === 0) { startPaste(); return; }   // nothing waiting: straight to pasting
+    function openAddList() {   // the waiting verses, from the "Choose from your list" row (the Add Verse button itself goes straight to pasting)
+      if (pickerLoading || pickerItems.length === 0) return;
       pickerAddOpen = true; renderPicker();
       const bx = document.getElementById("pickerList"); if (bx) bx.scrollTop = 0;
     }
@@ -5748,9 +5753,9 @@
       if (p.empty) { el.className = "paste-hint"; hidePasteChoices(); return; }   // nothing yet: just the box
       if (p.error) { el.textContent = p.error; el.className = "paste-hint bad"; hidePasteChoices(); return; }
       const ck = document.createElement("span"); ck.className = "ck"; ck.textContent = "\u2713"; el.appendChild(ck);
-      const t = document.createElement("span");
+      const t = document.createElement("span"); t.className = "ph-t";
       const b = document.createElement("b"); b.textContent = p.ref; t.appendChild(b);
-      const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = p.ver; t.appendChild(document.createTextNode(" ")); t.appendChild(vb);
+      const vb = document.createElement("span"); vb.className = "version-badge"; vb.textContent = p.ver; t.appendChild(vb);
       el.appendChild(t);
       el.className = "paste-hint ok";
       const sig = p.ref + "|" + p.ver + "|" + p.text;
@@ -5842,24 +5847,27 @@
           box.appendChild(b);
         });
       }
-      const bar = document.getElementById("npBar"); if (bar) bar.style.display = pickerAddOpen ? "none" : "";
+      const bar = document.getElementById("npBar"); if (bar) bar.style.display = "";   // Add Verse stays on screen
       if (!pickerAddOpen) {
+        // verses waiting in your list: one quiet row (shown once the list has loaded and only if there are any)
+        if (!pickerLoading && pickerItems.length) {
+          const wb = document.createElement("button"); wb.type = "button"; wb.className = "ip-item waiting"; wb.id = "ipWaiting";
+          const wm = document.createElement("span"); wm.className = "ip-main";
+          const wr = document.createElement("span"); wr.className = "ip-ref"; wr.textContent = "Choose from your list"; wm.appendChild(wr);
+          wb.appendChild(wm);
+          const wc = document.createElement("span"); wc.className = "ip-chip"; wc.textContent = pickerItems.length + " waiting"; wb.appendChild(wc);
+          wb.onclick = openAddList;
+          box.appendChild(wb);
+        }
         if (!prog.length && !qd.length) {
-          const e = document.createElement("div"); e.className = "ip-none"; e.textContent = "Nothing in progress. Tap Add Verse to start one."; box.appendChild(e);   // no Loading line here: the list loads quietly and shows its own once opened
+          const e = document.createElement("div"); e.className = "ip-none"; e.textContent = "Nothing in progress. Tap Add Verse to paste one."; box.appendChild(e);   // no Loading line here: the list loads quietly and shows its own once opened
         }
         return;
       }
-      // Add Verse was tapped: the waiting verses, with a row to paste a new one first
+      // The waiting verses (opened from the Choose from your list row); the Add Verse button below goes to pasting
       const back = document.createElement("button"); back.type = "button"; back.className = "ip-back"; back.textContent = "\u2039 Back"; back.onclick = closeAddList; box.appendChild(back);
-      head("Add new", false);
+      head("Your list", false);
       const panel = document.createElement("div"); panel.className = "ip-panel"; box.appendChild(panel);
-      const pasteRow = document.createElement("button"); pasteRow.type = "button"; pasteRow.className = "ip-paste";
-      const pm = document.createElement("span"); pm.className = "pk-main";
-      const pr = document.createElement("span"); pr.className = "pk-ref"; pr.textContent = "Paste a new verse"; pm.appendChild(pr);
-      pasteRow.appendChild(pm);
-      const pa = document.createElement("span"); pa.className = "pk-parts"; pa.textContent = "Paste"; pasteRow.appendChild(pa);
-      pasteRow.onclick = function() { startPaste(); };
-      panel.appendChild(pasteRow);
       if (pickerLoading) {
         const e = document.createElement("div"); e.className = "picker-empty"; e.textContent = "Loading verses\u2026"; panel.appendChild(e);
         return;
