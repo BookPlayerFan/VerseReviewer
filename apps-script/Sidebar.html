@@ -1899,6 +1899,7 @@
     function hiddenLock(c) { return !!(c && c.stage === 'lock' && isLocked(c) && c.reference !== viewRef); }
     function clearView() { if (viewRef === null) return; viewRef = null; sortLearning(); }
     function sortLearning() {
+      const shownRef = learningCards[learningIndex] ? learningCards[learningIndex].reference : null;   // the card on screen stays the card the index points at
       const all = learningCards.concat(learningHeld);
       learningCards = all.filter(function(c) { return !hiddenLock(c); });
       learningHeld = all.filter(hiddenLock);
@@ -1906,6 +1907,9 @@
         return ((a.unlockAt > nowSrv() ? 1 : 0) - (b.unlockAt > nowSrv() ? 1 : 0)) ||
           ((a.stage === 'lock' ? 0 : 1) - (b.stage === 'lock' ? 0 : 1)) || (a.rowIndex - b.rowIndex);
       });
+      // A Lock card whose time has come sorts ahead of the Learn card on screen. Without this the index stayed put, so it pointed at the Lock card while the
+      // screen still showed the Learn verse: the button then acted on the Lock card (Promote) under the Learn card's text.
+      if (shownRef) { const at = learningCards.findIndex(function(x) { return x.reference === shownRef; }); if (at >= 0) learningIndex = at; }
     }
     // A card that just arrived from the server (the next queued verse): joins the list without touching what is on screen.
     function addQuietCard(c) {
@@ -3051,7 +3055,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-356';
+    const CLIENT_BUILD = 'sync-357';
 
     let queue = [];
     let currentIndex = 0;
@@ -5129,6 +5133,7 @@
       if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); else if (kind === "miss") tapBusy("btnFailText"); return; }   // a tap that is ignored says so
       const card = learningCards[learningIndex];
       if (!card) return;
+      if (mode === 'learning' && document.getElementById("cardRef").textContent !== card.reference) { render(); return; }   // the screen and the list disagree: show the real card, press nothing
       if ((kind === "press" || kind === "miss") && isLocked(card)) return; // the unlock time is only in the hold menu
       if (kind === "miss" && card.stage !== 'lock') return;
       if (card.stage === 'lock' && (kind === "press" || kind === "miss") && !isFlipped) return;   // like Review: reveal something first (a peek does not count)
