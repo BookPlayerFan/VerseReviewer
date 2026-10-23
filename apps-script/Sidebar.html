@@ -277,7 +277,6 @@
       overflow: hidden; animation: pkPop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
     .pk-h { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px 8px; font-size: 17px; font-weight: 800; }
     .pk-h span { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    .pk-r { display: flex; justify-content: space-between; align-items: center; padding: 7px 16px; border-top: 1px solid var(--border-card); font-size: 15px; }
     @keyframes pkFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes pkPop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: none; } }
     .tr-mini { display: flex; gap: 8px; margin-top: 12px; }
@@ -358,8 +357,6 @@
     .pk-day .pk-h .pk-m { display: grid; grid-template-columns: auto auto; column-gap: 5px; align-items: baseline; line-height: 1.3; }   /* reviews and volume: two small rows on the right, level with the date; the numbers line up in one column, the labels in the next */
     .pk-m b { text-align: right; font-weight: 800; color: var(--text-primary); }
     .pk-m i { font-style: normal; text-align: left; font-weight: 600; }
-    .pk-day .pk-r { padding: 12px 20px; font-size: 15.5px; }
-    .pk-day .pk-r:last-child { padding-bottom: 14px; }
     .pk-day .pk-v { color: var(--text-accent); font-weight: 800; }
     .pk-day .pk-v.neg { color: var(--btn-fail-text); }
     .pk-day .pk-v.tot { color: var(--text-primary); }
@@ -374,8 +371,6 @@
     #verseListView, #upcomingView, .vl-verse, .vl-row, .tabbar, .tab, #cardBody { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #verseListView input { -webkit-user-select: text; user-select: text; }
     .vl-verse.lp-down, .picker-item.lp-down { background: var(--btn-restart-bg); }
-    .fail-list .fail-row { flex-wrap: wrap; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-    .fail-list .fail-row.lp-down { background: var(--btn-restart-bg); }
     /* Peek: the first words swap in over the reference (the rank pill stays), wiping in with a soft edge */
     .vl-peek { position: absolute; z-index: 9; top: 50%; margin-top: -15px; height: 30px; display: flex; align-items: center; box-sizing: border-box; padding: 0 2px; overflow: hidden; pointer-events: none;
       white-space: nowrap; font-weight: 700; font-style: italic; color: var(--text-accent); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
@@ -836,23 +831,16 @@
     /* Header stays put while the verses scroll beneath it; both lists are always five rows tall. */
     .fail-list .fail-head { display: flex; align-items: center; justify-content: center; height: 44px; box-sizing: border-box;
       border-bottom: 1px solid var(--border-body); background: var(--bg-body); position: relative; z-index: 1; }
-    .fail-list .fail-head .fail-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
+    .fail-list .fail-head .fail-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
     .fail-list .fail-head button { width: 100%; height: 32px; min-height: 0; border: 0; border-radius: 9px; padding: 0; font-family: inherit;
       background: var(--btn-restart-bg); color: var(--btn-restart-text); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-    .fail-list .fail-inner { height: 180px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    .fail-list .fail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 0 4px 0 6px; font-size: 14px; }
-    .fail-list .fail-row + .fail-row { border-top: 1px solid var(--border-body); }
+    .fail-list .fail-inner { height: 190px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .fail-list .vr + .fail-note { border-top: 1px solid var(--border-body); }
     .fail-list .fail-note { padding: 8px 6px; font-size: 12px; color: var(--text-muted); text-align: center; }
-    .fail-list .fail-row + .fail-note { border-top: 1px solid var(--border-body); }
-    .fail-list .fail-ref { min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
-    .fail-list .fail-head .pts-sum { margin-left: 12px; display: inline-flex; align-items: center; gap: 12px; line-height: 1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .fail-list .fail-head .pts-sum { margin-left: 12px; display: inline-flex; align-items: center; gap: 12px; line-height: 1; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
     .fail-list .fail-head .fail-title { line-height: 1; }
     .fail-list .fail-head .pts-sum .up { color: var(--text-accent); }
     .fail-list .fail-head .pts-sum .down { color: var(--btn-fail-text); }
-    .fail-due { margin-left: auto; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
-    .pts-badge { min-width: 34px; text-align: right; font-weight: 800; font-size: 14px; }
-    .pts-badge.up { color: var(--text-accent); }
-    .pts-badge.down { color: var(--btn-fail-text); }
 
     .summary-btn-stack {
       display: flex;
@@ -1020,25 +1008,41 @@
     .lg-b { min-width: 0; font-size: 14px; color: var(--text-muted); text-align: left; hyphens: manual; }
     .lg-row { text-align: left; }
     .vb-rows { position: relative; }
+    /* One verse row for every list (Verses list, Reviewed / Missed / Treasury on Review Complete, calendar day popup): 38 px, the reference at 15 px,
+       one small thing on the right (13 px). Tap: the first words and the next review day; tap again: the whole verse; hold: the whole verse at once. */
     .vr { border-bottom: 1px solid var(--border-card); }
     .vr:last-child { border-bottom: 0; }
-    .vr-b { display: flex; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 8px; transition: none; width: 100%; min-height: 0; margin: 0; box-sizing: border-box; padding: 14px 2px; border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; font: inherit; font-size: 16.5px; font-weight: 600; line-height: 22px; color: var(--text-primary); cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+    .vr-b { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; transition: none; width: 100%; min-height: 37px; margin: 0; box-sizing: border-box; padding: 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; font: inherit; font-size: 15px; font-weight: 600; line-height: 20px; color: var(--text-primary); cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
     .vr-b, .vr-b * { -webkit-tap-highlight-color: transparent; outline: none; }
     .vr-b:active, .vr-b:focus, .vr-b.lp-down { background: none; transform: none; filter: none; }
     .vr.open .vr-b { padding-bottom: 5px; }
     .vr-b.pk { align-items: center; }
-    .vr.open .vr-b.pk { padding-bottom: 14px; }
-    .vr-rf { flex: none; display: inline-flex; align-items: center; vertical-align: top; height: 22px; line-height: 22px; font-weight: 600; }
+    .vr.open .vr-b.pk { padding-bottom: 9px; }
+    .vr-rf { flex: none; display: inline-flex; align-items: center; vertical-align: top; height: 20px; line-height: 20px; font-weight: 600; }
     .vr-rf .version-badge { margin-left: 6px; }
-    .vr-pt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14.5px; font-weight: 400; line-height: 22px; color: var(--text-muted); animation: vrIn .16s ease; }
-    .vr-nx { flex: none; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: var(--vb-a); font-size: 11.5px; font-weight: 600; line-height: 18px; color: var(--text-muted); }
+    .vr-sp { flex: 1 1 auto; }
+    .vr-pt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; font-weight: 400; line-height: 20px; color: var(--text-muted); animation: vrIn .16s ease; }
+    .vr-nx { flex: none; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: var(--vb-a, color-mix(in srgb, var(--text-muted) 12%, var(--bg-card))); font-size: 13px; font-weight: 600; line-height: 18px; color: var(--text-muted); }
     .vr-nx.now { color: var(--text-accent); }
-    .vr-b.full { display: block; padding-bottom: 2px; font-size: 15.5px; font-weight: 400; line-height: 1.45; color: var(--text-muted); }
-    .vr-b.full .vr-rf { margin-right: 6px; font-size: 16.5px; color: var(--text-primary); }
+    .vr-pts { flex: none; min-width: 34px; text-align: right; font-weight: 800; font-size: 13px; line-height: 18px; }
+    .vr-pts.up { color: var(--text-accent); }
+    .vr-pts.down { color: var(--btn-fail-text); }
+    .vr-ms { flex: none; padding: 1px 9px; border-radius: 10px; background: #fdf0c9; color: #8a5a00; font-size: 13px; font-weight: 800; line-height: 18px; font-variant-numeric: tabular-nums; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vr-ms { background: #4a3b0a; color: #fdd663; } }
+    :root[data-theme="dark"] .vr-ms { background: #4a3b0a; color: #fdd663; }
+    .vr-ic { flex: none; display: inline-flex; --rc: var(--rl); color: var(--rc); }
+    .vr-ic svg { width: 22px; height: 22px; display: block; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vr-ic { --rc: var(--rd); } }
+    :root[data-theme="dark"] .vr-ic { --rc: var(--rd); }
+    .vr-b.full { display: block; min-height: 0; padding-top: 9px; padding-bottom: 2px; font-size: 15px; font-weight: 400; line-height: 1.45; color: var(--text-muted); }
+    .vr-b.full .vr-rf { margin-right: 6px; font-size: 15px; color: var(--text-primary); }
     .vr-ft { animation: vrIn .16s ease; }
-    .vr-snip { padding: 0 24px 13px 2px; margin-top: -2px; }
+    .vr-snip { padding: 0 24px 11px 2px; margin-top: -2px; }
     .vr-meta { margin-top: 5px; font-size: 12px; color: var(--text-meta); }
     .vr-meta b { font-weight: 600; color: var(--text-primary); }
+    .fail-list .vr { border-bottom-color: var(--border-body); }
+    .pk-bubble .vr-b { padding-left: 16px; padding-right: 16px; }
+    .pk-bubble .vr-snip { padding-left: 16px; }
     @keyframes vrIn { from { opacity: 0; } to { opacity: 1; } }
     .vl-searchbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .vl-searchbar .picker-search { flex: 1; min-width: 0; margin-bottom: 0; }
@@ -1899,7 +1903,7 @@
       const sig = JSON.stringify(raw);
       if (sig === vlSig && vlVerses.length === vlSigCount) return false;
       vlSig = sig;
-      vlVerses = raw.map(function(v) { const nv = textVerses(v.t, v.f); return { f: v.f, g: v.g, p: parseRef(v.f), n: nv, pn: nv, v: v.v || "", w: v.w || "", x: v.x || plainVerse(v.t), t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0 }; });
+      vlVerses = raw.map(function(v) { const nv = textVerses(v.t, v.f); return { f: v.f, g: v.g, p: parseRef(v.f), n: nv, pn: nv, v: v.v || "", w: v.w || "", x: v.x || plainVerse(v.t), t: v.t || "", d: (v.d === null || v.d === undefined) ? null : v.d, l: v.l > 0 ? v.l : 1, c: v.c ? 1 : 0, m: v.m > 0 ? Math.floor(v.m) : 0 }; });
       vlVerses.sort(compareVerses);
       vlSigCount = vlVerses.length;
       return true;
@@ -1921,7 +1925,7 @@
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
       updateTabs();
-      vlCat = null; vlRowOpen = null;   // the Verses page always opens on its front
+      vlCat = null; vrReset(document.getElementById("vlList"));   // the Verses page always opens on its front
       // the tiles are on screen at once: the list from last time, or empty tiles that fill in when the list arrives (so nothing jumps)
       if (vlVerses.length) renderVerseList(); else renderVerseList(true);
       loadVlVerses(function(changed) { if (changed) renderVerseList(); }, function() { if (!vlVerses.length) vlListNote("Couldn't load."); });
@@ -2086,24 +2090,22 @@
         hm.appendChild(n); hm.appendChild(t);
       });
       h.appendChild(hn); h.appendChild(hm); b.appendChild(h);
-      vs.forEach(function(v) {
-        const row = document.createElement("div"); row.className = "pk-r";
-        const rf = document.createElement("span"); rf.textContent = v.f;
-        row.appendChild(rf); row.appendChild(makePill(v.g)); b.appendChild(row);
-      });
+      const dayBox = b;                     // the popup scrolls when it is long, so it holds the rows' state and scroll
+      vrReset(dayBox);
+      const dayOpt = { text: function(v) { return v.x || ""; }, ver: function(v) { return v.v; }, days: function(v) { return v.d === null || v.d === undefined ? null : v.d; }, right: function(v) { return vrIcon(v.g); } };
+      vs.forEach(function(v) { b.appendChild(vrRow(dayBox, vlKey(v), v, dayOpt)); });
       document.body.appendChild(b);
       attachEdgeClose(b);
       endCue(b, "End \u00b7 " + vs.length + (vs.length === 1 ? " review" : " reviews"));   // before measuring, so the marker's room is counted
       // below the tile, or above it, whichever has room (the card scrolls if the list is long)
       const bottomLimit = window.innerHeight - (document.getElementById("tabbar").offsetHeight || 54) - 10;
       const below = bottomLimit - (r.bottom + 10), above = r.top - 10 - 10;
-      let top, maxH = 0;
-      if (b.offsetHeight <= below) top = r.bottom + 12;
-      else if (b.offsetHeight <= above) top = r.top - 12 - b.offsetHeight;
-      else if (below >= above) { top = r.bottom + 12; maxH = below - 2; }
-      else { top = 10; maxH = above - 2; }
-      if (maxH) b.style.maxHeight = maxH + "px";
-      b.style.top = top + "px";
+      // A row can open inside the popup, so the popup is given all the room on its side of the tile (it grows away from the tile and scrolls only past that).
+      if (b.offsetHeight <= below || (b.offsetHeight > above && below >= above)) {
+        b.style.top = (r.bottom + 12) + "px"; b.style.maxHeight = Math.max(120, below - 2) + "px";
+      } else {
+        b.style.bottom = (window.innerHeight - (r.top - 12)) + "px"; b.style.maxHeight = Math.max(120, above - 2) + "px";
+      }
     }
     // The days and their dates show at once; the counts and bars fill in when the numbers arrive (shown straight away if they were loaded already).
     function openUpcoming() {
@@ -2528,8 +2530,7 @@
     const VL_UNIT_OF = {};
     VL_GROUPS.forEach(function(g) { for (let i = g[1]; i <= g[2]; i++) VL_UNIT_OF[i] = "g:" + g[0]; });
     const VL_PEEK_WORDS = 3;
-    let vlCat = null, vlRowOpen = null, vlRowStage = 0, vlShownCat = null, vlSwipedAt = 0;   // vlCat = the chip that is open (a unit id), or null on the front
-    const vlRowOf = {};
+    let vlCat = null, vlShownCat = null, vlSwipedAt = 0;   // vlCat = the chip that is open (a unit id), or null on the front
     const vlEl = function(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const vlIsBible = function(v) { return typeof v.p.book === "number" && v.p.book >= 0 && v.p.book < 66; };
     function vlUnitOf(v) { return vlIsBible(v) ? (VL_UNIT_OF[v.p.book] || "b:" + v.p.book) : "x:" + v.p.name; }
@@ -2545,12 +2546,12 @@
       document.getElementById("vbSearchTxt").textContent = vlCat ? "Search" : "Search reference or words";
     }
     function vlToFront() {
-      vlCat = null; vlRowOpen = null;
+      vlCat = null; vrReset(document.getElementById("vlList"));
       renderVerseList();
       document.getElementById("vlList").scrollTop = 0;
     }
     function vlPickUnit(id) {
-      vlCat = id; vlRowOpen = null;
+      vlCat = id; vrReset(document.getElementById("vlList"));
       renderVerseList();
       document.getElementById("vlList").scrollTop = 0;
     }
@@ -2592,73 +2593,103 @@
       const vs = vlVerses.filter(function(v) { return vlUnitOf(v) === vlCat; });
       if (!vs.length) { vlCat = null; vlSetBar(); vlFront(box, false); return; }
       const rows = vlEl("div", "vb-rows");
+      vrCtl(box).rows = {}; vrCtl(box).slide = rows;   // a redraw (new data) keeps whichever row is open
       vs.forEach(function(v) { rows.appendChild(vlRow(v)); });
       box.appendChild(rows);
     }
     const vlKey = function(v) { return v.f + "|" + (v.v || ""); };
     const vlWords = function(v) { return (v.x || "").split(/\s+/).filter(Boolean); };
     const vlDueShort = function(d) { d = Math.max(0, d | 0); return d === 0 ? "Today" : d === 1 ? "Tomorrow" : "in " + d + "d"; };
-    function vlDueDate(d) { const t = new Date(); t.setDate(t.getDate() + Math.max(0, d | 0)); return t.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
+    function vlDueDate(d) { const t = new Date(); t.setDate(t.getDate() + Math.max(0, d | 0)); return t.toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+    // ── One verse row for every list ──
+    // The Verses list, Reviewed / Missed / Treasury on Review Complete and the calendar day popup all use this row: the reference on the left and one small thing
+    // on the right (rank icon, next review day, points, or times missed). Tap: the first words and the next review day. Tap again: the whole verse in the row,
+    // with its next review line. A third tap closes it (and so does opening another row). Hold: the whole verse at once.
     // A row's button and its reference are created once and never replaced; a tap only changes what follows the reference, so the reference cannot flicker.
-    function vlRow(v) {
-      const key = vlKey(v);
-      vlRowOf[key] = v;
+    // Each list keeps its own state on its box (open row, stage), so lists do not disturb each other.
+    function vrCtl(box) { return box._vr || (box._vr = { open: null, stage: 0, rows: {}, slide: null }); }
+    function vrReset(box) { const c = vrCtl(box); c.open = null; c.stage = 0; c.rows = {}; }
+    function vrIcon(g) {
+      g = g | 0;
+      if (g < 1 || g > 8 || !RANK_ICON[g]) return null;
+      const e = vlEl("span", "vr-ic rank-" + g); e.setAttribute("aria-label", rankName(g));
+      e.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + RANK_ICON[g] + "</svg>";
+      return e;
+    }
+    // v: { f: reference, ... }; opt: { text(v), ver(v), days(v) -> days until the next review or null, dueText(days), right(v) -> node or null, slide: the rows' container }
+    function vrRow(box, key, v, opt) {
+      const c = vrCtl(box);
       const w = vlEl("div", "vr"); w.setAttribute("data-k", key);
       const b = vlEl("button", "vr-b"); b.type = "button";
       const rf = vlEl("span", "vr-rf", v.f);
-      const ver = (v.v || "").trim();
+      const ver = String((opt.ver ? opt.ver(v) : v.v) || "").trim();
       if (ver && ver.toUpperCase() !== "ESV") rf.appendChild(vlEl("span", "version-badge", ver));
       b.appendChild(rf); w.appendChild(b);
-      const held = attachLongPress(b, function() { vlHold(key); });   // hold: the whole verse at once
-      b.addEventListener("click", function(ev) { ev.stopPropagation(); if (held()) return; vlTap(key); });
-      vlFill(w, v);
+      c.rows[key] = { w: w, v: v, opt: opt };
+      const held = attachLongPress(b, function() { vrHold(box, key); });   // hold: the whole verse at once
+      b.addEventListener("click", function(ev) { ev.stopPropagation(); if (held()) return; vrTap(box, key); });
+      vrFill(box, key);
       return w;
     }
-    function vlFill(w, v) {
-      const key = vlKey(v), open = vlRowOpen === key, peekOnly = open && vlRowStage === 1, b = w.firstChild, ws = vlWords(v);
-      const dated = v.g > 0 && v.d !== null && v.d !== undefined;
+    function vrWords(r) { return String(r.opt.text ? r.opt.text(r.v) : (r.v.x || "")).split(/\s+/).filter(Boolean); }
+    function vrFill(box, key) {
+      const c = vrCtl(box), r = c.rows[key]; if (!r) return;
+      const w = r.w, v = r.v, opt = r.opt, b = w.firstChild, open = c.open === key, peekOnly = open && c.stage === 1, ws = vrWords(r);
+      const d = opt.days ? opt.days(v) : null, dated = d !== null && d !== undefined;
+      const dueText = opt.dueText || vlDueShort;
       w.className = "vr" + (open ? " open" : ""); b.className = "vr-b" + (peekOnly ? " pk" : open ? " full" : "");
       while (b.lastChild !== b.firstChild) b.removeChild(b.lastChild);
       while (w.lastChild !== b) w.removeChild(w.lastChild);
       if (peekOnly) {
         b.appendChild(vlEl("span", "vr-pt", ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " …" : "")));
-        if (dated) b.appendChild(vlEl("span", "vr-nx" + (v.d <= 0 ? " now" : ""), vlDueShort(v.d)));
+        if (dated) b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d)));
       } else if (open) {
         b.appendChild(vlEl("span", "vr-ft", ws.join(" ") || "No text saved for this verse."));
         if (dated) {
           const sn = vlEl("div", "vr-snip"), m = vlEl("div", "vr-meta");
           m.appendChild(document.createTextNode("Next review "));
-          m.appendChild(vlEl("b", null, v.d <= 1 ? vlDueShort(v.d) : vlDueDate(v.d)));
-          if (v.d > 1) m.appendChild(document.createTextNode(" · in " + v.d + " days"));
+          m.appendChild(vlEl("b", null, d <= 1 ? vlDueShort(d) : vlDueDate(d)));
+          if (d > 1) m.appendChild(document.createTextNode(" \u00b7 in " + d + " days"));
           sn.appendChild(m); w.appendChild(sn);
         }
+      } else {
+        const rt = opt.right ? opt.right(v) : null;
+        if (rt) { b.appendChild(vlEl("span", "vr-sp")); b.appendChild(rt); }
       }
     }
-    function vlFindRow(key) { const all = document.querySelectorAll("#vlList .vr"); for (let i = 0; i < all.length; i++) if (all[i].getAttribute("data-k") === key) return all[i]; return null; }
+    function vrRefresh(box) { const c = vrCtl(box); Object.keys(c.rows).forEach(function(k) { vrFill(box, k); }); }   // data arrived (dates, counts): redraw the rows as they are
     // Changes only the rows involved (the one tapped and the one that closes), then puts the tapped row back exactly where it was on screen;
     // whatever the list cannot absorb by scrolling (the very top, a verse above closing) slides in.
-    function vlUpdateRows(tapKey, prevKey) {
-      const sc = document.getElementById("vlList"), o = vlFindRow(tapKey), t0 = o ? o.getBoundingClientRect().top : null;
-      [prevKey, tapKey].forEach(function(k) { if (!k) return; const w = vlFindRow(k); if (w && vlRowOf[k]) vlFill(w, vlRowOf[k]); });
-      const n = vlFindRow(tapKey); if (!n || t0 === null) return;
-      const d = n.getBoundingClientRect().top - t0; if (Math.abs(d) > 0.5) sc.scrollTop += d;
-      const rem = n.getBoundingClientRect().top - t0, rl = sc.querySelector(".vb-rows");
+    function vrUpdate(box, tapKey, prevKey) {
+      const c = vrCtl(box), o = c.rows[tapKey] && c.rows[tapKey].w, t0 = o ? o.getBoundingClientRect().top : null;
+      [prevKey, tapKey].forEach(function(k) { if (k) vrFill(box, k); });
+      if (!o || t0 === null) return;
+      const d = o.getBoundingClientRect().top - t0; if (Math.abs(d) > 0.5) box.scrollTop += d;
+      const rem = o.getBoundingClientRect().top - t0, rl = c.slide;
       if (rl && Math.abs(rem) > 0.5) { rl.style.transition = "none"; rl.style.transform = "translateY(" + (-rem) + "px)"; void rl.offsetHeight; rl.style.transition = "transform .22s ease"; rl.style.transform = "none"; }
     }
-    function vlHold(key) {
-      const v = vlRowOf[key]; if (!v || (vlRowOpen === key && vlRowStage === 2)) return;
-      const prev = vlRowOpen;
-      vlRowOpen = key; vlRowStage = 2;
-      vlUpdateRows(key, prev !== key ? prev : null);
+    function vrHold(box, key) {
+      const c = vrCtl(box); if (!c.rows[key] || (c.open === key && c.stage === 2)) return;
+      const prev = c.open;
+      c.open = key; c.stage = 2;
+      vrUpdate(box, key, prev !== key ? prev : null);
     }
-    function vlTap(key) {
-      const v = vlRowOf[key]; if (!v) return;
-      const prev = vlRowOpen;
-      if (vlRowOpen !== key) { vlRowOpen = key; vlRowStage = vlWords(v).length > VL_PEEK_WORDS ? 1 : 2; }   // another verse opening closes the last one
-      else if (vlRowStage === 1) vlRowStage = 2;                                                             // second tap: the whole verse
-      else vlRowOpen = null;                                                                                 // third tap: close
-      vlUpdateRows(key, prev !== key ? prev : null);
+    function vrTap(box, key) {
+      const c = vrCtl(box), r = c.rows[key]; if (!r) return;
+      const prev = c.open;
+      if (c.open !== key) { c.open = key; c.stage = vrWords(r).length > VL_PEEK_WORDS ? 1 : 2; }   // another verse opening closes the last one
+      else if (c.stage === 1) c.stage = 2;                                                       // second tap: the whole verse
+      else c.open = null;                                                                        // third tap: close
+      vrUpdate(box, key, prev !== key ? prev : null);
     }
+    // The Verses list: its rank icon on the right; the day only for verses that are in review.
+    const vlOpt = {
+      text: function(v) { return v.x || ""; },
+      ver: function(v) { return v.v; },
+      days: function(v) { return (v.g > 0 && v.d !== null && v.d !== undefined) ? v.d : null; },
+      right: function(v) { return vrIcon(v.g); }
+    };
+    function vlRow(v) { return vrRow(document.getElementById("vlList"), vlKey(v), v, vlOpt); }
     function renderVerseList(skeleton) {
       hideVerseTip();
       const box = document.getElementById("vlList"), keep = box.scrollTop, same = vlShownCat === vlCat;
@@ -2702,7 +2733,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-378';
+    const CLIENT_BUILD = 'sync-379';
 
     let queue = [];
     let currentIndex = 0;
@@ -5460,10 +5491,30 @@
       if (n <= 0) return "Today";
       if (n === 1) return "Tomorrow";
       const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n);
-      return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+      return d.toLocaleDateString([], { month: "short", day: "numeric" });
     }
-    function paintDueDates() {
-      document.querySelectorAll("#failList .fail-due").forEach(function(el) { el.textContent = dueDayWords(dueDaysOf(el.getAttribute("data-ref"))); });
+    // Times a verse has been missed (column A of the sheet, counted from sync-379 on), from the Verses list; null until that list has arrived.
+    function missOf(ref) {
+      for (let i = 0; i < vlVerses.length; i++) if (vlVerses[i].f === ref) return typeof vlVerses[i].m === "number" ? vlVerses[i].m : null;
+      return null;
+    }
+    // What each Review Complete list shows on the right of its rows, and where its words and days come from.
+    function statRowOpt(kind) {
+      return {
+        text: function(v) { return plainVerse(verseInfoFor(v.f).t); },
+        ver: function(v) { return verseInfoFor(v.f).v; },
+        days: function(v) { return dueDaysOf(v.f); },
+        dueText: kind === "done" ? dueDayWords : vlDueShort,
+        right: function(v) {
+          if (kind === "done") {
+            const n = dueDaysOf(v.f);
+            return n === null ? null : vlEl("span", "vr-nx" + (n <= 0 ? " now" : ""), dueDayWords(n));
+          }
+          if (kind === "grad") return v.d ? vlEl("span", "vr-pts " + (v.d > 0 ? "up" : "down"), fmtPts(v.d)) : null;
+          const m = missOf(v.f);
+          return m ? vlEl("span", "vr-ms", "\u00d7" + m) : null;
+        }
+      };
     }
     function statItems(kind) {
       const raw = Array.isArray(sessionStats[STAT_LISTS[kind].key]) ? sessionStats[STAT_LISTS[kind].key] : [];
@@ -5583,33 +5634,9 @@
       }
       const inner = document.createElement("div");
       inner.className = "fail-inner";
-      items.forEach(function(it) {
-        const row = document.createElement("div");
-        row.className = "fail-row";
-        const name = document.createElement("span");
-        name.className = "fail-ref";
-        name.textContent = it.f;
-        row.appendChild(name);
-        if (it.g !== null) row.appendChild(makePill(it.g));
-        if (kind === "done") {
-          const du = document.createElement("span");
-          du.className = "fail-due"; du.setAttribute("data-ref", it.f); du.textContent = dueDayWords(it.n);
-          row.appendChild(du);
-        }
-        if (kind === "grad" && it.d) {
-          const bd = document.createElement("span");
-          bd.className = "pts-badge " + (it.d > 0 ? "up" : "down");
-          bd.textContent = fmtPts(it.d);
-          row.appendChild(bd);
-        }
-        // tap: quick peek of the first words
-        row.onclick = function(ev) {
-          ev.stopPropagation();
-          const info = verseInfoFor(it.f);
-          showVerseTip(row, info.w);
-        };
-        inner.appendChild(row);
-      });
+      vrReset(inner);
+      const opt = statRowOpt(kind);
+      items.forEach(function(it) { inner.appendChild(vrRow(inner, it.f, it, opt)); });
       if (missing) {
         const note = document.createElement("div");
         note.className = "fail-note";
@@ -5621,7 +5648,12 @@
       list.appendChild(head);
       list.appendChild(inner);
       list.style.display = "block";
-      if (kind === "done" && !noLoad) loadVlVerses(function(changed) { if (openStatList === "done") { if (changed) resortDone(); else paintDueDates(); } }, function() {});   // fresh dates
+      // fresh dates and miss counts: the Reviewed list is drawn again in the new order, the others just redraw their rows
+      if (!noLoad) loadVlVerses(function(changed) {
+        if (openStatList !== kind) return;
+        if (kind === "done" && changed) resortDone();
+        else { const inn = document.querySelector("#failList .fail-inner"); if (inn) vrRefresh(inn); }
+      }, function() {});
       endCue(inner, "End \u00b7 " + items.length + (items.length === 1 ? " verse" : " verses"));
     }
 

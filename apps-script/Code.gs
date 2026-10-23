@@ -30,7 +30,7 @@
 
 const MAX_GROUP = 8;
 const UNDO_WINDOW_MS = 2 * 60 * 1000; // how long the last review can be undone
-const BUILD = 'srv-134'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
+const BUILD = 'srv-135'; // the server code's own number (the page has its own, 'sync-N'); shown in the app's status readout
 
 // The Sidebar.html build number the server expects. A page older than this is a stale copy (the phone kept an old one),
 // so it offers "Update ready - tap to reload". The number is read from the deployed Sidebar.html itself (its CLIENT_BUILD line),
@@ -1326,6 +1326,14 @@ function submitReview(expectedVersion, review, next) {
           };
         }
         if (info) logRef = logEvent_(info);
+        // Column A of the Verses tab ("Miss") counts first-try misses on Review cards, from the day it was added. Learn / Lock misses and
+        // same-day repeats do not count. The count is written with the review, so Undo can take it back (written.miss).
+        if (info && review && written && info.result === 'Fail' && !info.repeat && info.lb > 0) {
+          try {
+            const vs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Verses');
+            if (vs) { const cell = vs.getRange(written.r, 1); cell.setValue((Math.max(0, Math.floor(Number(cell.getValue()) || 0))) + 1); written.miss = 1; }
+          } catch (e) { console.error('Miss count failed: ' + e); }
+        }
       }
     }
 
@@ -1381,6 +1389,7 @@ function undoLast(undoId) {
         if (row) {
           const b = u.row.before;
           sheet.getRange(row, 2, 1, 4).setValues([[msToDate_(b[0]), msToDate_(b[1]), b[2], b[3]]]);
+          if (u.row.miss) { try { const cell = sheet.getRange(row, 1); cell.setValue(Math.max(0, Math.floor(Number(cell.getValue()) || 0) - 1) || ''); } catch (e) {} }   // the miss it counted comes off again
         }
       }
     }
@@ -1978,7 +1987,7 @@ function getVerseList() {
     // Days from today until the next review (overdue shows as 0); null when there is no review date (Level 0).
     const nd = g > 0 ? toMidnight_(data[i][1]) : null;
     const due = nd ? Math.max(0, Math.round((nd.getTime() - todayMs) / 86400000)) : null;
-    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, t: String(data[i][7] || ''), d: due, l: Math.round(verseLoad_(data[i][7]) * 10) / 10, c: (ctxCol[i] && String(ctxCol[i][0] || '').trim()) ? 1 : 0 });
+    verses.push({ f: ref, g: g, v: String(data[i][6] || '').trim(), w: first, t: String(data[i][7] || ''), d: due, m: Math.max(0, Math.floor(Number(data[i][0]) || 0)), l: Math.round(verseLoad_(data[i][7]) * 10) / 10, c: (ctxCol[i] && String(ctxCol[i][0] || '').trim()) ? 1 : 0 });
   }
   return { verses: verses };
 }
