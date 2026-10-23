@@ -994,25 +994,18 @@
     .vb-bar button:active { transform: none; filter: none; }
     /* One field: the category tag sits inside the search bar, at its left, so nothing looks cut off */
     .vb-field { flex: 1; min-width: 0; display: flex; align-items: center; height: 44px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--vb-a); overflow: hidden; }
-    .vb-search { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; height: 100%; padding: 0 12px; border: 0; background: none; color: var(--text-muted); font-size: 16px; font-weight: 400; text-align: left; }
-    .vb-search svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
-    .vb-search span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .vb-tok { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 32px; margin: 0 0 0 5px; padding: 0 10px; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--text-accent) 16%, var(--bg-card)); color: var(--text-accent); font-size: 14.5px; font-weight: 700; }
-    .vb-tok + .vb-search { padding-left: 10px; }
-    .vb-tok b { font-size: 11px; font-weight: 700; }
-    .vb-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-    .vb-two h4 { margin: 4px 2px 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-meta); }
-    .vb-stack { display: flex; flex-direction: column; gap: 8px; }
-    .vb-ct { transition: none; display: flex; align-items: center; justify-content: center; width: 100%; height: 64px; margin: 0; padding: 0 6px; min-height: 0; border: 0; border-radius: 16px; background: var(--vb-a); color: var(--text-primary); font-size: 18px; font-weight: 700; box-shadow: none; -webkit-tap-highlight-color: transparent; }
-    .vb-ct.nt { background: var(--vb-b); }
-    .vb-ct:active { transform: none; filter: none; opacity: .7; }
-    .vb-ct.skel { opacity: .5; pointer-events: none; }
-    .vb-ct.other { margin-top: 12px; height: 52px; }
+    .vb-field .vb-ico { flex: none; width: 40px; height: 100%; padding: 0 0 0 12px; justify-content: center; align-items: center; background: none; color: var(--text-muted); border-radius: 0; }
+    .vb-field .vb-ico svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    .vb-field .vb-search { flex: 1; min-width: 0; align-items: center; justify-content: flex-start; height: 100%; padding: 0 12px 0 0; border: 0; border-radius: 0; background: none; color: var(--text-muted); font-size: 16px; font-weight: 400; text-align: left; }
+    .vb-field .vb-search span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vb-field .vb-tok { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 30px; margin: 0 8px 0 0; padding: 0 9px 0 10px; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--text-accent) 16%, var(--bg-card)); color: var(--text-accent); font-size: 14px; font-weight: 700; white-space: nowrap; }
+    .vb-field .vb-tok b { font-size: 11px; font-weight: 700; }
     .vb-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 2px 0 6px; }
-    .vb-chips.w4 { grid-template-columns: repeat(4, 1fr); }
-    .vb-chip { transition: none; height: 40px; min-height: 0; width: auto; margin: 0; padding: 0 4px; border: 0; border-radius: 12px; background: var(--vb-a); color: var(--text-primary); font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; box-shadow: none; -webkit-tap-highlight-color: transparent; }
-    .vb-chip.lg { font-size: 11.5px; letter-spacing: -.2px; }
-    .vb-chip.sel { background: var(--text-primary); color: var(--bg-card); }
+    .vb-cut { grid-column: 1 / -1; height: 1px; margin: 6px 0; background: var(--border-card); }
+    .vb-chip { transition: none; height: 40px; min-height: 0; width: auto; margin: 0; padding: 0 4px; border: 0; border-radius: 12px; background: var(--vb-a); color: var(--text-primary); font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; box-shadow: none; -webkit-tap-highlight-color: transparent; }
+    .vb-chip.lg { font-size: 13px; letter-spacing: -.2px; }
+    .vb-chip.grp { background: color-mix(in srgb, var(--text-accent) 10%, var(--vb-a)); color: var(--text-accent); font-weight: 700; }
+    .vb-chip.skel { opacity: .5; pointer-events: none; }
     .vb-chip:active { transform: none; filter: none; opacity: .7; }
     .vb-rows { position: relative; }
     .vr { border-bottom: 1px solid var(--border-card); }
@@ -1023,7 +1016,7 @@
     .vr.open .vr-b { padding-bottom: 5px; }
     .vr-b.pk { align-items: center; }
     .vr.open .vr-b.pk { padding-bottom: 14px; }
-    .vr-rf { flex: none; display: inline-block; vertical-align: top; height: 22px; line-height: 22px; font-weight: 600; }
+    .vr-rf { flex: none; display: inline-flex; align-items: center; vertical-align: top; height: 22px; line-height: 22px; font-weight: 600; }
     .vr-rf .version-badge { margin-left: 6px; }
     .vr-pt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14.5px; font-weight: 400; line-height: 22px; color: var(--text-muted); animation: vrIn .16s ease; }
     .vr-nx { flex: none; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: var(--vb-a); font-size: 11.5px; font-weight: 600; line-height: 18px; color: var(--text-muted); }
@@ -1338,8 +1331,9 @@
 
   <div class="picker" id="verseListView">
     <div class="vb-bar" id="vbBar"><div class="vb-field">
+      <button type="button" class="vb-ico" id="vbIco" aria-label="Search" onclick="openSearch()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
       <button type="button" class="vb-tok" id="vbTok" style="display:none" aria-label="Back to all verses" onclick="vlToFront()"><span id="vbTokName"></span><b aria-hidden="true">&#10005;</b></button>
-      <button type="button" class="vb-search" id="vbSearch" onclick="openSearch()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span id="vbSearchTxt">Search reference or words</span></button>
+      <button type="button" class="vb-search" id="vbSearch" onclick="openSearch()"><span id="vbSearchTxt">Search reference or words</span></button>
     </div></div>
     <div class="picker-list" id="vlList"></div>
   </div>
@@ -1911,7 +1905,7 @@
     function openVerseList() {
       document.getElementById("verseListView").classList.add("open");
       updateTabs();
-      vlCat = null; vlUnit = null; vlRowOpen = null;   // the Verses page always opens on its front
+      vlCat = null; vlRowOpen = null;   // the Verses page always opens on its front
       // the tiles are on screen at once: the list from last time, or empty tiles that fill in when the list arrives (so nothing jumps)
       if (vlVerses.length) renderVerseList(); else renderVerseList(true);
       loadVlVerses(function(changed) { if (changed) renderVerseList(); }, function() { if (!vlVerses.length) vlListNote("Couldn't load."); });
@@ -2512,30 +2506,23 @@
     }
 
     // ── The Verses page ──
-    // Front: category tiles (Old Testament | New Testament). A category shows its books as chips (the numbered books, the minor prophets and a few
-    // small ones are one chip each) and then its verses as rows. A row: tap for the first words beside the reference, tap again for the whole verse,
-    // tap a third time to close. Hold it for the verse card. Swipe right (or tap the category tag) goes back to the front; tapping Verses does too.
-    const VL_RANGE = function(a, b) { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; };
-    const VL_CATS = [
-      { k: "History", ot: 1, books: VL_RANGE(0, 16) }, { k: "Prophets", ot: 1, books: VL_RANGE(22, 38) },
-      { k: "Poetry", ot: 1, books: [17, 18, 21] }, { k: "Wisdom", ot: 1, books: [19, 20] },
-      { k: "Gospels", ot: 0, books: VL_RANGE(39, 43) }, { k: "Churches", ot: 0, books: VL_RANGE(44, 52) },
-      { k: "Pastoral", ot: 0, books: VL_RANGE(53, 56) }, { k: "General", ot: 0, books: VL_RANGE(57, 65) }
-    ];
-    // one chip for several books: [label, first book, last book]
-    const VL_GROUPS = [["Law", 0, 4], ["Samuel", 8, 9], ["Kings", 10, 11], ["Chronicles", 12, 13], ["Ezra", 14, 15], ["Minor", 27, 38],
-      ["Corinthians", 45, 46], ["Thessalonians", 51, 52], ["Timothy", 53, 54], ["Titus", 55, 56], ["Peter", 59, 60], ["John", 61, 63]];
-    const VL_UNIT_OF = {}, VL_CAT_OF = {};
+    // Front: every book that has a verse, as one chip each, in Bible order (Old Testament, a line, New Testament). The numbered books, the minor prophets,
+    // Jeremiah with Lamentations, the Law and the History books (Joshua to Esther) are one chip each. Books with no verses are not shown.
+    // A chip opens that book's verses as rows. A row: tap for the first words beside the reference, tap again for the whole verse, tap a third time
+    // to close; hold shows the whole verse at once. Swipe right (or tap the tag in the search bar) goes back to the front; tapping Verses does too.
+    // one chip for several books: [label, first book, last book]; "wide" ones get a slightly different look
+    const VL_GROUPS = [["Law", 0, 4], ["History", 5, 16], ["Jeremiah", 23, 24], ["Minor", 27, 38],
+      ["Corinthians", 45, 46], ["Thessalonians", 51, 52], ["Timothy", 53, 54], ["Peter", 59, 60], ["1\u20133 John", 61, 63]];
+    const VL_WIDE = { "Law": 1, "History": 1, "Minor": 1 };
+    const VL_UNIT_OF = {};
     VL_GROUPS.forEach(function(g) { for (let i = g[1]; i <= g[2]; i++) VL_UNIT_OF[i] = "g:" + g[0]; });
-    VL_CATS.forEach(function(c) { c.books.forEach(function(i) { VL_CAT_OF[i] = c.k; }); });
     const VL_PEEK_WORDS = 3;
-    let vlCat = null, vlUnit = null, vlRowOpen = null, vlRowStage = 0, vlShownCat = null, vlSwipedAt = 0;
+    let vlCat = null, vlRowOpen = null, vlRowStage = 0, vlShownCat = null, vlSwipedAt = 0;   // vlCat = the chip that is open (a unit id), or null on the front
     const vlRowOf = {};
     const vlEl = function(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const vlIsBible = function(v) { return typeof v.p.book === "number" && v.p.book >= 0 && v.p.book < 66; };
-    function vlCatOf(v) { return vlIsBible(v) ? VL_CAT_OF[v.p.book] : "Other"; }
     function vlUnitOf(v) { return vlIsBible(v) ? (VL_UNIT_OF[v.p.book] || "b:" + v.p.book) : "x:" + v.p.name; }
-    // a unit's chip: label and where it sits in the category
+    // a unit's chip: label and where it sits in the Bible
     function vlUnitInfo(id) {
       if (id.indexOf("g:") === 0) { const g = VL_GROUPS.filter(function(x) { return "g:" + x[0] === id; })[0]; return { label: g[0], order: g[1] }; }
       if (id.indexOf("b:") === 0) { const i = parseInt(id.slice(2), 10), n = BIBLE_BOOKS[i][0]; return { label: n === "Song of Solomon" ? "Song of Sol." : n, order: i }; }
@@ -2543,59 +2530,39 @@
     }
     function vlSetBar() {
       document.getElementById("vbTok").style.display = vlCat ? "" : "none";
-      document.getElementById("vbTokName").textContent = vlCat ? "‹ " + vlCat : "";
+      document.getElementById("vbTokName").textContent = vlCat ? "\u2039 " + vlUnitInfo(vlCat).label : "";
       document.getElementById("vbSearchTxt").textContent = vlCat ? "Search" : "Search reference or words";
     }
     function vlToFront() {
-      vlCat = null; vlUnit = null; vlRowOpen = null;
-      renderVerseList();
-      document.getElementById("vlList").scrollTop = 0;
-    }
-    function vlPickCat(k) {
-      vlCat = k; vlUnit = null; vlRowOpen = null;
+      vlCat = null; vlRowOpen = null;
       renderVerseList();
       document.getElementById("vlList").scrollTop = 0;
     }
     function vlPickUnit(id) {
-      vlUnit = vlUnit === id ? null : id; vlRowOpen = null;
+      vlCat = id; vlRowOpen = null;
       renderVerseList();
+      document.getElementById("vlList").scrollTop = 0;
     }
     function vlFront(box, skeleton) {
-      const have = {};
-      if (!skeleton) vlVerses.forEach(function(v) { const c = vlCatOf(v); have[c] = (have[c] || 0) + 1; });
-      const two = vlEl("div", "vb-two");
-      [["Old Testament", 1, ""], ["New Testament", 0, " nt"]].forEach(function(g) {
-        const tiles = VL_CATS.filter(function(c) { return c.ot === g[1] && (skeleton || have[c.k]); });
-        if (!tiles.length) return;
-        const col = vlEl("div"); col.appendChild(vlEl("h4", null, g[0]));
-        const st = vlEl("div", "vb-stack");
-        tiles.forEach(function(c) {
-          const b = vlEl("button", "vb-ct" + g[2] + (skeleton ? " skel" : ""), c.k); b.type = "button";
-          if (!skeleton) b.onclick = function() { vlPickCat(c.k); };
-          st.appendChild(b);
-        });
-        col.appendChild(st); two.appendChild(col);
-      });
-      box.appendChild(two);
-      if (have.Other) { const o = vlEl("button", "vb-ct other", "Other"); o.type = "button"; o.onclick = function() { vlPickCat("Other"); }; box.appendChild(o); }
-    }
-    function vlCategory(box) {
-      const vs = vlVerses.filter(function(v) { return vlCatOf(v) === vlCat; });
-      if (!vs.length) { vlCat = null; vlSetBar(); vlFront(box, false); return; }
-      const seen = {}, units = [];
-      vs.forEach(function(v) { const id = vlUnitOf(v); if (!seen[id]) { seen[id] = 1; const u = vlUnitInfo(id); units.push({ id: id, label: u.label, order: u.order }); } });
+      const units = [], seen = {};
+      if (skeleton) { for (let i = 0; i < 24; i++) units.push({ id: "", label: "", order: i }); }
+      else vlVerses.forEach(function(v) { const id = vlUnitOf(v); if (!seen[id]) { seen[id] = 1; const u = vlUnitInfo(id); units.push({ id: id, label: u.label, order: u.order }); } });
       units.sort(function(a, b) { return a.order - b.order || (a.label < b.label ? -1 : 1); });
-      if (vlUnit && !seen[vlUnit]) vlUnit = null;
-      const wide = units.length >= 7 && units.length <= 8;   // seven or eight chips fit on two rows of four
-      const chips = vlEl("div", "vb-chips" + (wide ? " w4" : ""));
-      units.forEach(function(u) {
-        const c = vlEl("button", "vb-chip" + (u.id === vlUnit ? " sel" : "") + (u.label.length > (wide ? 8 : 11) ? " lg" : ""), u.label); c.type = "button";
-        c.onclick = function() { vlPickUnit(u.id); };
+      const chips = vlEl("div", "vb-chips");
+      units.forEach(function(u, i) {
+        const before = i > 0 ? units[i - 1].order : -1;
+        if (!skeleton && i > 0 && ((u.order >= 39 && before < 39) || (u.order >= 1000 && before < 1000))) chips.appendChild(vlEl("div", "vb-cut"));   // a line between Old and New Testament, and before custom books
+        const c = vlEl("button", "vb-chip" + (skeleton ? " skel" : "") + (VL_WIDE[u.label] ? " grp" : "") + (u.label.length > 12 ? " lg" : ""), u.label); c.type = "button";
+        if (!skeleton) c.onclick = function() { vlPickUnit(u.id); };
         chips.appendChild(c);
       });
       box.appendChild(chips);
+    }
+    function vlBook(box) {
+      const vs = vlVerses.filter(function(v) { return vlUnitOf(v) === vlCat; });
+      if (!vs.length) { vlCat = null; vlSetBar(); vlFront(box, false); return; }
       const rows = vlEl("div", "vb-rows");
-      vs.filter(function(v) { return !vlUnit || vlUnitOf(v) === vlUnit; }).forEach(function(v) { rows.appendChild(vlRow(v)); });
+      vs.forEach(function(v) { rows.appendChild(vlRow(v)); });
       box.appendChild(rows);
     }
     const vlKey = function(v) { return v.f + "|" + (v.v || ""); };
@@ -2675,7 +2642,7 @@
         box.appendChild(e);
         return;
       }
-      if (vlCat) vlCategory(box); else vlFront(box, false);
+      if (vlCat) vlBook(box); else vlFront(box, false);
       vlSetBar();
       vlShownCat = vlCat;
       if (same) box.scrollTop = keep;
@@ -2704,7 +2671,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-365';
+    const CLIENT_BUILD = 'sync-366';
 
     let queue = [];
     let currentIndex = 0;
