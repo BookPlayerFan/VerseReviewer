@@ -713,6 +713,10 @@
       color: var(--btn-pass-text); 
       font-size: 16px; 
     }
+    .btn-pass { position: relative; overflow: hidden; -webkit-touch-callout: none; }
+    .btn-pass > span:not(.climb-fill) { position: relative; z-index: 1; }
+    .climb-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; z-index: 0; pointer-events: none; background: color-mix(in srgb, var(--text-accent) 22%, transparent); }
+    .lvl-pill { display: inline-flex; align-items: center; gap: 5px; background: color-mix(in srgb, var(--text-accent) 14%, var(--bg-card)); color: var(--text-accent); border-radius: 999px; padding: 4px 10px; }
     .btn-pass.clear { background: var(--btn-restart-bg); color: var(--btn-restart-text); }   /* repeat cards: blue, like the New tab's Review button */
 
     .btn-pass.locked { opacity: 0.5; }                      /* New card waiting for its next unlock time: still tappable (shows the time); a Review card before anything is revealed: inert */
@@ -1303,6 +1307,7 @@
             <span class="shortcut-hint">[D]</span>
           </button>
           <button type="button" class="btn-pass" id="btnPass" onclick="scoreCard('Pass')">
+            <span class="climb-fill" aria-hidden="true"></span>
             <span id="btnPassText">Pass</span>
             <span class="shortcut-hint">[F]</span>
           </button>
@@ -2697,7 +2702,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-377';
+    const CLIENT_BUILD = 'sync-378';
 
     let queue = [];
     let currentIndex = 0;
@@ -2797,6 +2802,7 @@
       attachRevealHold();
       attachSwipe();
       attachRefHold();
+      attachClimbHold(document.getElementById("btnPass"));
       const tn = document.getElementById("tabNew");
       const heldTab = attachLongPress(tn, function() { addNewVerse(); });
       tn.addEventListener("click", function(e) { if (heldTab()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
@@ -4348,7 +4354,8 @@
       // right side: the level number on a Learn card; on Review a ring that fills as the deck is done, with the number of cards left in the middle (not on a repeat card); nothing on a Lock card
       let right = flag;
       if (!isNew && baseCount > 0 && currentIndex < baseCount) right = dayRing(baseCount - currentIndex, baseCount);
-      let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
+      const pillOn = lvlPill.until > Date.now() && mode === 'learning' && !!learningCard() && lvlPill.ref === learningCard().reference;   // a rebuild inside the 1.5 s the level notice shows keeps it
+      let html = `<div class="passage-toolbar"><span class="passage-status" data-base="${escapeHtml(status)}">${pillOn ? lvlPillHtml(lvlPill.L) : status}</span>${right ? `<span class="pt-right">${right}</span>` : ''}</div>`;
 
       html += '<div class="passage-stream">';
       // A reference learned in parts: each part is its own block with a bar down the left and its number, the part you are on in blue.
@@ -4542,6 +4549,57 @@
         const e2 = document.querySelector("#cardBody .passage-toolbar .passage-status");
         if (e2 && !peeking) swapLabel(e2, e2.getAttribute("data-base") || "");
       }, 1500);
+    }
+
+    // A held Review press that raised the level: the bar's left label becomes a small pill, "Level 3 · Every other", for a moment, then goes back to the verse.
+    const LVL_ARROW = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    let lvlPill = { L: 0, ref: "", until: 0 };
+    function lvlPillHtml(L) { return '<span class="lvl-pill">' + LVL_ARROW + "Level " + L + " \u00b7 " + HINT_NAMES[L] + "</span>"; }
+    function flashLevelUp(L) {
+      const card = learningCards[learningIndex];
+      lvlPill = { L: L, ref: card ? card.reference : "", until: Date.now() + 1500 };
+      const el = document.querySelector("#cardBody .passage-toolbar .passage-status"); if (!el) return;
+      clearTimeout(lvlFlashTimer);
+      el.style.opacity = 0;
+      setTimeout(function() { const e1 = document.querySelector("#cardBody .passage-toolbar .passage-status"); if (e1) { e1.innerHTML = lvlPillHtml(L); e1.style.opacity = 1; } }, 120);
+      lvlFlashTimer = setTimeout(function() {
+        const e2 = document.querySelector("#cardBody .passage-toolbar .passage-status");
+        if (e2 && !peeking) swapLabel(e2, e2.getAttribute("data-base") || "");
+      }, 1500);
+    }
+
+    // Hold the Review button on a Learn card: the button fills, and at the end that press is a Review that also raises the hint level by one. A tap is a plain Review.
+    // Its own timing (CLIMB_*), apart from the 350 ms of every other hold in the app. Not offered at level 5, on a step's last rep, or while the button is not open yet:
+    // there a press is just a Review.
+    const CLIMB_HOLD_MS = 400, CLIMB_FILL_DELAY_MS = 150;
+    function canClimb() {
+      if (mode !== 'learning' || isScoring || learnPending) return false;
+      const c = learningCard();
+      return !!(c && isLearnCard(c) && hasActiveCard() && !isLocked(c) && hintLevel < 5 && (c.dot || 1) < 7);
+    }
+    function attachClimbHold(btn) {
+      const fill = btn.querySelector(".climb-fill");
+      let t1 = null, t2 = null, sx = 0, sy = 0, fired = false;
+      function reset(fast) { clearTimeout(t1); clearTimeout(t2); t1 = t2 = null; fill.style.transition = fast ? "width .08s linear" : "none"; fill.style.width = "0"; }
+      btn.addEventListener("pointerdown", function(e) {
+        fired = false;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        if (!canClimb()) return;
+        sx = e.clientX; sy = e.clientY; reset(false);
+        document.body.classList.add("lp-active"); bindLongPressWindow();
+        t1 = setTimeout(function() { t1 = null; fill.style.transition = "width " + (CLIMB_HOLD_MS - CLIMB_FILL_DELAY_MS) + "ms linear"; fill.style.width = "100%"; }, CLIMB_FILL_DELAY_MS);
+        t2 = setTimeout(function() {
+          t2 = null; fired = true;
+          fill.style.transition = "none"; fill.style.width = "0";
+          if (!canClimb()) return;
+          pressLearning("press", true);
+        }, CLIMB_HOLD_MS);
+      });
+      btn.addEventListener("pointermove", function(e) { if (t2 && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) reset(true); });
+      ["pointerup", "pointercancel", "pointerleave"].forEach(function(n) { btn.addEventListener(n, function() { if (t2) reset(true); }); });
+      btn.addEventListener("click", function(e) { if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // the click after a hold is not a tap
+      btn.addEventListener("contextmenu", function(e) { if (t2 || fired) e.preventDefault(); });
+      btn.addEventListener("selectstart", function(e) { if (t2 || fired) e.preventDefault(); });
     }
 
     // Press and hold in the verse box is a peek; it never reveals anything and it ends when you let go.
@@ -4776,7 +4834,7 @@
     }
 
     // kind: 'press' (the button). 'skip' and 'again' (skip ahead, keep in Lock another day) are still understood here and on the server, but nothing on the page sends them now.
-    function pressLearning(kind) {
+    function pressLearning(kind, climb) {
       if (isScoring || learnPending) { if (kind === "press") tapBusy("btnPassText"); else if (kind === "miss") tapBusy("btnFailText"); return; }   // a tap that is ignored says so
       const card = learningCards[learningIndex];
       if (!card) return;
@@ -4787,9 +4845,10 @@
       learnPending = true;
       const promote = card.stage === 'lock' && card.lockPart === 'pm' && (kind === 'press');
       enqueueLearn({ ref: card.reference, action: kind, rep: card.rep, promote: promote, x: { h: card.stage === 'learn' ? hintLevel : 0, s: cardSeconds(), p: peekCount } });
-      // Every Review press on reps 2 to 6 of a step makes the next rep one hint level harder (never past 5). It adds one to whatever level you are on, so a level
-      // you changed yourself carries on from there. Rep 1 does not add, so reps 1 and 2 are both at the starting level; rep 7 ends the step (the next one starts at Full).
-      if (kind === 'press' && card.stage === 'learn' && (card.dot || 1) >= 2 && (card.dot || 1) <= 6 && hintLevel < 5) setHintLevel(hintLevel + 1, true);
+      // The hint level only goes up when you hold the Review button (see attachClimbHold): that press also makes the next rep one level harder. A tap leaves the level alone.
+      // (The rep itself was sent above at the level it was done at.)
+      let climbed = false;
+      if (climb && kind === 'press' && card.stage === 'learn' && (card.dot || 1) < 7 && hintLevel < 5) { setHintLevel(hintLevel + 1, true); climbed = true; }
       if (promote) {
         notePts(card.reference, textVerses(card.text, card.reference) * ptsOf(1), 1);      // a new card in Bronze: one Treasury point per verse
         // Promote: the card becomes a Bronze verse (the server confirms). Play the rank-up now and move on.
@@ -4835,6 +4894,7 @@
       } else {
         applyLearnCard(predictLearn(card, kind)); // show the next state at once; the server's answer replaces it
         rehideAfterPress(card);
+        if (climbed) flashLevelUp(hintLevel);   // after the card is rebuilt, so the notice is on the bar that stays
       }
     }
 
