@@ -349,8 +349,8 @@
     .pk-x b { font-weight: 700; }
     .pk-x small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 1px; }
     /* End of a list: a divider with "End" after the last row, always, so every list ends the same way; and a soft fade at the bottom edge while a scrolling list has more below. */
-    .end-mark { display: flex; align-items: center; gap: 10px; padding: 12px 14px 14px; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
-    .end-mark i { flex: 1; height: 1px; background: var(--border-card); }
+    .end-mark { display: flex; justify-content: center; align-items: center; gap: 7px; padding: 13px 0 15px; pointer-events: none; }
+    .end-mark i { display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); opacity: .7; }
     .scrolls::after { content: ""; display: block; position: sticky; bottom: 0; height: 30px; margin-top: -30px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--fade, var(--bg-card))); opacity: 0; transition: opacity .15s; }
     .scrolls.more::after { opacity: 1; }
     .fail-inner { --fade: var(--bg-body); }
@@ -2460,15 +2460,15 @@
     // One small icon per rank (coin, bar, gem cuts), drawn in the rank's color through currentColor.
     const RANK_ICON = {"0":"<polygon points=\"5,16 7,8 12,5 18,8 20,15 15,20 8,19\" fill=\"currentColor\"/><polygon points=\"7,8 12,5 18,8 12,11\" fill=\"#fff\" opacity=\".3\"/><polygon points=\"5,16 7,8 12,11 8,19\" fill=\"#000\" opacity=\".12\"/>","1":"<circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".5\" stroke-width=\"1.2\"/><circle cx=\"12\" cy=\"12\" r=\"6.6\" fill=\"none\" stroke=\"#000\" stroke-opacity=\".22\" stroke-width=\"1\"/><path d=\"M12 7.5 L13.2 10.6 L16.5 10.8 L13.9 12.8 L14.8 16 L12 14.2 L9.2 16 L10.1 12.8 L7.5 10.8 L10.8 10.6Z\" fill=\"#fff\" opacity=\".45\"/><path d=\"M5 8 A8.5 8.5 0 0 1 14 3.6\" stroke=\"#fff\" stroke-opacity=\".55\" stroke-width=\"1.5\" fill=\"none\" stroke-linecap=\"round\"/>","2":"<circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".6\" stroke-width=\"1.2\"/><circle cx=\"12\" cy=\"12\" r=\"6.6\" fill=\"none\" stroke=\"#000\" stroke-opacity=\".2\" stroke-width=\"1\"/><rect x=\"9.4\" y=\"9.4\" width=\"5.2\" height=\"5.2\" transform=\"rotate(45 12 12)\" fill=\"#fff\" opacity=\".45\"/><path d=\"M5 8 A8.5 8.5 0 0 1 14 3.6\" stroke=\"#fff\" stroke-opacity=\".65\" stroke-width=\"1.5\" fill=\"none\" stroke-linecap=\"round\"/>","3":"<polygon points=\"7,6 17,6 20,11 4,11\" fill=\"currentColor\"/><polygon points=\"7,6 17,6 20,11 4,11\" fill=\"#fff\" opacity=\".42\"/><polygon points=\"4,11 20,11 22,19 2,19\" fill=\"currentColor\"/><polygon points=\"4,11 20,11 22,19 2,19\" fill=\"#000\" opacity=\".08\"/><rect x=\"8\" y=\"13\" width=\"8\" height=\"3\" rx=\"1\" fill=\"#fff\" opacity=\".35\"/><polyline points=\"4,11 20,11\" stroke=\"#fff\" stroke-opacity=\".6\" stroke-width=\".8\"/>","4":"<polygon points=\"8,3 16,3 18,6 6,6\" fill=\"currentColor\"/><polygon points=\"8,3 16,3 18,6 6,6\" fill=\"#fff\" opacity=\".45\"/><polygon points=\"6,6 18,6 19,11 5,11\" fill=\"currentColor\"/><polygon points=\"3,12 21,12 23,16 1,16\" fill=\"currentColor\"/><polygon points=\"3,12 21,12 23,16 1,16\" fill=\"#fff\" opacity=\".32\"/><polygon points=\"1,16 23,16 23,21 1,21\" fill=\"currentColor\"/><polygon points=\"1,16 23,16 23,21 1,21\" fill=\"#000\" opacity=\".12\"/><polyline points=\"1,16 23,16\" stroke=\"#fff\" stroke-opacity=\".5\" stroke-width=\".8\"/>","5":"<ellipse cx=\"12\" cy=\"12\" rx=\"8.6\" ry=\"11\" fill=\"currentColor\"/><ellipse cx=\"12\" cy=\"12\" rx=\"5.6\" ry=\"7.6\" fill=\"#fff\" opacity=\".16\"/><ellipse cx=\"12\" cy=\"12\" rx=\"5.6\" ry=\"7.6\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".5\" stroke-width=\".8\"/><path d=\"M12 4.4 L12 19.6 M6.4 12 L17.6 12\" stroke=\"#fff\" stroke-opacity=\".3\" stroke-width=\".7\"/><path d=\"M7 7 Q8 4.8 11 4.4\" stroke=\"#fff\" stroke-opacity=\".75\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/>","6":"<polygon points=\"7,2 17,2 22,7 22,17 17,22 7,22 2,17 2,7\" fill=\"currentColor\"/><polygon points=\"9,6 15,6 18,9 18,15 15,18 9,18 6,15 6,9\" fill=\"#fff\" opacity=\".16\"/><polygon points=\"9,6 15,6 18,9 18,15 15,18 9,18 6,15 6,9\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".55\" stroke-width=\".8\"/><polygon points=\"7,2 17,2 15,6 9,6\" fill=\"#fff\" opacity=\".28\"/><rect x=\"9.5\" y=\"9.5\" width=\"5\" height=\"5\" fill=\"#000\" opacity=\".12\"/>","7":"<rect x=\"2.5\" y=\"2.5\" width=\"19\" height=\"19\" rx=\"6\" fill=\"currentColor\"/><path d=\"M5 5 L9.6 9.6 M19 5 L14.4 9.6 M5 19 L9.6 14.4 M19 19 L14.4 14.4\" stroke=\"#fff\" stroke-opacity=\".45\" stroke-width=\".9\"/><rect x=\"8.6\" y=\"8.6\" width=\"6.8\" height=\"6.8\" rx=\"2\" fill=\"#fff\" opacity=\".2\"/><rect x=\"8.6\" y=\"8.6\" width=\"6.8\" height=\"6.8\" rx=\"2\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".55\" stroke-width=\".8\"/><path d=\"M5.2 8 Q6 5.2 9 4.6\" stroke=\"#fff\" stroke-opacity=\".75\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/>","8":"<polygon points=\"6,3 18,3 23,9 12,22 1,9\" fill=\"currentColor\"/><polygon points=\"6,3 18,3 15,9 9,9\" fill=\"#fff\" opacity=\".38\"/><polygon points=\"1,9 9,9 12,22\" fill=\"#000\" opacity=\".14\"/><polygon points=\"23,9 15,9 12,22\" fill=\"#fff\" opacity=\".12\"/><polyline points=\"1,9 23,9\" stroke=\"#fff\" stroke-opacity=\".55\" stroke-width=\".8\" fill=\"none\"/>"};
     // The end-of-list cues (see .end-mark): marks a scrolling element as scrolling or not, and fades its bottom edge while there is more below.
-    // label: the text after the last row ("End \u00b7 14 references"); null for only the fade.
+    // label: read out by screen readers for the three dots after the last row ("End \u00b7 14 references"); null for only the fade.
     function endCue(el, label) {
       if (!el) return;
       let m = null;
       for (let i = el.children.length - 1; i >= 0 && !m; i--) if (el.children[i].classList.contains("end-mark")) m = el.children[i];
       if (label === null) { if (m) m.remove(); }
       else {
-        if (!m) { m = document.createElement("div"); m.className = "end-mark"; m.appendChild(document.createElement("i")); m.appendChild(document.createElement("span")); m.appendChild(document.createElement("i")); }
-        m.children[1].textContent = label;
+        if (!m) { m = document.createElement("div"); m.className = "end-mark"; for (let k = 0; k < 3; k++) m.appendChild(document.createElement("i")); }
+        m.setAttribute("aria-label", label);   // three dots to look at; the count is for screen readers
         if (el.lastElementChild !== m) el.appendChild(m);
       }
       const upd = function() {
@@ -2644,7 +2644,11 @@
       if (open) {
         const txt = !ws.length ? "No text saved for this verse." : peekOnly ? ws.slice(0, VL_PEEK_WORDS).join(" ") + (ws.length > VL_PEEK_WORDS ? " \u2026" : "") : ws.join(" ");
         const qt = keepQt || vlEl("span", "vr-qt");
-        if (qt.textContent !== txt) qt.textContent = txt;
+        if (!peekOnly && ws.length > VL_PEEK_WORDS) {   // the whole verse: the peek's words, then the rest in its own span so it can fade in
+          const hd = ws.slice(0, VL_PEEK_WORDS).join(" ");
+          if (qt.firstChild && qt.firstChild.nodeType === 3 && qt.firstChild.data === hd && qt.querySelector(".vr-tl")) { /* already built */ }
+          else { qt.textContent = hd + " "; qt.appendChild(vlEl("span", "vr-tl", ws.slice(VL_PEEK_WORDS).join(" "))); }
+        } else if (qt.textContent !== txt || qt.querySelector(".vr-tl")) qt.textContent = txt;
         if (!peekOnly) b.appendChild(document.createTextNode(" "));   // a space between the reference and the verse, as in a line of text
         b.appendChild(qt);
         if (peekOnly && dated) b.appendChild(vlEl("span", "vr-nx" + (d <= 0 ? " now" : ""), dueText(d)));   // a peek: the next review on the right; the whole verse: nothing on the right
@@ -2661,7 +2665,7 @@
       while (sc && sc !== document.body && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
       return sc && sc !== document.body ? sc : null;
     }
-    const VR_EASE_MS = 200;
+    const VR_EASE_MS = 260, VR_EASE = "cubic-bezier(.25,.8,.25,1)";
     function vrUpdate(box, tapKey, prevKey) {
       const c = vrCtl(box), o = c.rows[tapKey] && c.rows[tapKey].w, t0 = o ? o.getBoundingClientRect().top : null;
       const grow = [prevKey, tapKey].filter(Boolean).map(function(k) { const e = c.rows[k] && c.rows[k].w; return e ? { e: e, h0: e.getBoundingClientRect().height } : null; }).filter(Boolean);
@@ -2680,15 +2684,25 @@
       moving.forEach(function(g) {
         const h1 = g.e.getBoundingClientRect().height;
         g.e.style.overflow = "hidden";
-        const an = g.e.animate([{ height: g.h0 + "px" }, { height: h1 + "px" }], { duration: VR_EASE_MS, easing: "ease" });
+        const an = g.e.animate([{ height: g.h0 + "px" }, { height: h1 + "px" }], { duration: VR_EASE_MS, easing: VR_EASE });
         an.onfinish = an.oncancel = function() { g.e.style.overflow = ""; };
+        // what appears fades in as the row opens (the rest of the verse; the icon or date of a row that closes), so nothing pops
+        const tl = g.e.querySelector(".vr-tl");
+        if (tl) tl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: VR_EASE_MS - 40, delay: 70, easing: "ease-out", fill: "backwards" });
+        else if (!g.e.classList.contains("open")) Array.prototype.slice.call(g.e.firstChild.children, 1).forEach(function(n) { n.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, delay: 60, easing: "ease-out", fill: "backwards" }); });
       });
       const tok = c.animTok = (c.animTok || 0) + 1;
+      let tt = t0;
       (function frame() {
         if (c.animTok !== tok) return;
-        const d = o.getBoundingClientRect().top - t0;
+        const d = o.getBoundingClientRect().top - tt;
         if (sc && Math.abs(d) > 0.5) sc.scrollTop += d;
-        if (performance.now() - t1 < VR_EASE_MS + 40) requestAnimationFrame(frame); else vrReveal(box, o);   // then, if the verse runs past the list's bottom, bring it into view
+        if (sc && o.classList.contains("open")) {   // as the verse grows its bottom edge is kept in view (never past its own top), in the same motion, not as a second scroll afterwards
+          const bb = sc.getBoundingClientRect(), rb = o.getBoundingClientRect();
+          const by = Math.min(rb.bottom - bb.bottom, rb.top - bb.top);
+          if (by > 0.5) { const y0 = rb.top; sc.scrollTop += by; tt -= y0 - o.getBoundingClientRect().top; }
+        }
+        if (performance.now() - t1 < VR_EASE_MS + 40) requestAnimationFrame(frame); else vrReveal(box, o);   // finally, if it still runs past the bottom, bring it into view
       })();
     }
     // An opened verse that runs past the bottom of its list scrolls up just far enough to be seen in full (never past its own top).
@@ -2742,6 +2756,7 @@
         return;
       }
       if (vlCat) vlBook(box); else vlFront(box, false);
+      if (vlCat) { const n = box.querySelectorAll(".vr").length; endCue(box, n ? "End \u00b7 " + n + (n === 1 ? " verse" : " verses") : null); } else endCue(box, null);
       vlSetBar();
       vlShownCat = vlCat;
       if (same) box.scrollTop = keep;
@@ -2770,7 +2785,7 @@
     const SETTLE_TIMEOUT_MS = 15000;
     const POLL_MS = 30000;   // the focus, visibility, page-show and touch checks keep it feeling instant; this is only the idle backstop
     const TOUCH_SYNC_GAP_MS = 8000;
-    const CLIENT_BUILD = 'sync-389';
+    const CLIENT_BUILD = 'sync-390';
 
     let queue = [];
     let currentIndex = 0;
