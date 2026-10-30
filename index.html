@@ -120,6 +120,9 @@
 
   <script>
     var APP_URL = "https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec";
+    // 3.10 direct mode (native plan step 2): the app runs straight in this page (no Google frames); its page comes from the server's front door and is kept
+    // in this phone's database, and every call it makes goes through the front door. Off here; the VR Beta copy of this page (built from this file) has it on.
+    var DIRECT = false;
 
     // Optional access key: only used if you add a VR_KEY script property in Apps Script.
     // It is stored on this device only, never in this public file.
@@ -245,14 +248,96 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.9";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-37";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.10";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-38";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
       return { type: "VR_SHELL", sv: SHELL_BUILD, ver: SHELL_VERSION, wl: loadWaitLog(), ws: loadWaits(), first: first, key: key, works: works, vl: loadVl(), pills: loadPills(), updated: updated || null, db: dbInfo };
     }
+    // ───── direct mode ─────
+    // One call through the front door: POST {op:'api', key, name, args} as plain text (no "may I" round first). Resolves with the result.
+    function directCall(name, args) {
+      var key = ""; try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
+      return fetch(APP_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
+        body: JSON.stringify({ op: "api", key: key, name: name, args: Array.isArray(args) ? args : [] }) })
+        .then(function(r) { return r.text(); })
+        .then(function(t) {
+          var j = null; try { j = JSON.parse(t); } catch (e) {}
+          if (!j) throw new Error("The server sent something unexpected.");
+          if (!j.ok) { var er = new Error(j.error || "The server refused."); er.auth = /Access key/.test(j.error || ""); throw er; }
+          return j.result;
+        });
+    }
+    window.directCall = directCall;
+    // The app only ever calls the server through google.script.run (its srv() wraps it); here that is a small stand-in sending each call through directCall.
+    var DIRECT_SHIM = '<script>(function(){var P=window.parent;function run(s,f){var o={withSuccessHandler:function(h){return run(h,f);},withFailureHandler:function(h){return run(s,h);},withUserObject:function(){return o;},' +
+      'api:function(k,name,args){P.directCall(name,args).then(function(r){if(s)s(r);},function(e){if(f)f(e);});}};return o;}window.google={script:{run:run(null,null)}};window.__vrDirect=1;})();<\/script>';
+    function directPrepare(html) {
+      var head = /<head[^>]*>/i;
+      var add = DIRECT_SHIM + (/name=["']viewport/i.test(html) ? "" : '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">');
+      return head.test(html) ? html.replace(head, function(m) { return m + add; }) : add + html;
+    }
+    var directShown = false, directTouched = false;
+    function directShow(page) {
+      var f = document.getElementById("appFrame");
+      directShown = true; directTouched = false;
+      f.onload = function() { try { ["pointerdown", "keydown"].forEach(function(ev) { f.contentWindow.addEventListener(ev, function() { directTouched = true; }, { capture: true, once: true }); }); } catch (e) {} };
+      f.removeAttribute("src");
+      f.srcdoc = directPrepare(page.html);
+    }
+    // Opening: the saved app page at once, with today's saved deck when there is one (or with no deck, and the app loads it itself); then the fresh page and
+    // session from the server, which take its place unless you have started using it. 3.10: the server sends the page and the session apart ("parts").
+    function localDay() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+    function bootJson(sessionJson) {   // the app's BOOT, as the server writes it (the key comes from this phone)
+      var key = ""; try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
+      return '{"boot":1,"key":' + JSON.stringify(key) + ',"session":' + (sessionJson || "null") + '}';
+    }
+    function composePage(tpl, sessionJson) {
+      var j = bootJson(sessionJson).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+      return { html: tpl.replace(/<\?!=\s*initialSessionJson\s*\?>/, function() { return j; }) };
+    }
+    function directLoad() {
+      directShown = false;
+      var saved = Promise.all([VRDB.get("app"), VRDB.get("session")]).then(function(r) {
+        var p = r[0], ss = r[1];
+        if (p && !directShown) {
+          if (p.tpl) directShow(composePage(p.tpl, ss && ss.day === localDay() && ss.s ? JSON.stringify(ss.s) : null));
+          else if (p.html) directShow(p);   // a page saved before 3.10
+        }
+        return p;
+      }, function() { return null; });
+      directCall("appPage", ["parts"]).then(function(r) {
+        var page;
+        if (r && r.tpl) {
+          VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
+          try { var b = JSON.parse(r.boot); if (b && b.session) VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } catch (e) {}
+          page = composePage(r.tpl, (function() { try { var b = JSON.parse(r.boot); return b && b.session ? JSON.stringify(b.session) : null; } catch (e) { return null; } })());
+        } else {   // an older server: the whole page
+          page = { html: r.html };
+          VRDB.set("app", { html: r.html, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
+        }
+        saved.then(function() { if (!directShown || !directTouched) directShow(page); });
+      }).catch(function(e) {
+        saved.then(function(p) {
+          if (directShown) return;   // the saved page is up and retries the server itself
+          if (e && e.auth) { askKey(); return; }
+          dismissSplash();
+          if (window.confirm("Couldn't reach the server: " + (e && e.message || e) + "\n\nTry again?")) directLoad();
+        });
+      });
+    }
+    function askKey() {
+      hideEarly();
+      dismissSplash();
+      var entered = window.prompt("Enter your access key");
+      if (entered) {
+        try { localStorage.setItem("vr_key", entered.trim()); } catch (err) {}
+        loadApp();
+      }
+    }
     function loadApp() {
+      if (DIRECT) { directLoad(); return; }
       var key = "";
       try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
       // The changing "_" part only exists so the phone cannot reuse an old copy of the app; the server ignores it.
@@ -424,7 +509,8 @@
       for (var k = 0; k < 5 && w; k++) { if (w === app) return true; if (w === w.parent) return false; w = w.parent; }
       return false;
     }
-    function isAppOrigin(o) { return /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(String(o)); }
+    function isAppOrigin(o) { return (DIRECT && o === location.origin) || /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(String(o)); }
+
 
     function todayKey() {
       var d = new Date();
@@ -659,6 +745,9 @@
         try { e.source.postMessage({ type: "VR_WAKEINFO", wk: wakeInfo() }, appOrigin); } catch (err) {}
       } else if (d.type === 'VR_BUSY') {
         appBusy = !!d.b;
+      } else if (d.type === 'VR_SESSION') {
+        // 3.10 instant deck: the app's current session (sent only when every save has landed), for the next open (direct mode only)
+        if (DIRECT && d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now() }).catch(function() {});
       } else if (d.type === 'VR_OUTBOX') {
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
@@ -671,13 +760,7 @@
         hideEarly();
         dismissSplash();
       } else if (d.type === 'VR_AUTH_REQUIRED') {
-        hideEarly();
-        dismissSplash();
-        var entered = window.prompt("Enter your access key");
-        if (entered) {
-          try { localStorage.setItem("vr_key", entered.trim()); } catch (err) {}
-          loadApp();
-        }
+        askKey();
       }
     });
 
