@@ -31,6 +31,8 @@
 </div>
 <button id="go" type="button">Test connection</button>
 <div class="card" id="out"></div>
+<button id="upd" type="button" style="background:transparent;color:var(--acc);border:1px solid var(--line)">Check the test server for updates</button>
+<div class="card" id="updOut" style="display:none"></div>
 <p class="note" id="foot"></p>
 <script>
   // The test copy's web app (its own deployment; holds no secret on its own).
@@ -74,6 +76,33 @@
     }).catch(function(e) {
       conn.textContent = "no (" + (e && e.message || e) + ")"; conn.className = "bad"; sp.textContent = "—";
     }).then(function() { btn.disabled = false; btn.textContent = "Test again"; document.getElementById("foot").textContent = "Screenshot this and send it to Claude."; });
+  };
+  // The test copy updates itself from your private repo the same way the real app does (its updater needs GH_TOKEN and DEPLOYMENT_ID in its Script Properties).
+  var updOut = document.getElementById("updOut"), updBtn = document.getElementById("upd"), latestSha = "";
+  function urow(label, value, cls) { var keep = out; out = updOut; var b = row(label, value, cls); out = keep; return b; }
+  updBtn.onclick = function() {
+    if (!key()) { document.getElementById("keyBox").style.display = "block"; return; }
+    updBtn.disabled = true;
+    if (latestSha) {   // second tap: install
+      updBtn.textContent = "Installing\u2026 (about 30 s)";
+      call("installUpdate", [latestSha]).then(function(a) {
+        var r = a.j && a.j.ok ? a.j.result : null;
+        urow("Install", r && r.ok ? "done \u00b7 " + (r.version ? "version " + r.version : "") : ((r && r.message) || (a.j && a.j.error) || ("HTTP " + a.status)), r && r.ok ? "ok" : "bad");
+      }).catch(function(e) { urow("Install", String(e && e.message || e), "bad"); })
+        .then(function() { latestSha = ""; updBtn.disabled = false; updBtn.textContent = "Check the test server for updates"; });
+      return;
+    }
+    updOut.textContent = ""; updOut.style.display = "block"; updBtn.textContent = "Checking\u2026";
+    call("updaterStatus", [true]).then(function(a) {
+      var r = a.j && a.j.ok ? a.j.result : null;
+      if (!r) { urow("Updates", (a.j && a.j.error) || ("HTTP " + a.status), "bad"); return; }
+      if (!r.ok) { urow("Updates", r.message || "?", "bad"); return; }
+      urow("Updates from", r.src === "private" ? "private repo" : "public repo (GH_TOKEN not saved in the copy)", r.src === "private" ? "ok" : "bad");
+      urow("Installed", r.installed ? (r.installed.ver || r.installed.sha) : "unknown");
+      urow("Newest", (r.latest.ver || r.latest.short), r.upToDate ? "ok" : "");
+      if (!r.upToDate) { latestSha = r.latest.sha; updBtn.textContent = "Install " + (r.latest.ver || r.latest.short) + " on the test server"; }
+    }).catch(function(e) { urow("Updates", String(e && e.message || e), "bad"); })
+      .then(function() { updBtn.disabled = false; if (!latestSha) updBtn.textContent = "Check the test server for updates"; });
   };
   if (!key()) document.getElementById("keyBox").style.display = "block";
 </script>
