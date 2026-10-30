@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>VR Beta</title>
+<style>
+  :root { --bg: #f4f5f7; --card: #fff; --fg: #1f2328; --mut: #5f6368; --line: #e3e5e8; --ok: #188038; --bad: #c5221f; --acc: #1a73e8; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121212; --card: #1e1f22; --fg: #e8eaed; --mut: #9aa0a6; --line: #34363a; --ok: #5bb974; --bad: #f28b82; --acc: #8ab4f8; color-scheme: dark; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  h1 { font-size: 24px; margin: 4px 0 4px; } p.sub { margin: 0 0 16px; color: var(--mut); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; } .row span:first-child { color: var(--mut); } .row span:last-child { text-align: right; font-weight: 600; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  button { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: var(--acc); color: #fff; font: 700 16px -apple-system, sans-serif; margin-bottom: 14px; }
+  @media (prefers-color-scheme: dark) { button { color: #15161a; } }
+  input { width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); margin: 6px 0 12px; }
+  .note { color: var(--mut); font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>VR Beta</h1>
+<p class="sub">Connection test for the test copy of your sheet. Nothing here touches your real reviews.</p>
+<div id="keyBox" class="card" style="display:none;padding:12px 14px">
+  <div>Access key (the same VR_KEY as the test copy)</div>
+  <input id="keyIn" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="note">Kept on this phone only.</div>
+</div>
+<button id="go" type="button">Test connection</button>
+<div class="card" id="out"></div>
+<p class="note" id="foot"></p>
+<script>
+  // The test copy's web app (its own deployment; holds no secret on its own).
+  var TEST_URL = "https://script.google.com/macros/s/AKfycbwVa9nlRY4PWJDLNB6tE0ZaeGPTJthu8bQ5cerEySfFXYqH3zjDdGsbfSoov0gLN-5o/exec";
+  var out = document.getElementById("out");
+  function key() { try { return localStorage.getItem("vr_beta_key") || localStorage.getItem("vr_key") || ""; } catch (e) { return ""; } }
+  function row(label, value, cls) { var r = document.createElement("div"); r.className = "row"; var a = document.createElement("span"), b = document.createElement("span"); a.textContent = label; b.textContent = value; if (cls) b.className = cls; r.appendChild(a); r.appendChild(b); out.appendChild(r); return b; }
+  // One call through the server's front door: POST {op:'api', key, name, args} sent as plain text (so the browser sends it straight away).
+  function call(name, args) {
+    var t0 = Date.now();
+    return fetch(TEST_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ op: "api", key: key(), name: name, args: args || [] }), redirect: "follow" })
+      .then(function(r) { return r.text().then(function(t) { var j = null; try { j = JSON.parse(t); } catch (e) {} return { status: r.status, j: j, raw: t, ms: Date.now() - t0 }; }); });
+  }
+  function dbCount() {   // the phone's database the home-screen page keeps (same site, so this page can read it)
+    return new Promise(function(res) {
+      try {
+        var r = indexedDB.open("vr");
+        r.onsuccess = function() { var d = r.result; if (!d.objectStoreNames.contains("verses")) { d.close(); res("empty (not made yet)"); return; }
+          var c = d.transaction("verses").objectStore("verses").count(); c.onsuccess = function() { res(c.result + " verses"); d.close(); }; c.onerror = function() { res("could not read"); }; };
+        r.onerror = function() { res("refused (" + (r.error && r.error.name) + ")"); };
+      } catch (e) { res("not available"); }
+    });
+  }
+  document.getElementById("go").onclick = function() {
+    var ki = document.getElementById("keyIn");
+    if (!key()) { if (ki.value.trim()) { try { localStorage.setItem("vr_beta_key", ki.value.trim()); } catch (e) {} } else { document.getElementById("keyBox").style.display = "block"; ki.focus(); return; } }
+    out.textContent = ""; var btn = this; btn.disabled = true; btn.textContent = "Testing…";
+    var conn = row("Reaches the test server", "…"), sp = row("First answer", "…"), sp2 = row("Second answer", "…"), ver = row("Test server", "…"), cards = row("Today's deck (test sheet)", "…"), db = row("Phone database", "…");
+    dbCount().then(function(t) { db.textContent = t; });
+    call("checkSession", [0, ""]).then(function(a) {
+      sp.textContent = (a.ms / 1000).toFixed(1) + " s";
+      if (!a.j) { conn.textContent = "no (HTTP " + a.status + ")"; conn.className = "bad"; ver.textContent = a.raw ? "an older version (no front door yet)" : "—"; return; }
+      if (a.j.ok === false && /Wrong key|Nothing saved/.test(a.j.message || "")) { conn.textContent = "yes"; conn.className = "ok"; ver.textContent = "older than 3.8 (install 3.8 in the copy)"; ver.className = "bad"; return; }
+      if (!a.j.ok) { conn.textContent = "yes, but refused"; conn.className = "bad"; ver.textContent = a.j.error || "?"; return; }
+      conn.textContent = "yes"; conn.className = "ok"; ver.textContent = a.j.srv || "?";
+      return call("loadSession", []).then(function(b) {
+        sp2.textContent = (b.ms / 1000).toFixed(1) + " s";
+        if (b.j && b.j.ok && b.j.result) { var r = b.j.result; cards.textContent = (Array.isArray(r.cards) ? r.cards.length : 0) + " review · " + (Array.isArray(r.learning) ? r.learning.length : 0) + " learning"; cards.className = "ok"; }
+        else cards.textContent = (b.j && b.j.error) || ("HTTP " + b.status);
+      });
+    }).catch(function(e) {
+      conn.textContent = "no (" + (e && e.message || e) + ")"; conn.className = "bad"; sp.textContent = "—";
+    }).then(function() { btn.disabled = false; btn.textContent = "Test again"; document.getElementById("foot").textContent = "Screenshot this and send it to Claude."; });
+  };
+  if (!key()) document.getElementById("keyBox").style.display = "block";
+</script>
+</body>
+</html>
