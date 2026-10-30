@@ -1,21 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="color-scheme: light dark;">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fa">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
 <meta name="apple-mobile-web-app-title" content="VR Beta">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <title>VR Beta</title>
 <style>
-  :root { --bg: #f4f5f7; --fg: #1f2328; --mut: #5f6368; --line: #e3e5e8; --acc: #1a73e8; --card: #fff; color-scheme: light; }
+  :root { --bg: #f8f9fa; --fg: #1f2328; --mut: #5f6368; --line: #e3e5e8; --acc: #1a73e8; --card: #fff; color-scheme: light; }
   @media (prefers-color-scheme: dark) { :root { --bg: #121212; --fg: #e8eaed; --mut: #9aa0a6; --line: #34363a; --acc: #8ab4f8; --card: #1e1f22; color-scheme: dark; } }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-  #app { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--bg); }
+  * { box-sizing: border-box; }
+  /* sized exactly as the real home-screen page sizes the app (the same settings, so the app fills the screen the same way) */
+  html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; position: fixed; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+    background: var(--bg); color: var(--fg); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #app { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; border: 0; outline: none; display: none; background: var(--bg); }
   #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
   #splash img { width: 84px; height: 84px; border-radius: 20px; }
   #splash .t { font-size: 20px; font-weight: 800; }
@@ -25,8 +31,9 @@
   #keyBox button, #retry { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background: var(--acc); color: #fff; font: 700 16px -apple-system, sans-serif; }
   #retry { display: none; max-width: 320px; }
   @media (prefers-color-scheme: dark) { #keyBox button, #retry { color: #15161a; } }
-  #badge { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 2px); font: 700 10px -apple-system, sans-serif; letter-spacing: .8px;
-    color: #15161a; background: #f59e0b; border-radius: 999px; padding: 2px 8px; opacity: .85; pointer-events: none; display: none; }
+  /* a small tag in the top corner, clear of the card's title and the tab bar */
+  #badge { position: fixed; z-index: 5; top: 4px; right: 6px; font: 800 9px -apple-system, sans-serif; letter-spacing: .8px;
+    color: #15161a; background: #f59e0b; border-radius: 999px; padding: 2px 7px; opacity: .9; pointer-events: none; display: none; }
 </style>
 </head>
 <body>
@@ -43,7 +50,7 @@
   <a href="test.html" style="color:var(--acc);font-size:13px;margin-top:8px">Connection test and test-server updates</a>
 </div>
 <iframe id="app" title="VR Beta"></iframe>
-<div id="badge">BETA · TEST SHEET</div>
+<div id="badge">BETA</div>
 <script>
   // VR Beta (native plan, step 2): the app itself, running straight in this page instead of inside Google's frames, against the TEST copy of the sheet.
   // The app page comes from the test server's front door (appPage) and is kept in this phone's database, so the next open shows it at once; its calls to
