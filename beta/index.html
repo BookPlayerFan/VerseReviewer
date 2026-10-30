@@ -250,7 +250,7 @@
       return { build: now.b, srv: now.s };
     }
     var SHELL_VERSION = "3.10";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-38";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_BUILD = "shell-39";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vrb_first")) || 0; key = !!localStorage.getItem("vrb_key"); works = true; } catch (e) {}
