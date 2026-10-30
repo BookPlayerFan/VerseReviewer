@@ -1,0 +1,12 @@
+{
+  "name": "VR Beta",
+  "short_name": "VR Beta",
+  "start_url": "https://bookplayerfan.github.io/VerseReviewer/beta/",
+  "scope": "https://bookplayerfan.github.io/VerseReviewer/beta/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    { "src": "https://bookplayerfan.github.io/VerseReviewer/beta/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
