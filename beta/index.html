@@ -287,13 +287,37 @@
       f.removeAttribute("src");
       f.srcdoc = directPrepare(page.html);
     }
-    // Opening: the saved app page at once (if any), and the fresh one from the server, which takes its place unless you have started using the saved one.
+    // Opening: the saved app page at once, with today's saved deck when there is one (or with no deck, and the app loads it itself); then the fresh page and
+    // session from the server, which take its place unless you have started using it. 3.10: the server sends the page and the session apart ("parts").
+    function localDay() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+    function bootJson(sessionJson) {   // the app's BOOT, as the server writes it (the key comes from this phone)
+      var key = ""; try { key = localStorage.getItem("vrb_key") || ""; } catch (e) {}
+      return '{"boot":1,"key":' + JSON.stringify(key) + ',"session":' + (sessionJson || "null") + '}';
+    }
+    function composePage(tpl, sessionJson) {
+      var j = bootJson(sessionJson).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+      return { html: tpl.replace(/<\?!=\s*initialSessionJson\s*\?>/, function() { return j; }) };
+    }
     function directLoad() {
       directShown = false;
-      var saved = VRDB.get("app").then(function(p) { if (p && p.html && !directShown) directShow(p); return p; }, function() { return null; });
-      directCall("appPage", []).then(function(r) {
-        var page = { html: r.html, at: Date.now(), srv: r.srv, ver: r.ver };
-        VRDB.set("app", page).catch(function() {});
+      var saved = Promise.all([VRDB.get("app"), VRDB.get("session")]).then(function(r) {
+        var p = r[0], ss = r[1];
+        if (p && !directShown) {
+          if (p.tpl) directShow(composePage(p.tpl, ss && ss.day === localDay() && ss.s ? JSON.stringify(ss.s) : null));
+          else if (p.html) directShow(p);   // a page saved before 3.10
+        }
+        return p;
+      }, function() { return null; });
+      directCall("appPage", ["parts"]).then(function(r) {
+        var page;
+        if (r && r.tpl) {
+          VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
+          try { var b = JSON.parse(r.boot); if (b && b.session) VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } catch (e) {}
+          page = composePage(r.tpl, (function() { try { var b = JSON.parse(r.boot); return b && b.session ? JSON.stringify(b.session) : null; } catch (e) { return null; } })());
+        } else {   // an older server: the whole page
+          page = { html: r.html };
+          VRDB.set("app", { html: r.html, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
+        }
         saved.then(function() { if (!directShown || !directTouched) directShow(page); });
       }).catch(function(e) {
         saved.then(function(p) {
@@ -722,6 +746,9 @@
         try { e.source.postMessage({ type: "VR_WAKEINFO", wk: wakeInfo() }, appOrigin); } catch (err) {}
       } else if (d.type === 'VR_BUSY') {
         appBusy = !!d.b;
+      } else if (d.type === 'VR_SESSION') {
+        // 3.10 instant deck: the app's current session (sent only when every save has landed), for the next open (direct mode only)
+        if (DIRECT && d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now() }).catch(function() {});
       } else if (d.type === 'VR_OUTBOX') {
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
