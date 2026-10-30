@@ -290,20 +290,24 @@
     // Opening: the saved app page at once, with today's saved deck when there is one (or with no deck, and the app loads it itself); then the fresh page and
     // session from the server, which take its place unless you have started using it. 3.10: the server sends the page and the session apart ("parts").
     function localDay() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
-    function bootJson(sessionJson) {   // the app's BOOT, as the server writes it (the key comes from this phone)
+    function bootJson(sessionJson, pendJson) {   // the app's BOOT, as the server writes it (the key comes from this phone); pend: review saves still to send (3.10 step 3)
       var key = ""; try { key = localStorage.getItem("vrb_key") || ""; } catch (e) {}
-      return '{"boot":1,"key":' + JSON.stringify(key) + ',"session":' + (sessionJson || "null") + '}';
+      return '{"boot":1,"key":' + JSON.stringify(key) + ',"session":' + (sessionJson || "null") + (pendJson ? ',"pend":' + pendJson : '') + '}';
     }
-    function composePage(tpl, sessionJson) {
-      var j = bootJson(sessionJson).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+    function composePage(tpl, sessionJson, pendJson) {
+      var j = bootJson(sessionJson, pendJson).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
       return { html: tpl.replace(/<\?!=\s*initialSessionJson\s*\?>/, function() { return j; }) };
     }
     function directLoad() {
       directShown = false;
+      var savedPend = false;
       var saved = Promise.all([VRDB.get("app"), VRDB.get("session")]).then(function(r) {
         var p = r[0], ss = r[1];
+        // 3.10 step 3: saves still to send keep their deck even past midnight (they are sent on it first; the server then moves on to the new day)
+        savedPend = !!(ss && Array.isArray(ss.pend) && ss.pend.length);
+        var use = ss && ss.s && (ss.day === localDay() || savedPend);
         if (p && !directShown) {
-          if (p.tpl) directShow(composePage(p.tpl, ss && ss.day === localDay() && ss.s ? JSON.stringify(ss.s) : null));
+          if (p.tpl) directShow(composePage(p.tpl, use ? JSON.stringify(ss.s) : null, use && savedPend ? JSON.stringify(ss.pend) : null));
           else if (p.html) directShow(p);   // a page saved before 3.10
         }
         return p;
@@ -318,7 +322,8 @@
           page = { html: r.html };
           VRDB.set("app", { html: r.html, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
         }
-        saved.then(function() { if (!directShown || !directTouched) directShow(page); });
+        // the server's copy takes over unless you have started using the saved one, or saves made on the phone are still on their way (the phone is ahead)
+        saved.then(function() { if (!directShown || (!directTouched && !savedPend && !appBusy)) directShow(page); });
       }).catch(function(e) {
         saved.then(function(p) {
           if (directShown) return;   // the saved page is up and retries the server itself
@@ -748,7 +753,7 @@
         appBusy = !!d.b;
       } else if (d.type === 'VR_SESSION') {
         // 3.10 instant deck: the app's current session (sent only when every save has landed), for the next open (direct mode only)
-        if (DIRECT && d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now() }).catch(function() {});
+        if (DIRECT && d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now(), pend: Array.isArray(d.pend) ? d.pend.slice(0, 200) : [] }).catch(function() {});
       } else if (d.type === 'VR_OUTBOX') {
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
