@@ -248,8 +248,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.19";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-45";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.19.2";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-46";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -279,14 +279,16 @@
       return head.test(html) ? html.replace(head, function(m) { return m + add; }) : add + html;
     }
     var directShown = false, directTouched = false;
-    var freshDay = null, appFrameReady = null;
+    var freshDay = null, appFrameReady = null, appSavedSession = false;
     function sendFresh() {
-      if (!freshDay || !appFrameReady || directTouched || appBusy) return;
+      if (freshDay && (directTouched || appBusy)) { freshDay = null; return; }   // 3.19.2: in use: the app catches up by itself (a day kept for later could be older by then)
+      if (!freshDay || !appFrameReady) return;
       try { appFrameReady.postMessage({ type: "VR_FRESH", s: freshDay }, appOrigin); } catch (e) {}
       freshDay = null;
     }
     function directShow(page) {
       appFrameReady = null;
+      try { appSource = null; if (lastGo && Date.now() - lastGo.at < 15000 && !pendingGo) pendingGo = lastGo.tab; } catch (e) {}   // 3.19.2
       var f = document.getElementById("appFrame");
       directShown = true; directTouched = false;
       f.onload = function() { try { ["pointerdown", "keydown"].forEach(function(ev) { f.contentWindow.addEventListener(ev, function() { directTouched = true; }, { capture: true, once: true }); }); } catch (e) {} };
@@ -295,6 +297,7 @@
     }
     // Opening: the saved app page at once, with today's saved deck when there is one (or with no deck, and the app loads it itself); then the fresh page and
     // session from the server, which take its place unless you have started using it. 3.10: the server sends the page and the session apart ("parts").
+    function isoDay() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
     function localDay() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
     function bootJson(sessionJson, pendJson, localJson) {   // the app's BOOT, as the server writes it (the key comes from this phone); pend: review saves still to send (3.10 step 3); local: what the app needs to build a new day itself (3.11)
       var key = ""; try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
@@ -311,7 +314,7 @@
         var p = r[0], ss = r[1], rows = r[2];
         // 3.10 step 3: saves still to send keep their deck even past midnight (they are sent on it first; the server then moves on to the new day)
         savedPend = !!(ss && Array.isArray(ss.pend) && ss.pend.length);
-        var use = ss && ss.s && (ss.day === localDay() || savedPend);
+        var use = ss && ss.s && ((ss.day === localDay() && (!ss.s.date || ss.s.date === isoDay())) || savedPend);   // 3.19.2: and the day itself is today's (a copy saved just after midnight could still be yesterday's)
         // 3.11: a new day, nothing waiting, and the app said its copy of the verse list was complete: the app builds today's deck itself, at once
         var local = !use && ss && ss.s && ss.rowsOk === true && Array.isArray(rows) && rows.length && rows[0].dm !== undefined
           ? JSON.stringify({ rows: rows, prev: { learning: ss.s.learning || [], queue: ss.s.queue || [], build: ss.s.build, ver: ss.s.ver } }) : null;
@@ -325,7 +328,7 @@
         var page;
         if (r && r.tpl) {
           VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
-          try { var b = JSON.parse(r.boot); if (b && b.session) VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } catch (e) {}
+          try { var b = JSON.parse(r.boot); if (b && b.session && !appSavedSession && !savedPend) { b.session.skew = typeof b.session.serverNow === "number" ? b.session.serverNow - Date.now() : 0; b.session.savedAt = Date.now(); VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } } catch (e) {}   // 3.19.2
           page = composePage(r.tpl, (function() { try { var b = JSON.parse(r.boot); return b && b.session ? JSON.stringify(b.session) : null; } catch (e) { return null; } })());
         } else {   // an older server: the whole page
           page = { html: r.html };
@@ -446,7 +449,7 @@
     // The shell owns push because the service worker has to live on this site, not inside the Apps Script frame.
     var pushSource = null, pushOS = null;
     // A tapped push opens us with ?go=new or ?go=review; once the app is up we send it to that tab.
-    var pendingGo = null;
+    var pendingGo = null, lastGo = null;
     try {
       var qs = new URLSearchParams(location.search);
       var g = qs.get("go");
@@ -469,7 +472,7 @@
     function sendGoto(src) {
       appSource = src;
       if (!pendingGo) return;
-      var tab = pendingGo; pendingGo = null;
+      var tab = pendingGo; pendingGo = null; lastGo = { tab: tab, at: Date.now() };
       setTimeout(function() { try { src.postMessage({ type: "VR_GOTO", tab: tab }, appOrigin); } catch (e) {} }, 700);
     }
     // No icon badge: clear any leftover one when the app opens or comes back.
@@ -768,6 +771,7 @@
       } else if (d.type === 'VR_BUSY') {
         appBusy = !!d.b;
       } else if (d.type === 'VR_SESSION') {
+        appSavedSession = true;
         // 3.10 instant deck: the app's current session (sent only when every save has landed), for the next open (direct mode only)
         if (DIRECT && d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now(), pend: Array.isArray(d.pend) ? d.pend.slice(0, 200) : [], rowsOk: d.rowsOk === true }).catch(function() {});
       } else if (d.type === 'VR_OUTBOX') {
