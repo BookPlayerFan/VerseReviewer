@@ -248,8 +248,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.15";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-43";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.16";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-44";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -436,7 +436,7 @@
     try {
       var qs = new URLSearchParams(location.search);
       var g = qs.get("go");
-      if (g === "new" || g === "review") pendingGo = g;
+      if (g === "new" || g === "review" || g === "current") pendingGo = g;
       if ((qs.has("go") || qs.has("s")) && history.replaceState) history.replaceState(null, "", location.pathname);
     } catch (e) {}
     // A fresh launch opens on the New tab (the card that is due, or the In progress page when nothing is due); a tapped reminder (?go=new or ?go=review) still opens its own tab. (A reload after an update keeps where it was: this is only read once.)
@@ -772,7 +772,7 @@
       }
     });
 
-    if (pendingGo !== "verses") showEarly();   // the saved New verses are for the New tab (nothing saved when no card is due: the splash shows until the app is up)
+    if (pendingGo !== "verses" && pendingGo !== "current") showEarly();   // the saved New verses are for the New tab (nothing saved when no card is due: the splash shows until the app is up)
     setTimeout(dismissSplash, 4000);
   </script>
 </body>
