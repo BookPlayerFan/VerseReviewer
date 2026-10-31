@@ -121,8 +121,8 @@
   <script>
     var APP_URL = "https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec";
     // 3.10 direct mode (native plan step 2): the app runs straight in this page (no Google frames); its page comes from the server's front door and is kept
-    // in this phone's database, and every call it makes goes through the front door. Off here; the VR Beta copy of this page (built from this file) has it on.
-    var DIRECT = false;
+    // in this phone's database, and every call it makes goes through the front door.
+    var DIRECT = true;   // 4.0: always (the app runs straight in this page; the old way, inside Google's frames, is gone)
 
     // Optional access key: only used if you add a VR_KEY script property in Apps Script.
     // It is stored on this device only, never in this public file.
@@ -248,8 +248,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.19.2";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-46";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "4.0";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-47";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -361,14 +361,7 @@
         loadApp();
       }
     }
-    function loadApp() {
-      if (DIRECT) { directLoad(); return; }
-      var key = "";
-      try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
-      // The changing "_" part only exists so the phone cannot reuse an old copy of the app; the server ignores it.
-      var url = APP_URL + "?platform=mobile&_=" + Date.now() + (key ? "&key=" + encodeURIComponent(key) : "");
-      document.getElementById("appFrame").src = url;
-    }
+    function loadApp() { directLoad(); }
     loadApp();
     // After an Install the app asks for a reload once Google serves the new page: ask the web app which page number it serves now (a tiny JSON answer), every 3 s,
     // and reload once when it is the wanted one. A server that does not answer yet (the old version sends its page) counts as "not yet". If the check cannot be made
@@ -443,12 +436,9 @@
     }
   </script>
 
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>
-    // ── Reminders (OneSignal web push) ──
-    // The shell owns push because the service worker has to live on this site, not inside the Apps Script frame.
-    var pushSource = null, pushOS = null;
-    // A tapped push opens us with ?go=new or ?go=review; once the app is up we send it to that tab.
+    // ── Opening a tab ──
+    // 4.0: web push (OneSignal) is gone; reminders are the iPhone app's own. A link may still open us with ?go=new, ?go=review or ?go=current.
     var pendingGo = null, lastGo = null;
     try {
       var qs = new URLSearchParams(location.search);
@@ -459,16 +449,6 @@
     // A fresh launch opens on the New tab (the card that is due, or the In progress page when nothing is due); a tapped reminder (?go=new or ?go=review) still opens its own tab. (A reload after an update keeps where it was: this is only read once.)
     if (!pendingGo) pendingGo = "new";
     var appSource = null;
-    // The service worker tells us which tab a tapped push wants, for when the app was already open.
-    try {
-      navigator.serviceWorker.addEventListener("message", function(ev) {
-        var m = ev.data;
-        if (m && m.type === "VR_GOTO" && (m.tab === "new" || m.tab === "review")) {
-          pendingGo = m.tab;
-          if (appSource) sendGoto(appSource);
-        }
-      });
-    } catch (e) {}
     function sendGoto(src) {
       appSource = src;
       if (!pendingGo) return;
@@ -479,37 +459,6 @@
     function clearIconBadge() { try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) {} }
     clearIconBadge();
     document.addEventListener('visibilitychange', function() { if (!document.hidden) clearIconBadge(); });
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      pushOS = OneSignal;
-      await OneSignal.init({
-        appId: "e9bc8efc-620e-49a8-9275-09f9d76cd272",
-        serviceWorkerPath: "/VerseReviewer/OneSignalSDKWorker.js",
-        serviceWorkerParam: { scope: "/VerseReviewer/" },
-        notifyButton: { enable: false },
-        promptOptions: { slidedown: { prompts: [] } }
-      });
-      try { OneSignal.User.PushSubscription.addEventListener("change", sendPushState); } catch (e) {}
-      sendPushState();
-    });
-    function pushState() {
-      var os = pushOS;
-      var supported = !!os && ("Notification" in window);
-      var on = false, denied = false;
-      try { on = !!(os && os.User.PushSubscription.optedIn); } catch (e) {}
-      try { denied = (Notification.permission === "denied"); } catch (e) {}
-      return { type: "VR_PUSH_STATE", supported: supported, on: on, denied: denied };
-    }
-    function sendPushState() {
-      if (!pushSource) return;
-      try { pushSource.postMessage(pushState(), appOrigin); } catch (e) {}
-    }
-    function enablePush() {
-      if (!pushOS) { sendPushState(); return; }
-      try {
-        pushOS.Notifications.requestPermission().then(sendPushState, sendPushState);
-      } catch (e) { sendPushState(); }
-    }
   </script>
 
   <script>
@@ -534,7 +483,7 @@
       for (var k = 0; k < 5 && w; k++) { if (w === app) return true; if (w === w.parent) return false; w = w.parent; }
       return false;
     }
-    function isAppOrigin(o) { return (DIRECT && o === location.origin) || /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(String(o)); }
+    function isAppOrigin(o) { return o === location.origin; }   // 4.0: the app page runs on this page's own origin (no Google frames)
 
 
     function todayKey() {
@@ -724,11 +673,6 @@
         if (wakeApp) wakeTouch(); else wakeSync();
         return;
       }
-      if (d.type === 'VR_PUSH_ENABLE') {
-        pushSource = e.source;
-        enablePush();
-        return;
-      }
       if (d.type === 'VR_CLIP_READ') {
         // the app asks us (top page, where clipboard access is allowed) to read the clipboard after the user's tap
         var src = e.source, org = e.origin, rid = d.id;
@@ -781,7 +725,6 @@
         sendGoto(e.source);
         sendReplay(e.source);
         try { e.source.postMessage(shellInfo(noteVersion(d.build, d.srv)), appOrigin); } catch (err) {}
-        pushSource = e.source; sendPushState();
         if (earlyActive) handoff(e.source); else dismissSplash();
       } else if (d.type === 'VR_APPLIED') {
         hideEarly();
