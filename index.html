@@ -235,8 +235,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "4.6.14";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-58";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "4.6.15";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-59";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -266,7 +266,12 @@
       return head.test(html) ? html.replace(head, function(m) { return m + add; }) : add + html;
     }
     var directShown = false, directTouched = false;
-    var freshDay = null, appFrameReady = null, appSavedSession = false;
+    var freshDay = null, appFrameReady = null, appSavedSession = false, newerClient = 0;
+    function sendNewer() {
+      if (!newerClient || !appFrameReady) return;
+      try { appFrameReady.postMessage({ type: "VR_NEWER", client: newerClient }, appOrigin); } catch (e) {}
+      newerClient = 0;
+    }
     function sendFresh() {
       if (freshDay && (directTouched || appBusy)) { freshDay = null; return; }   // 3.19.2: in use: the app catches up by itself (a day kept for later could be older by then)
       if (!freshDay || !appFrameReady) return;
@@ -329,6 +334,10 @@
             return;
           }
           if (!directShown || (!directTouched && !savedPend && !appBusy)) directShow(page);
+          else {   // 4.6.15: you had already started: tell the app at once that a newer page is in (it takes it over as soon as nothing is waiting to save)
+            var mm = /const CLIENT_BUILD = 'sync-(\d+)'/.exec((r && r.tpl) || "");
+            if (mm) { newerClient = Number(mm[1]); sendNewer(); }
+          }
         });
       }).catch(function(e) {
         saved.then(function(p) {
@@ -618,7 +627,7 @@
       } else if (d.type === 'VR_OUTBOX') {
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
-        appFrameReady = e.source; sendFresh();
+        appFrameReady = e.source; sendFresh(); sendNewer();
         sendGoto(e.source);
         sendReplay(e.source);
         try { e.source.postMessage(shellInfo(noteVersion(d.build, d.srv)), appOrigin); } catch (err) {}
