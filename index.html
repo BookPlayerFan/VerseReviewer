@@ -30,12 +30,14 @@
     :root {
       --bg-theme: #f8f9fa;
       --spinner-color: #1a73e8;
+      --text-theme: #202124;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
         --bg-theme: #121212;
         --spinner-color: #8ab4f8;
+        --text-theme: #e8eaed;
       }
     }
 
@@ -97,6 +99,35 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* 4.6.21: first open with no saved page and no answer from the server */
+    #loadFail {
+      position: fixed;
+      inset: 0;
+      z-index: 100000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px;
+      text-align: center;
+      background-color: var(--bg-theme);
+      color: var(--text-theme);
+      font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #loadFail .lf-title { font-size: 19px; font-weight: 800; }
+    #loadFail .lf-msg { opacity: 0.7; max-width: 300px; }
+    #loadFail button {
+      margin-top: 8px;
+      min-width: 160px;
+      padding: 13px 22px;
+      border: 0;
+      border-radius: 14px;
+      font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--bg-theme);
+      background-color: var(--spinner-color);
+    }
   </style>
 </head>
 <body>
@@ -106,18 +137,19 @@
 
   <iframe id="appFrame" allow="clipboard-read; clipboard-write"></iframe>
 
+  <div id="loadFail" role="alert">
+    <div class="lf-title">Couldn't open Verse Review</div>
+    <div class="lf-msg" id="loadFailMsg"></div>
+    <button type="button" id="loadFailBtn">Try again</button>
+  </div>
+
   <script>
     var APP_URL = "https://script.google.com/macros/s/AKfycbyoSSJrEh4cf-YkLXIJgiQ3d4KZbzTG2Twho6JSRAlwXkaGbpZXAPfGqBegHhLc5U3YPQ/exec";
-    // 3.10 direct mode (native plan step 2): the app runs straight in this page (no Google frames); its page comes from the server's front door and is kept
-    // in this phone's database, and every call it makes goes through the front door.
-    var DIRECT = true;   // 4.0: always (the app runs straight in this page; the old way, inside Google's frames, is gone)
-
-    // Optional access key: only used if you add a VR_KEY script property in Apps Script.
-    // It is stored on this device only, never in this public file.
+    // 3.10 direct mode: the app runs straight in this page's own frame (no Google frames); its page comes from the server's front door and is kept
+    // in this phone's database, and every call it makes goes through the front door with the access key (kept on this phone only, never in this public file).
+    var IN_APP = false;   // 4.6.21: true in the iPhone app's copy (build_shell.py sets it)
     // When this icon first opened, so the status readout can show whether its saved data ever got wiped (a wipe starts the date over).
     try { if (!localStorage.getItem("vr_first")) localStorage.setItem("vr_first", String(Date.now())); } catch (e) {}
-    // 3.2.1: hint levels come from each verse's step now; the levels this page used to keep (before 3.0) are cleared once.
-    try { localStorage.removeItem("vr_hl"); localStorage.removeItem("vr_hint"); } catch (e) {}
     // ───── 3.8 local database (native plan, step 3 piece 1) ─────
     // The phone's own database (IndexedDB) for this page. For now it keeps a copy of what this page already saves (the verse list, the unsent presses,
     // the quick view's cards, the pills), so nothing changes in how the app behaves; later stages read from it. If the phone refuses it, every call
@@ -235,8 +267,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "4.6.18";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-60";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "4.6.21";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-61";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -244,10 +276,12 @@
     }
     // ───── direct mode ─────
     // One call through the front door: POST {op:'api', key, name, args} as plain text (no "may I" round first). Resolves with the result.
-    function directCall(name, args) {
+    function directCall(name, args, signal) {   // signal (4.6.21): the start page's own first load can give up (an AbortController's)
       var key = ""; try { key = localStorage.getItem("vr_key") || ""; } catch (e) {}
-      return fetch(APP_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
-        body: JSON.stringify({ op: "api", key: key, name: name, args: Array.isArray(args) ? args : [] }) })
+      var opt = { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
+        body: JSON.stringify({ op: "api", key: key, name: name, args: Array.isArray(args) ? args : [] }) };
+      if (signal) opt.signal = signal;
+      return fetch(APP_URL, opt)
         .then(function(r) { return r.text(); })
         .then(function(t) {
           var j = null; try { j = JSON.parse(t); } catch (e) {}
@@ -256,7 +290,7 @@
           return j.result;
         });
     }
-    window.directCall = directCall;
+    window.directCall = directCall;   // the app page's calls (the shim passes no signal: they are never given up on here)
     // The app only ever calls the server through google.script.run (its srv() wraps it); here that is a small stand-in sending each call through directCall.
     var DIRECT_SHIM = '<script>(function(){var P=window.parent;function run(s,f){var o={withSuccessHandler:function(h){return run(h,f);},withFailureHandler:function(h){return run(s,h);},withUserObject:function(){return o;},' +
       'api:function(k,name,args){P.directCall(name,args).then(function(r){if(s)s(r);},function(e){if(f)f(e);});}};return o;}window.google={script:{run:run(null,null)}};window.__vrDirect=1;})();<\/script>';
@@ -299,9 +333,19 @@
       var j = bootJson(sessionJson, pendJson, localJson).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
       return { html: tpl.replace(/<\?!=\s*initialSessionJson\s*\?>/, function() { return j; }) };
     }
-    function directLoad() {
+    // fresh (4.6.21): an update reload: the saved copy is not shown first (it would be replaced a moment later, so the page loaded twice); it is used
+    // only if the server cannot be reached, or when saves made on the phone are still waiting (they go out on the saved day first)
+    var LOAD_GIVE_UP_MS = 12000;
+    function directLoad(fresh) {
       directShown = false;
-      var savedPend = false;
+      hideLoadFail();
+      if (fresh) {   // the page that asked is taken down at once (as the saved copy used to replace it), so nothing is pressed on it meanwhile
+        showSplash();
+        try { var fr = document.getElementById("appFrame"); fr.onload = null; fr.srcdoc = ""; } catch (e) {}
+        appFrameReady = null;
+        appSource = null;   // a reminder tapped while the new page loads waits for it (pendingGo), not sent to the emptied frame
+      }
+      var savedPend = false, held = null;
       var saved = Promise.all([VRDB.get("app"), VRDB.get("session"), VRDB.verses().catch(function() { return []; })]).then(function(r) {
         var p = r[0], ss = r[1], rows = r[2];
         // 3.10 step 3: saves still to send keep their deck even past midnight (they are sent on it first; the server then moves on to the new day)
@@ -310,53 +354,82 @@
         // 3.11: a new day, nothing waiting, and the app said its copy of the verse list was complete: the app builds today's deck itself, at once
         var local = !use && ss && ss.s && ss.rowsOk === true && Array.isArray(rows) && rows.length && rows[0].dm !== undefined
           ? JSON.stringify({ rows: rows, prev: { learning: ss.s.learning || [], queue: ss.s.queue || [], build: ss.s.build, ver: ss.s.ver } }) : null;
-        if (p && !directShown) {
-          if (p.tpl) directShow(composePage(p.tpl, use ? JSON.stringify(ss.s) : null, use && savedPend ? JSON.stringify(ss.pend) : null, local));
-          else if (p.html) directShow(p);   // a page saved before 3.10
+        if (p && p.tpl && !directShown) {
+          var pg = composePage(p.tpl, use ? JSON.stringify(ss.s) : null, use && savedPend ? JSON.stringify(ss.pend) : null, local);
+          if (fresh && !savedPend) held = pg; else directShow(pg);
         }
         return p;
       }, function() { return null; });
-      directCall("appPage", ["parts"]).then(function(r) {
-        var page;
-        if (r && r.tpl) {
-          VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
-          try { var b = JSON.parse(r.boot); if (b && b.session && !appSavedSession && !savedPend) { b.session.skew = typeof b.session.serverNow === "number" ? b.session.serverNow - Date.now() : 0; b.session.savedAt = Date.now(); VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } } catch (e) {}   // 3.19.2
-          page = composePage(r.tpl, (function() { try { var b = JSON.parse(r.boot); return b && b.session ? JSON.stringify(b.session) : null; } catch (e) { return null; } })());
-        } else {   // an older server: the whole page
-          page = { html: r.html };
-          VRDB.set("app", { html: r.html, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
-        }
+      // 4.6.21 (B24): with nothing on screen yet, the server's answer is given up on after 12 s (then the saved copy, or Try again)
+      var ctl = null; try { ctl = new AbortController(); } catch (e) {}
+      var giveUp = setTimeout(function() { if (!directShown && ctl) ctl.abort(); }, LOAD_GIVE_UP_MS);
+      directCall("appPage", ["parts"], ctl && ctl.signal).then(function(r) {
+        clearTimeout(giveUp);
+        if (!r || !r.tpl) throw new Error("The server sent something unexpected.");
+        VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
+        try { var b = JSON.parse(r.boot); if (b && b.session && !appSavedSession && !savedPend) { b.session.skew = typeof b.session.serverNow === "number" ? b.session.serverNow - Date.now() : 0; b.session.savedAt = Date.now(); VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } } catch (e) {}   // 3.19.2
+        var page = composePage(r.tpl, (function() { try { var b = JSON.parse(r.boot); return b && b.session ? JSON.stringify(b.session) : null; } catch (e) { return null; } })());
         // the server's copy takes over unless you have started using the saved one, or saves made on the phone are still on their way (the phone is ahead).
         // 3.18.1: when the page itself is the same one, only the day is handed in (no reload of the whole page, which showed as a second load)
         saved.then(function(p) {
-          if (directShown && p && p.tpl && r && r.tpl && p.tpl === r.tpl) {
+          if (directShown && p && p.tpl && p.tpl === r.tpl) {
             try { var bs = JSON.parse(r.boot); if (bs && bs.session) { freshDay = bs.session; sendFresh(); } } catch (e) {}
             return;
           }
           if (!directShown || (!directTouched && !savedPend && !appBusy)) directShow(page);
           else {   // 4.6.15: you had already started: tell the app at once that a newer page is in (it takes it over as soon as nothing is waiting to save)
-            var mm = /const CLIENT_BUILD = 'sync-(\d+)'/.exec((r && r.tpl) || "");
+            var mm = /const CLIENT_BUILD = 'sync-(\d+)'/.exec(r.tpl);
             if (mm) { newerClient = Number(mm[1]); sendNewer(); }
           }
         });
       }).catch(function(e) {
-        saved.then(function(p) {
+        clearTimeout(giveUp);
+        saved.then(function() {
           if (directShown) return;   // the saved page is up and retries the server itself
-          if (e && e.auth) { askKey(); return; }
-          dismissSplash();
-          if (window.confirm("Couldn't reach the server: " + (e && e.message || e) + "\n\nTry again?")) directLoad();
+          if (held) { directShow(held); return; }   // an update reload with no signal: the saved copy after all
+          if (e && e.auth) { askKey(false); return; }
+          showLoadFail(e && e.name === "AbortError" ? "Verse Review took too long to answer." : "Check your connection" + (e && e.message && !/fetch|network|load failed/i.test(e.message) ? " (" + String(e.message).slice(0, 80) + ")" : "") + ".", false);
         });
       });
     }
-    function askKey() {
+    // 4.6.21 (B24): first open with no saved page and no answer: a message and a Try again button (was a confirm() box, with no time limit)
+    function showLoadFail(msg, key) {
       dismissSplash();
-      var entered = window.prompt("Enter your access key");
-      if (entered) {
-        try { localStorage.setItem("vr_key", entered.trim()); } catch (err) {}
-        loadApp();
-      }
+      var box = document.getElementById("loadFail"); if (!box) return;
+      document.getElementById("loadFailMsg").textContent = msg;
+      document.getElementById("loadFailBtn").textContent = key ? "Enter access key" : "Try again";
+      document.getElementById("loadFailBtn").onclick = function() { if (key) askKey(false); else { showSplash(); directLoad(); } };
+      box.style.display = "flex";
     }
-    function loadApp() { directLoad(); }
+    function hideLoadFail() { var box = document.getElementById("loadFail"); if (box) box.style.display = "none"; }
+    // The access key: asked for when the server refuses it (on the first load, or when the app page says so with VR_AUTH_REQUIRED). 4.6.21: asked once at a
+    // time; Cancel keeps the old key and is not asked again until the app page reloads; a new key is used by the app page's next call at once (every call
+    // reads it here), so a page that is up is not reloaded, only told (VR_KEY_SET). For 20 s after a new key, a refusal is taken to be from a call made
+    // with the old one (still on its way), so it does not ask again.
+    var keyAsking = false, keyDeclined = false, keyEnteredAt = 0, KEY_QUIET_MS = 20000;
+    function askKey(wrong) {
+      if (keyAsking) return;
+      keyAsking = true;
+      var had = ""; try { had = localStorage.getItem("vr_key") || ""; } catch (e) {}
+      dismissSplash();
+      var entered = null;
+      try { entered = window.prompt(had || wrong ? "That access key didn't work. Enter your access key again." : "Enter your access key"); } catch (e) {}
+      keyAsking = false;
+      entered = entered ? String(entered).trim() : "";
+      if (!entered) {
+        keyDeclined = true;
+        if (!directShown) showLoadFail("Verse Review needs its access key.", true);
+        return;
+      }
+      keyDeclined = false; keyEnteredAt = Date.now();
+      try { localStorage.setItem("vr_key", entered); } catch (err) {}
+      keySaved();
+    }
+    function keySaved() {   // the iPhone app's glue adds to this (the background refresh gets the key too)
+      if (directShown && appFrameReady) { try { appFrameReady.postMessage({ type: "VR_KEY_SET" }, appOrigin); } catch (e) {} }
+      else loadApp();
+    }
+    function loadApp(fresh) { directLoad(fresh === true); }
     loadApp();
     // After an Install the app asks for a reload once Google serves the new page: ask the web app which page number it serves now (a tiny JSON answer), every 3 s,
     // and reload once when it is the wanted one. A server that does not answer yet (the old version sends its page) counts as "not yet". If the check cannot be made
@@ -364,8 +437,10 @@
     // This page lives on GitHub Pages, and iOS keeps a home-screen app alive for days, so after a change here the phone could go on running the old copy (it did: the
     // quiet update check was missing for a day). At launch, and when you come back after half an hour away, ask GitHub for the current copy and, if its number is higher,
     // load it once. The same number is never tried twice within ten minutes, so a copy that is still cached cannot cause a loop.
+    // 4.6.21: not in the iPhone app: its copy of this page is inside the app (a new one comes with a TestFlight build), so the check could only find itself.
     var hiddenAt = 0;
     function checkShellUpdate() {
+      if (IN_APP) return;
       try {
         var cur = Number(String(SHELL_BUILD).replace(/\D/g, "")) || 0;
         var base = location.href.split("#")[0].split("?")[0];
@@ -409,7 +484,7 @@
     function waitForBuild(n) {
       clearTimeout(waitTimer);
       var t0 = Date.now(), polls = 0, netFails = 0;
-      var done = function(res) { saveWaitLog({ n: n, res: res, polls: polls, s: Math.round((Date.now() - t0) / 1000) }); loadApp(); };
+      var done = function(res) { saveWaitLog({ n: n, res: res, polls: polls, s: Math.round((Date.now() - t0) / 1000) }); loadApp(true); };
       (function poll() {
         if (Date.now() - t0 > 100000) { done("timeout"); return; }
         polls++;
@@ -463,18 +538,17 @@
     try { localStorage.removeItem("vr_early"); } catch (e) {}
     dbMirror("early", null);
 
-    // The Apps Script page sits a frame or two inside #appFrame; a message counts only when it comes from in there.
-    var appOrigin = "*";
+    // The app page runs in #appFrame (a srcdoc frame on this page's own origin); a message counts only when it comes from that frame itself.
+    var appOrigin = "*";   // set to the app page's origin by its first message
     function fromAppFrame(w) {
-      var app = document.getElementById("appFrame"); app = app && app.contentWindow;
-      for (var k = 0; k < 5 && w; k++) { if (w === app) return true; if (w === w.parent) return false; w = w.parent; }
-      return false;
+      var app = document.getElementById("appFrame");
+      return !!(w && app && w === app.contentWindow);
     }
-    function isAppOrigin(o) { return o === location.origin; }   // 4.0: the app page runs on this page's own origin (no Google frames)
+    function isAppOrigin(o) { return o === location.origin; }
 
 
-    // Keep the screen awake on the New tab (the app on its New tab). The lock lives here in the top page,
-    // because the app sits inside Google's sandboxed frames. It is let go after 10 minutes with no touches, and asked for again on the next one.
+    // Keep the screen awake on the New tab (the app on its New tab). The lock lives here in the top page (the app page asks with VR_WAKE).
+    // It is let go after 10 minutes with no touches, and asked for again on the next one.
     var wakeApp = false, wakeLock = null, wakePending = false, wakeIdleAt = 0, wakeTimer = null;
     var WAKE_IDLE_MS = 10 * 60 * 1000;
     // 3.4.1: what happened to the lock, for the status panel's "Screen awake" row: held, refused by the phone, let go by the phone while the page was
@@ -487,7 +561,7 @@
       try { localStorage.setItem("vr_wake", JSON.stringify(wakeEv)); } catch (e) {}
     }
     function wakeInfo() {
-      return { sup: !!(navigator.wakeLock && navigator.wakeLock.request), held: !!wakeLock, since: wakeHeldAt, pend: wakePending, app: wakeApp, early: false,
+      return { sup: !!(navigator.wakeLock && navigator.wakeLock.request), held: !!wakeLock, since: wakeHeldAt, pend: wakePending, app: wakeApp,
         msg: wakeMsgAt, idle: Date.now() - wakeIdleAt >= WAKE_IDLE_MS, ev: wakeEv.slice(-6), retry: wakeTries, db: dbInfo };   // 3.8: db rides along (asked for when Details opens)
     }
     function wakeWanted() { return wakeApp && !document.hidden && Date.now() - wakeIdleAt < WAKE_IDLE_MS; }
@@ -533,11 +607,18 @@
     }
     document.addEventListener("visibilitychange", wakeSync);
 
+    var splashTimer = null, splashHideT = null;
+    function showSplash() {   // 4.6.21: again, while a reload or a Try again waits for the page (taken away by its VR_READY, or after 15 s at most)
+      var sp = document.getElementById("splashScreen"); if (!sp) return;
+      sp.style.display = ""; sp.style.opacity = "1";
+      clearTimeout(splashHideT); splashHideT = null;   // a fade-out still finishing must not hide it again
+      clearTimeout(splashTimer); splashTimer = setTimeout(dismissSplash, 15000);
+    }
     function dismissSplash() {
       const splash = document.getElementById('splashScreen');
       if (splash && splash.style.display !== 'none') {
         splash.style.opacity = '0';
-        setTimeout(() => { splash.style.display = 'none'; }, 250);
+        clearTimeout(splashHideT); splashHideT = setTimeout(() => { splashHideT = null; if (splash.style.opacity === '0') splash.style.display = 'none'; }, 250);
       }
     }
 
@@ -569,7 +650,7 @@
       var d = e.data;
       if (!d || typeof d !== 'object') return;
 
-      if (!isAppOrigin(e.origin) || !fromAppFrame(e.source)) return;   // 3.2.1: a Google page, and the one inside our own app frame
+      if (!isAppOrigin(e.origin) || !fromAppFrame(e.source)) return;   // only the app page in our own frame
       appOrigin = e.origin;
 
       if (d.type === 'VR_WAKE') {
@@ -579,19 +660,7 @@
         if (wakeApp) wakeTouch(); else wakeSync();
         return;
       }
-      if (d.type === 'VR_CLIP_READ') {
-        // the app asks us (top page, where clipboard access is allowed) to read the clipboard after the user's tap
-        var src = e.source, org = e.origin, rid = d.id;
-        function reply(ok, text, err) { try { src.postMessage({ type: 'VR_CLIP_TEXT', id: rid, ok: ok, text: text, error: err }, org); } catch (x) {} }
-        try {
-          if (!navigator.clipboard || !navigator.clipboard.readText) { reply(false, '', 'unsupported'); return; }
-          navigator.clipboard.readText().then(function(tx) { reply(true, tx, ''); }, function(er) { reply(false, '', String(er && er.name || er)); });
-        } catch (x) { reply(false, '', 'error'); }
-        return;
-      }
-      if (d.type === 'VR_CACHE') {
-        // 4.6.14: the opening screen's copy of the New card: not kept any more
-      } else if (d.type === 'VR_VL') {
+      if (d.type === 'VR_VL') {
         saveVl(d.verses);
       } else if (d.type === 'VR_PILLS') {
         savePills(d.pills);
@@ -615,27 +684,26 @@
             }
           } catch (err) { return; }
         }
-        if (Number(d.wait) > 0) waitForBuild(Number(d.wait)); else loadApp();
+        if (Number(d.wait) > 0) waitForBuild(Number(d.wait)); else loadApp(true);   // 4.6.21: the new page only (the saved copy is not shown first)
       } else if (d.type === 'VR_WAKE_Q') {
         try { e.source.postMessage({ type: "VR_WAKEINFO", wk: wakeInfo() }, appOrigin); } catch (err) {}
       } else if (d.type === 'VR_BUSY') {
         appBusy = !!d.b;
       } else if (d.type === 'VR_SESSION') {
         appSavedSession = true;
-        // 3.10 instant deck: the app's current session (sent only when every save has landed), for the next open (direct mode only)
-        if (DIRECT && d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now(), pend: Array.isArray(d.pend) ? d.pend.slice(0, 200) : [], rowsOk: d.rowsOk === true }).catch(function() {});
+        // 3.10 instant deck: the app's current session (sent only when every save has landed), for the next open
+        if (d.s && typeof d.s === "object" && typeof d.day === "string") VRDB.set("session", { s: d.s, day: d.day, at: Date.now(), pend: Array.isArray(d.pend) ? d.pend.slice(0, 200) : [], rowsOk: d.rowsOk === true }).catch(function() {});
       } else if (d.type === 'VR_OUTBOX') {
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
-        appFrameReady = e.source; sendFresh(); sendNewer();
+        appFrameReady = e.source; keyDeclined = false; hideLoadFail(); sendFresh(); sendNewer();
         sendGoto(e.source);
         sendReplay(e.source);
         try { e.source.postMessage(shellInfo(noteVersion(d.build, d.srv)), appOrigin); } catch (err) {}
         dismissSplash();
-      } else if (d.type === 'VR_APPLIED') {
-        dismissSplash();
       } else if (d.type === 'VR_AUTH_REQUIRED') {
-        askKey();
+        // 4.6.21: the app page says Google refused the access key: asked for again (once: not while the box is up, just after a new key, or after Cancel)
+        if (!keyDeclined && Date.now() - keyEnteredAt > KEY_QUIET_MS) askKey(true);
       }
     });
 
