@@ -268,8 +268,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "4.6.28";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-62";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.0.1";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-63";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vrb_first")) || 0; key = !!localStorage.getItem("vrb_key"); works = true; } catch (e) {}
@@ -337,7 +337,38 @@
     // fresh (4.6.21): an update reload: the saved copy is not shown first (it would be replaced a moment later, so the page loaded twice); it is used
     // only if the server cannot be reached, or when saves made on the phone are still waiting (they go out on the saved day first)
     var LOAD_GIVE_UP_MS = 12000;
+    // 3.0.1 (user, 5 Nov): a new version is fetched BEHIND the page you are using: nothing is taken down and no spinner shows while Google answers (3-15 s).
+    // Once the new page is in and saved on the phone, it takes over the way a normal open does (the saved page with the phone's own saved day), as soon as
+    // nothing is waiting to save. If the fetch fails, the page you have stays up (the app asks again later by itself).
+    var prefetching = false;
+    function phonePage(tpl, ss, rows) {   // the page as a normal open builds it: the phone's saved day when it is today's (or has saves still to send)
+      var savedPend = !!(ss && Array.isArray(ss.pend) && ss.pend.length);
+      var use = ss && ss.s && ((ss.day === localDay() && (!ss.s.date || ss.s.date === isoDay())) || savedPend);
+      var local = !use && ss && ss.s && ss.rowsOk === true && Array.isArray(rows) && rows.length && rows[0].dm !== undefined
+        ? JSON.stringify({ rows: rows, prev: { learning: ss.s.learning || [], queue: ss.s.queue || [], build: ss.s.build, ver: ss.s.ver } }) : null;
+      return { page: composePage(tpl, use ? JSON.stringify(ss.s) : null, use && savedPend ? JSON.stringify(ss.pend) : null, local), pend: savedPend };
+    }
+    function prefetchSwap() {
+      if (prefetching) return;
+      prefetching = true;
+      var ctl = null; try { ctl = new AbortController(); } catch (e) {}
+      var giveUp = setTimeout(function() { if (ctl) ctl.abort(); }, 45000);
+      directCall("appPage", ["parts"], ctl && ctl.signal).then(function(r) {
+        clearTimeout(giveUp);
+        if (!r || !r.tpl) throw new Error("no page");
+        return VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {}).then(function() {
+          reloadWhenIdle(function() {
+            Promise.all([VRDB.get("session"), VRDB.verses().catch(function() { return []; })]).then(function(x) {
+              prefetching = false;
+              directShow(phonePage(r.tpl, x[0], x[1]).page);
+            }, function() { prefetching = false; directShow(composePage(r.tpl, null, null, null)); });
+          }, 0);
+          setTimeout(function() { prefetching = false; }, 125000);   // a page busy saving for the whole 2 minutes: the next ask starts over
+        });
+      }).catch(function() { clearTimeout(giveUp); prefetching = false; });
+    }
     function directLoad(fresh) {
+      if (fresh && directShown) { prefetchSwap(); return; }   // 3.0.1: a page is up: the new one comes in behind it
       directShown = false;
       hideLoadFail();
       if (fresh) {   // the page that asked is taken down at once (as the saved copy used to replace it), so nothing is pressed on it meanwhile
