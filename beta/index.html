@@ -268,8 +268,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.0.5";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-64";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.0.9";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-65";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vrb_first")) || 0; key = !!localStorage.getItem("vrb_key"); works = true; } catch (e) {}
@@ -350,7 +350,11 @@
     }
     // 3.0.5 (user, 5 Nov): the app asks for the new page as soon as it sees one (VR_PREFETCH) and shows What's new over the screen; closing it asks for the
     // reload, which then swaps the page that is already here at once.
-    var prefetched = null, swapWanted = false;
+    var prefetched = null, swapWanted = false, swapWant = 0, swapTries = 0;
+    function toApp(m) { try { if (appFrameReady) appFrameReady.postMessage(m, appOrigin); } catch (e) {} }
+    function tplBuild(t) { var m = /const CLIENT_BUILD = 'sync-(\d+)'/.exec(t || ""); return m ? Number(m[1]) : 0; }
+    // 3.0.9 (review): a swap that cannot happen says so (VR_SWAP_FAIL), so the app's pill can say it did not load instead of "Updating…" for good
+    function swapFail(why) { swapWanted = false; swapWant = 0; swapTries = 0; toApp({ type: "VR_SWAP_FAIL", why: why }); }
     function prefetchFetch() {
       if (prefetching) return;
       prefetching = true;
@@ -361,28 +365,42 @@
         if (!r || !r.tpl) throw new Error("no page");
         return VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {}).then(function() {
           prefetching = false;
-          prefetched = { r: r, at: Date.now() };
-          if (swapWanted) doSwap();
+          prefetched = { r: r, at: Date.now(), fresh: swapWanted };
+          if (swapWanted) {
+            // 3.0.9 (review): Google can still hand back the old page for a minute after an install: ask again (4 tries, 8 s apart) rather than swap in the same page
+            if (swapWant && tplBuild(r.tpl) < swapWant) { prefetched = null; if (++swapTries < 4) { setTimeout(prefetchFetch, 8000); return; } swapFail("old"); return; }
+            doSwap();
+          }
         });
-      }).catch(function() { clearTimeout(giveUp); prefetching = false; swapWanted = false; });
+      }).catch(function() { clearTimeout(giveUp); prefetching = false; if (swapWanted) swapFail("net"); });
     }
     function doSwap() {
-      swapWanted = false;
-      var r = prefetched.r; prefetched = null;
+      swapWanted = false; swapWant = 0; swapTries = 0;
+      var pf = prefetched, r = pf.r; prefetched = null;
       reloadWhenIdle(function() {
         Promise.all([VRDB.get("session"), VRDB.verses().catch(function() { return []; })]).then(function(x) {
-          directShow(phonePage(r.tpl, x[0], x[1]).page);
+          var ss = x[0], pend = !!(ss && Array.isArray(ss.pend) && ss.pend.length), bs = null;
+          // 3.0.9 (review): a page fetched just now with nothing waiting to save comes in on the server's day (as a fresh load did), so a Reload still puts a phone
+          // copy that is out of step right; one fetched earlier (while What's new was up) or with saves waiting uses the phone's own saved day
+          if (pf.fresh && !pend) { try { var b = JSON.parse(r.boot); bs = b && b.session ? b.session : null; } catch (e) {} }
+          if (bs) {
+            bs.skew = typeof bs.serverNow === "number" ? bs.serverNow - Date.now() : 0; bs.savedAt = Date.now();
+            VRDB.set("session", { s: bs, day: localDay(), at: Date.now() }).catch(function() {});
+            directShow(composePage(r.tpl, JSON.stringify(bs)));
+          } else directShow(phonePage(r.tpl, ss, x[1]).page);
         }, function() { directShow(composePage(r.tpl, null, null, null)); });
       }, 0);
     }
-    function prefetchSwap() {
-      if (prefetched && Date.now() - prefetched.at < 600000) { doSwap(); return; }   // fetched while What's new was up: in at once
+    function prefetchSwap(want) {
+      swapWant = Number(want) || 0; swapTries = 0;
+      toApp({ type: "VR_SWAP_WAIT" });   // 3.0.9 (review): the app waits for the swap (Google takes 3-15 s) instead of saying "Couldn't load" after 3.5 s
+      if (prefetched && Date.now() - prefetched.at < 600000 && !(swapWant && tplBuild(prefetched.r.tpl) < swapWant)) { doSwap(); return; }   // fetched while What's new was up: in at once (when it is the page wanted)
       prefetched = null;
       swapWanted = true;
       prefetchFetch();
     }
-    function directLoad(fresh) {
-      if (fresh && directShown) { prefetchSwap(); return; }   // 3.0.1: a page is up: the new one comes in behind it
+    function directLoad(fresh, want) {
+      if (fresh && directShown) { prefetchSwap(want); return; }   // 3.0.1: a page is up: the new one comes in behind it
       directShown = false;
       hideLoadFail();
       if (fresh) {   // the page that asked is taken down at once (as the saved copy used to replace it), so nothing is pressed on it meanwhile
@@ -475,7 +493,7 @@
       if (directShown && appFrameReady) { try { appFrameReady.postMessage({ type: "VR_KEY_SET" }, appOrigin); } catch (e) {} }
       else loadApp();
     }
-    function loadApp(fresh) { directLoad(fresh === true); }
+    function loadApp(fresh, want) { directLoad(fresh === true, want); }
     loadApp();
     // After an Install the app asks for a reload once Google serves the new page: ask the web app which page number it serves now (a tiny JSON answer), every 3 s,
     // and reload once when it is the wanted one. A server that does not answer yet (the old version sends its page) counts as "not yet". If the check cannot be made
@@ -530,7 +548,7 @@
     function waitForBuild(n) {
       clearTimeout(waitTimer);
       var t0 = Date.now(), polls = 0, netFails = 0;
-      var done = function(res) { saveWaitLog({ n: n, res: res, polls: polls, s: Math.round((Date.now() - t0) / 1000) }); loadApp(true); };
+      var done = function(res) { saveWaitLog({ n: n, res: res, polls: polls, s: Math.round((Date.now() - t0) / 1000) }); prefetched = null; loadApp(true, res === "new" ? n : 0); };   // 3.0.9 (review): a page fetched before the install is not the one wanted
       (function poll() {
         if (Date.now() - t0 > 100000) { done("timeout"); return; }
         polls++;
@@ -730,7 +748,7 @@
             }
           } catch (err) { return; }
         }
-        if (Number(d.wait) > 0) waitForBuild(Number(d.wait)); else loadApp(true);   // 4.6.21: the new page only (the saved copy is not shown first)
+        if (Number(d.wait) > 0) waitForBuild(Number(d.wait)); else loadApp(true, Number(d.want) || 0);   // 4.6.21: the new page only (the saved copy is not shown first)
       } else if (d.type === 'VR_WAKE_Q') {
         try { e.source.postMessage({ type: "VR_WAKEINFO", wk: wakeInfo() }, appOrigin); } catch (err) {}
       } else if (d.type === 'VR_PREFETCH') {
