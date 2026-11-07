@@ -267,8 +267,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.0.9";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-65";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.1.9";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-66";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -313,8 +313,10 @@
       freshDay = null;
     }
     function directShow(page) {
-      appFrameReady = null;
-      try { appSource = null; if (lastGo && Date.now() - lastGo.at < 15000 && !pendingGo) { pendingGo = lastGo.tab; pendingRef = typeof lastGo.ref === "string" ? lastGo.ref : null; } } catch (e) {}   // 3.19.2
+      appFrameReady = null; appGen++;
+      // 3.19.2: a link tapped just before the page was replaced goes to the new one. Review (6 Nov): only a link not yet handed over (sent: false), so a
+      // reminder, the widget's "current" or a tab link is never acted on twice when an update reload follows a launch
+      try { appSource = null; if (lastGo && !lastGo.sent && Date.now() - lastGo.at < 15000 && !pendingGo) { pendingGo = lastGo.tab; pendingRef = typeof lastGo.ref === "string" ? lastGo.ref : null; } } catch (e) {}
       var f = document.getElementById("appFrame");
       directShown = true; directTouched = false;
       f.onload = function() { try { ["pointerdown", "keydown"].forEach(function(ev) { f.contentWindow.addEventListener(ev, function() { directTouched = true; }, { capture: true, once: true }); }); } catch (e) {} };
@@ -373,10 +375,13 @@
         });
       }).catch(function() { clearTimeout(giveUp); prefetching = false; if (swapWanted) swapFail("net"); });
     }
+    var swapSeq = 0, swapping = false;   // review (6 Nov): one swap at a time: a newer reload ask replaces a swap still waiting for the app to be idle
     function doSwap() {
       swapWanted = false; swapWant = 0; swapTries = 0;
-      var pf = prefetched, r = pf.r; prefetched = null;
+      var pf = prefetched, r = pf.r, seq = ++swapSeq; prefetched = null; swapping = true;
       reloadWhenIdle(function() {
+        if (seq !== swapSeq) return;
+        swapping = false;
         Promise.all([VRDB.get("session"), VRDB.verses().catch(function() { return []; })]).then(function(x) {
           var ss = x[0], pend = !!(ss && Array.isArray(ss.pend) && ss.pend.length), bs = null;
           // 3.0.9 (review): a page fetched just now with nothing waiting to save comes in on the server's day (as a fresh load did), so a Reload still puts a phone
@@ -388,9 +393,10 @@
             directShow(composePage(r.tpl, JSON.stringify(bs)));
           } else directShow(phonePage(r.tpl, ss, x[1]).page);
         }, function() { directShow(composePage(r.tpl, null, null, null)); });
-      }, 0);
+      }, 0, function() { if (seq === swapSeq) { swapping = false; swapFail("busy"); } });
     }
     function prefetchSwap(want) {
+      swapSeq++; swapping = false;   // a swap still waiting from an earlier ask is replaced by this one
       swapWant = Number(want) || 0; swapTries = 0;
       toApp({ type: "VR_SWAP_WAIT" });   // 3.0.9 (review): the app waits for the swap (Google takes 3-15 s) instead of saying "Couldn't load" after 3.5 s
       if (prefetched && Date.now() - prefetched.at < 600000 && !(swapWant && tplBuild(prefetched.r.tpl) < swapWant)) { doSwap(); return; }   // fetched while What's new was up: in at once (when it is the page wanted)
@@ -405,22 +411,18 @@
       if (fresh) {   // the page that asked is taken down at once (as the saved copy used to replace it), so nothing is pressed on it meanwhile
         showSplash();
         try { var fr = document.getElementById("appFrame"); fr.onload = null; fr.srcdoc = ""; } catch (e) {}
-        appFrameReady = null;
+        appFrameReady = null; appGen++;
         appSource = null;   // a reminder tapped while the new page loads waits for it (pendingGo), not sent to the emptied frame
       }
       var savedPend = false, held = null;
       var saved = Promise.all([VRDB.get("app"), VRDB.get("session"), VRDB.verses().catch(function() { return []; })]).then(function(r) {
         var p = r[0], ss = r[1], rows = r[2];
-        // 3.10 step 3: saves still to send keep their deck even past midnight (they are sent on it first; the server then moves on to the new day)
-        savedPend = !!(ss && Array.isArray(ss.pend) && ss.pend.length);
-        var use = ss && ss.s && ((ss.day === localDay() && (!ss.s.date || ss.s.date === isoDay())) || savedPend);   // 3.19.2: and the day itself is today's (a copy saved just after midnight could still be yesterday's)
-        // 3.11: a new day, nothing waiting, and the app said its copy of the verse list was complete: the app builds today's deck itself, at once
-        var local = !use && ss && ss.s && ss.rowsOk === true && Array.isArray(rows) && rows.length && rows[0].dm !== undefined
-          ? JSON.stringify({ rows: rows, prev: { learning: ss.s.learning || [], queue: ss.s.queue || [], build: ss.s.build, ver: ss.s.ver } }) : null;
+        // the phone's saved day when it is today's, or has saves still to send (3.10 step 3: they go out on it first); a new day with a complete verse list:
+        // the app builds today's deck itself (3.11). phonePage does both (review, 6 Nov: one copy of the rule).
         if (p && p.tpl && !directShown) {
-          var pg = composePage(p.tpl, use ? JSON.stringify(ss.s) : null, use && savedPend ? JSON.stringify(ss.pend) : null, local);
-          if (fresh && !savedPend) held = pg; else directShow(pg);
-        }
+          var pp = phonePage(p.tpl, ss, rows); savedPend = pp.pend;
+          if (fresh && !savedPend) held = pp.page; else directShow(pp.page);
+        } else savedPend = !!(ss && Array.isArray(ss.pend) && ss.pend.length);
         return p;
       }, function() { return null; });
       // 4.6.21 (B24): with nothing on screen yet, the server's answer is given up on after 12 s (then the saved copy, or Try again)
@@ -441,8 +443,8 @@
           }
           if (!directShown || (!directTouched && !savedPend && !appBusy)) directShow(page);
           else {   // 4.6.15: you had already started: tell the app at once that a newer page is in (it takes it over as soon as nothing is waiting to save)
-            var mm = /const CLIENT_BUILD = 'sync-(\d+)'/.exec(r.tpl);
-            if (mm) { newerClient = Number(mm[1]); sendNewer(); }
+            var nb = tplBuild(r.tpl);
+            if (nb) { newerClient = nb; sendNewer(); }
           }
         });
       }).catch(function(e) {
@@ -490,6 +492,7 @@
     }
     function keySaved() {   // the iPhone app's glue adds to this (the background refresh gets the key too)
       if (directShown && appFrameReady) { try { appFrameReady.postMessage({ type: "VR_KEY_SET" }, appOrigin); } catch (e) {} }
+      else if (directShown || swapping) return;   // review (6 Nov): a page is coming in (a swap, or the frame not ready yet): it reads the saved key itself; no second load
       else loadApp();
     }
     function loadApp(fresh, want) { directLoad(fresh === true, want); }
@@ -524,10 +527,10 @@
     // 3.2.1: not while the app still has a save waiting (it says so with VR_BUSY): wait for it, checking every 3 s for up to 2 minutes, then leave the
     // update for the next launch.
     var appBusy = false;
-    function reloadWhenIdle(go, tries) {
+    function reloadWhenIdle(go, tries, giveUp) {
       if (!appBusy) { go(); return; }
-      if (tries >= 40) return;
-      setTimeout(function() { reloadWhenIdle(go, tries + 1); }, 3000);
+      if (tries >= 40) { if (giveUp) giveUp(); return; }   // review (6 Nov): a swap that gave up says so (the app's pill)
+      setTimeout(function() { reloadWhenIdle(go, tries + 1, giveUp); }, 3000);
     }
     setTimeout(checkShellUpdate, 2500);
     document.addEventListener("visibilitychange", function() {
@@ -571,7 +574,7 @@
 
   <script>
     // ── Opening a tab ──
-    // 4.0: web push (OneSignal) is gone; reminders are the iPhone app's own. A link may still open us with ?go=new, ?go=review or ?go=current.
+    // A link may open us with ?go=new, ?go=review or ?go=current (reminders are the iPhone app's own).
     var pendingGo = null, lastGo = null, pendingRef = null;   // 4.6.10: pendingRef: a tapped reminder about one verse (its card opens)
     try {
       var qs = new URLSearchParams(location.search);
@@ -581,12 +584,17 @@
     } catch (e) {}
     // A fresh launch opens on the New tab (the card that is due, or the In progress page when nothing is due); a tapped reminder (?go=new or ?go=review) still opens its own tab. (A reload after an update keeps where it was: this is only read once.)
     if (!pendingGo) pendingGo = "new";
-    var appSource = null;
+    var appSource = null, appGen = 0;   // appGen: bumped whenever the app page is replaced (a link waiting for the old page goes to the new one instead)
     function sendGoto(src) {
       appSource = src;
       if (!pendingGo) return;
-      var tab = pendingGo, ref = pendingRef; pendingGo = null; pendingRef = null; lastGo = { tab: tab, at: Date.now(), ref: ref };
-      setTimeout(function() { try { src.postMessage(typeof ref === "string" ? { type: "VR_GOTO", tab: tab, ref: ref } : { type: "VR_GOTO", tab: tab }, appOrigin); } catch (e) {} }, 700);   // ref (4.6.10): from a tapped reminder ("" when it names several verses)
+      var tab = pendingGo, ref = pendingRef, gen = appGen; pendingGo = null; pendingRef = null;
+      var go = lastGo = { tab: tab, at: Date.now(), ref: ref, sent: false };
+      setTimeout(function() {
+        if (gen !== appGen || appSource !== src) return;   // review (6 Nov): the page was replaced meanwhile: directShow handed the link to the new one
+        go.sent = true;
+        try { src.postMessage(typeof ref === "string" ? { type: "VR_GOTO", tab: tab, ref: ref } : { type: "VR_GOTO", tab: tab }, appOrigin); } catch (e) {}
+      }, 700);   // ref (4.6.10): from a tapped reminder ("" when it names several verses)
     }
     // No icon badge: clear any leftover one when the app opens or comes back.
     function clearIconBadge() { try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) {} }
@@ -595,12 +603,6 @@
   </script>
 
   <script>
-    // 4.6.14: the opening screen (the early view: a sealed copy of the New card shown while the app loaded) is gone. It dated from when the app page came
-    // from Google on every open (seconds); now the page and today's deck are kept on the phone and the app is up in well under a second (opening timer,
-    // 2 Nov: 0.06 s). What an older version saved for it is cleared.
-    try { localStorage.removeItem("vr_early"); } catch (e) {}
-    dbMirror("early", null);
-
     // The app page runs in #appFrame (a srcdoc frame on this page's own origin); a message counts only when it comes from that frame itself.
     var appOrigin = "*";   // set to the app page's origin by its first message
     function fromAppFrame(w) {
@@ -668,7 +670,7 @@
       wakeTimer = setTimeout(wakeSync, WAKE_IDLE_MS + 1000);
       wakeSync();
     }
-    document.addEventListener("visibilitychange", wakeSync);
+    document.addEventListener("visibilitychange", function() { wakeSync(); });   // review (6 Nov): through the name, so the iPhone glue's wrap (native keep-awake) runs too
 
     var splashTimer = null, splashHideT = null;
     function showSplash() {   // 4.6.21: again, while a reload or a Try again waits for the page (taken away by its VR_READY, or after 15 s at most)
