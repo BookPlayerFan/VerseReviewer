@@ -268,8 +268,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.4.6";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-70";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.5.25";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-71";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vrb_first")) || 0; key = !!localStorage.getItem("vrb_key"); works = true; } catch (e) {}
@@ -365,7 +365,7 @@
       directCall("appPage", ["parts"], ctl && ctl.signal).then(function(r) {
         clearTimeout(giveUp);
         if (!r || !r.tpl) throw new Error("no page");
-        return VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {}).then(function() {
+        return VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver, sig: r.sig }).catch(function() {}).then(function() {
           prefetching = false;
           prefetched = { r: r, at: Date.now(), fresh: swapWanted };
           if (swapWanted) {
@@ -429,10 +429,13 @@
       // 4.6.21 (B24): with nothing on screen yet, the server's answer is given up on after 12 s (then the saved copy, or Try again)
       var ctl = null; try { ctl = new AbortController(); } catch (e) {}
       var giveUp = setTimeout(function() { if (!directShown && ctl) ctl.abort(); }, LOAD_GIVE_UP_MS);
-      directCall("appPage", ["parts"], ctl && ctl.signal).then(function(r) {
+      // (owner, 23 Nov, review S4) the saved page's sig goes with the ask: when Google's page is the same, it answers { same } instead of the whole page again
+      saved.then(function(p) {
+        return directCall("appPage", p && p.tpl && p.sig ? ["parts", p.sig] : ["parts"], ctl && ctl.signal).then(function(r) { if (r && r.same && p && p.tpl) { r.tpl = p.tpl; r.kept = true; } return r; });
+      }).then(function(r) {
         clearTimeout(giveUp);
         if (!r || !r.tpl) throw new Error("The server sent something unexpected.");
-        VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver }).catch(function() {});
+        if (!r.kept) VRDB.set("app", { tpl: r.tpl, at: Date.now(), srv: r.srv, ver: r.ver, sig: r.sig }).catch(function() {});   // (not saved again when it is the same)
         try { var b = JSON.parse(r.boot); if (b && b.session && !appSavedSession && !savedPend) { b.session.skew = typeof b.session.serverNow === "number" ? b.session.serverNow - Date.now() : 0; b.session.savedAt = Date.now(); VRDB.set("session", { s: b.session, day: localDay(), at: Date.now() }).catch(function() {}); } } catch (e) {}   // 3.19.2
         var page = composePage(r.tpl, (function() { try { var b = JSON.parse(r.boot); return b && b.session ? JSON.stringify(b.session) : null; } catch (e) { return null; } })());
         // the server's copy takes over unless you have started using the saved one, or saves made on the phone are still on their way (the phone is ahead).
@@ -591,11 +594,10 @@
       if (!pendingGo) return;
       var tab = pendingGo, ref = pendingRef, gen = appGen; pendingGo = null; pendingRef = null;
       var go = lastGo = { tab: tab, at: Date.now(), ref: ref, sent: false };
-      setTimeout(function() {
-        if (gen !== appGen || appSource !== src) return;   // review (6 Nov): the page was replaced meanwhile: directShow handed the link to the new one
-        go.sent = true;
-        try { src.postMessage(typeof ref === "string" ? { type: "VR_GOTO", tab: tab, ref: ref } : { type: "VR_GOTO", tab: tab }, appOrigin); } catch (e) {}
-      }, 700);   // ref (4.6.10): from a tapped reminder ("" when it names several verses)
+      // (owner, 23 Nov) at once, while the opening screen still covers the page (sent 0.7 s later, the last tab showed and then jumped to Learn)
+      if (gen !== appGen || appSource !== src) return;   // review (6 Nov): the page was replaced meanwhile: directShow handed the link to the new one
+      go.sent = true;
+      try { src.postMessage(typeof ref === "string" ? { type: "VR_GOTO", tab: tab, ref: ref } : { type: "VR_GOTO", tab: tab }, appOrigin); } catch (e) {}   // ref (4.6.10): from a tapped reminder ("" when it names several verses)
     }
     // No icon badge: clear any leftover one when the app opens or comes back.
     function clearIconBadge() { try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) {} }
@@ -616,7 +618,8 @@
     // Keep the screen awake on the New tab (the app on its New tab). The lock lives here in the top page (the app page asks with VR_WAKE).
     // It is let go after 10 minutes with no touches, and asked for again on the next one.
     var wakeApp = false, wakeLock = null, wakePending = false, wakeIdleAt = 0, wakeTimer = null;
-    var WAKE_IDLE_MS = 10 * 60 * 1000;
+    var WAKE_IDLE_MS = 10 * 60 * 1000;   // (owner, 23 Nov) the app page now says how long (wakeMs): 20 minutes on a Learn card, 10 anywhere else
+    var wakeMs = WAKE_IDLE_MS;
     // 3.4.1: what happened to the lock, for the status panel's "Screen awake" row: held, refused by the phone, let go by the phone while the page was
     // showing, and the app saying the New tab is (or is not) showing. The last 10 events are kept (vr_wake) so they survive a reload.
     var wakeHeldAt = 0, wakeMsgAt = 0, wakeEv = [];
@@ -628,9 +631,9 @@
     }
     function wakeInfo() {
       return { sup: !!(navigator.wakeLock && navigator.wakeLock.request), held: !!wakeLock, since: wakeHeldAt, pend: wakePending, app: wakeApp,
-        msg: wakeMsgAt, idle: Date.now() - wakeIdleAt >= WAKE_IDLE_MS, ev: wakeEv.slice(-6), retry: wakeTries, db: dbInfo };   // 3.8: db rides along (asked for when Details opens)
+        msg: wakeMsgAt, idle: Date.now() - wakeIdleAt >= wakeMs, ev: wakeEv.slice(-6), retry: wakeTries, db: dbInfo };   // 3.8: db rides along (asked for when Details opens)
     }
-    function wakeWanted() { return wakeApp && !document.hidden && Date.now() - wakeIdleAt < WAKE_IDLE_MS; }
+    function wakeWanted() { return wakeApp && !document.hidden && Date.now() - wakeIdleAt < wakeMs; }
     function wakeRelease() {
       var l = wakeLock; wakeLock = null;
       if (l) { try { l.release(); } catch (e) {} }
@@ -668,7 +671,7 @@
     function wakeTouch() {
       wakeIdleAt = Date.now();
       clearTimeout(wakeTimer);
-      wakeTimer = setTimeout(wakeSync, WAKE_IDLE_MS + 1000);
+      wakeTimer = setTimeout(wakeSync, wakeMs + 1000);
       wakeSync();
     }
     document.addEventListener("visibilitychange", function() { wakeSync(); });   // review (6 Nov): through the name, so the iPhone glue's wrap (native keep-awake) runs too
@@ -723,6 +726,7 @@
         wakeMsgAt = Date.now();
         if ((d.on === true) !== wakeApp) wakeNote(d.on === true ? "new" : "left");
         wakeApp = d.on === true;
+        if (typeof d.ms === 'number' && d.ms >= 60000 && d.ms <= 3600000) wakeMs = d.ms;
         if (wakeApp) wakeTouch(); else wakeSync();
         return;
       }
@@ -765,8 +769,8 @@
         saveOutbox(d.items);
       } else if (d.type === 'VR_READY') {
         appFrameReady = e.source; keyDeclined = false; hideLoadFail(); sendFresh(); sendNewer();
+        sendReplay(e.source);   // (the Learn presses kept here first, so the tab opens on the card as it now stands)
         sendGoto(e.source);
-        sendReplay(e.source);
         try { e.source.postMessage(shellInfo(noteVersion(d.build, d.srv)), appOrigin); } catch (err) {}
         dismissSplash();
       } else if (d.type === 'VR_AUTH_REQUIRED') {
