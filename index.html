@@ -267,8 +267,8 @@
       if (!prev || typeof prev !== "object" || (prev.b === now.b && prev.s === now.s)) return null;
       return { build: now.b, srv: now.s };
     }
-    var SHELL_VERSION = "3.5.25";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
-    var SHELL_BUILD = "shell-71";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
+    var SHELL_VERSION = "3.5.26";   // 3.5.1: the app version this page last changed in (the same numbers as the app; set at /publish when this page changes)
+    var SHELL_BUILD = "shell-72";   // this home-screen page's own number, shown in the status panel (an older copy cached on the phone has none)
     function shellInfo(updated) {
       var first = 0, key = false, works = false;
       try { first = Number(localStorage.getItem("vr_first")) || 0; key = !!localStorage.getItem("vr_key"); works = true; } catch (e) {}
@@ -388,7 +388,7 @@
           // copy that is out of step right; one fetched earlier (while What's new was up) or with saves waiting uses the phone's own saved day
           if (pf.fresh && !pend) { try { var b = JSON.parse(r.boot); bs = b && b.session ? b.session : null; } catch (e) {} }
           if (bs) {
-            bs.skew = typeof bs.serverNow === "number" ? bs.serverNow - Date.now() : 0; bs.savedAt = Date.now();
+            bs.skew = typeof bs.serverNow === "number" ? bs.serverNow - (pf.at || Date.now()) : 0; bs.savedAt = Date.now();   // (owner, 23 Nov) from when Google answered (the swap can wait, the phone locked meanwhile)
             VRDB.set("session", { s: bs, day: localDay(), at: Date.now() }).catch(function() {});
             directShow(composePage(r.tpl, JSON.stringify(bs)));
           } else directShow(phonePage(r.tpl, ss, x[1]).page);
